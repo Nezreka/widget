@@ -1,76 +1,114 @@
-# Project: Investigation of Widget-Based Websites with Central Stores
+# Customizable Widget Dashboard
 
-## 1. Project Overview
+## 🚀 Overview
 
-This project was initiated to identify and categorize websites or platforms that offer a collection of widgets, often featuring a central store, gallery, or marketplace for users to discover and add new widgets. The goal was to understand the landscape of such services.
+This project is a dynamic, grid-based dashboard application built with Next.js and React. It allows users to arrange and interact with various widgets on a customizable grid. The dashboard features a sleek, dark-themed UI with a particle background and provides a foundation for a highly personalized user experience.
 
-## 2. User Query
+## ✨ Current Features
 
-The investigation was prompted by the user query: "is there a website that acts like a bunch of widgets with a central store of widgets"
+* **Grid-Based Layout:** Widgets are placed on a responsive grid that adapts to screen size.
+* **Widget Management:**
+    * **Move & Resize:** Widgets can be freely moved and resized by the user.
+    * **Minimize/Maximize:** Widgets can be minimized to save space or maximized for a focused view.
+    * **Delete:** Widgets can be removed from the dashboard.
+    * **Focus:** Active widget is highlighted.
+* **Settings Modal:** A generic modal system for configuring individual widget settings.
+* **Undo/Redo:** Functionality to undo and redo widget layout changes (move, resize, delete, settings changes).
+* **Persistent State (Conceptual):** The current architecture supports saving widget states to history, laying groundwork for future `localStorage` or backend persistence.
+* **Available Widgets:**
+    * **Weather Widget:** Displays current weather and hourly forecast for a specified location (supports manual entry or geolocation). Customizable units (Imperial/Metric).
+    * **Clock Widget:**
+        * **Analog Mode:** Classic analog clock face with hour, minute, and optional second hands.
+        * **Digital Mode:** Digital time display with 12/24 hour format and optional seconds.
+    * **Calculator Widget:** A functional calculator for basic arithmetic operations.
+    * **ToDo Widget (Placeholder):** Basic structure for a to-do list.
+* **Aesthetic UI:**
+    * Dark theme with CSS variables for easy theming.
+    * Dynamic particle background (`GridBackground.tsx`).
+    * Tailwind CSS for styling.
 
-## 3. Methodology
+## 💻 Tech Stack
 
-To address the query, the following steps were taken:
+* **Framework:** Next.js (App Router)
+* **Language:** TypeScript
+* **Styling:** Tailwind CSS, CSS Variables
+* **State Management:** React Hooks (`useState`, `useEffect`, `useCallback`, `useRef`)
+* **Core UI:** React
 
-1.  **Initial Analysis:** The query was analyzed to understand the core requirements:
-    * Website or platform.
-    * Functionality based on "a bunch of widgets."
-    * A "central store" or similar mechanism for accessing/adding widgets.
-2.  **Information Gathering:** The `google_search` tool was employed with targeted search queries, including:
-    * "websites with widget stores"
-    * "customizable start pages with widget marketplaces"
-    * "dashboard websites with widget galleries"
-    * "platforms offering collections of embeddable widgets and a central store"
-3.  **Data Synthesis:** The search results were reviewed and synthesized to identify relevant platforms and services.
-4.  **Categorization:** The identified platforms were grouped into logical categories based on their primary use case and target audience.
+## 🛠️ Getting Started
 
-## 4. Key Findings
+This is a Next.js project.
 
-The investigation confirmed the existence of various platforms and websites that match the user's description. These can be broadly classified into two main categories:
+1.  **Clone the repository (if applicable):**
+    ```bash
+    git clone <your-repository-url>
+    cd <project-directory>
+    ```
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    # or
+    yarn install
+    # or
+    pnpm install
+    ```
+3.  **Set up Environment Variables:**
+    * Create a `.env.local` file in the root of your project.
+    * Add your Tomorrow.io API key for the Weather Widget:
+        ```
+        NEXT_PUBLIC_TOMORROW_API_KEY=your_api_key_here
+        ```
+4.  **Run the development server:**
+    ```bash
+    npm run dev
+    # or
+    yarn dev
+    # or
+    pnpm dev
+    ```
+    Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-### Category A: Personal Customizable Start Pages and Dashboards
+## 🔮 Future Ideas & Enhancements
 
-These platforms allow users to create personalized homepages or dashboards composed of various widgets. They typically feature a selection of widgets that users can add, remove, and arrange.
+We have many exciting ideas to expand the dashboard's capabilities:
 
-* **Examples Found:**
-    * Netvibes
-    * Protopage
-    * igHome
-    * Start.me
-    * My Yahoo
-* **Common Features:**
-    * Drag-and-drop interface.
-    * Widgets for news (RSS), social media, email, weather, calendars, notes, etc.
-    * A gallery or list of available widgets.
+* **Dynamic Widget Loading:**
+    * Implement a "+" button or a widget palette.
+    * Allow users to select and add new widgets to the dashboard dynamically.
+    * Widgets define their own default sizes.
+* **Widget Discovery & Search:**
+    * Search for widgets by name.
+    * Filter widgets by categories (e.g., "Productivity", "Educational", "Entertainment").
+* **Auto-Placement Algorithm:** Intelligently place newly added widgets in available grid space.
+* **More Widgets:**
+    * Notes/Scratchpad
+    * Calendar
+    * News Feed (RSS)
+    * Countdown Timer
+    * Stock Ticker / Crypto Tracker
+* **Advanced Clock Widget Features:**
+    * Customizable analog clock faces (numerals, hand styles, colors).
+    * Selectable fonts for digital display.
+    * Date display options.
+    * Timezone selection.
+* **Persistence:**
+    * Save dashboard layout and widget settings to `localStorage`.
+    * (Further Future) User accounts and cloud-based persistence.
+* **Theming:** More advanced theming options for the dashboard and widgets.
+* **Accessibility Improvements:** Continuously review and enhance accessibility.
 
-### Category B: Platforms Offering Embeddable Widgets with a Central Gallery/Marketplace
+## 📁 Project Structure (Key Components)
 
-These services cater primarily to website owners, developers, or businesses, providing a collection of widgets that can be embedded into existing websites or digital platforms. They usually have a central "store," "gallery," or "marketplace" to browse and select widgets.
-
-* **Examples Found:**
-    * Elfsight
-    * CommonNinja
-    * Curator.io (focus on social media aggregation)
-    * EmbedSocial (focus on UGC widgets)
-    * Framer Marketplace (components and templates, some widget-like)
-    * MagicINFO Widget Marketplace (specialized for digital signage)
-    * HighLevel Web Widget Marketplace (for funnels and websites built on their platform)
-* **Common Features:**
-    * A library of pre-built widgets.
-    * Customization options for appearance and functionality.
-    * Embed codes (e.g., HTML, JavaScript) for easy integration.
-
-## 5. Conclusion of Initial Investigation
-
-Websites and platforms offering widget-based functionality with central stores or galleries are prevalent. The specific choice of platform depends on the user's needs:
-* For **personal organization and information aggregation**, customizable start pages/dashboards are suitable.
-* For **enhancing existing websites with specific functionalities**, platforms offering embeddable widgets are the appropriate choice.
-
-## 6. Potential Next Steps (If Applicable)
-
-* Deeper dive into the specific features and pricing models of selected platforms.
-* Evaluation of user experience and ease of use for top contenders in each category.
-* Investigation into the technical aspects of widget creation and integration for platforms that support custom widget development.
+* `src/app/page.tsx`: The main entry point for the dashboard, manages overall layout, widget state, and interactions.
+* `src/components/`: Contains reusable UI components and individual widget components.
+    * `Widget.tsx`: The generic wrapper for all widgets, handling move, resize, minimize, maximize, delete, and settings controls.
+    * `GridBackground.tsx`: Renders the animated particle background.
+    * `SettingsModal.tsx`: Provides the modal UI for widget settings.
+    * `WeatherWidget.tsx`: Logic and UI for the weather widget.
+    * `ClockWidget.tsx`: Logic and UI for the analog and digital clock widget.
+    * `CalculatorWidget.tsx`: Logic and UI for the calculator widget.
+* `src/app/globals.css`: Global styles and Tailwind CSS setup, including CSS variables for theming.
 
 ---
-*This README was generated on May 16, 2025, based on the information gathered up to this point.*
+
+This README provides a good overview. Feel free to expand on any section as the project grows!
