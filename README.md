@@ -14,7 +14,6 @@ This project is a dynamic, grid-based dashboard application built with Next.js a
     * **Focus:** Active widget is highlighted.
 * **Settings Modal:** A generic modal system for configuring individual widget settings.
 * **Undo/Redo:** Functionality to undo and redo widget layout changes (move, resize, delete, settings changes).
-* **Persistent State (Conceptual):** The current architecture supports saving widget states to history, laying groundwork for future `localStorage` or backend persistence.
 * **Available Widgets:**
     * **Weather Widget:** Displays current weather and hourly forecast for a specified location (supports manual entry or geolocation). Customizable units (Imperial/Metric).
     * **Clock Widget:**
@@ -72,14 +71,17 @@ This is a Next.js project.
 
 We have many exciting ideas to expand the dashboard's capabilities:
 
-* **Dynamic Widget Loading:**
-    * Implement a "+" button or a widget palette.
+* **Dynamic Widget Loading & Management:**
+    * Implement a "+" button or a widget palette for adding new widgets.
     * Allow users to select and add new widgets to the dashboard dynamically.
     * Widgets define their own default sizes.
-* **Widget Discovery & Search:**
-    * Search for widgets by name.
-    * Filter widgets by categories (e.g., "Productivity", "Educational", "Entertainment").
-* **Auto-Placement Algorithm:** Intelligently place newly added widgets in available grid space.
+    * **Widget Discovery & Search:**
+        * Search for widgets by name.
+        * Filter widgets by categories (e.g., "Productivity", "Educational", "Entertainment").
+    * **Auto-Placement Algorithm:** Intelligently place newly added widgets in available grid space.
+* **Client-Side Persistence & Portability:**
+    * **Local Storage:** Automatically save the current dashboard layout (widgets, positions, sizes, settings) to the browser's `localStorage` to persist changes between sessions.
+    * **Export/Import Layout:** Allow users to export their entire dashboard configuration as a JSON file (a "blob"). This file can be saved, shared, or used to import the layout onto another computer or browser.
 * **More Widgets:**
     * Notes/Scratchpad
     * Calendar
@@ -91,9 +93,6 @@ We have many exciting ideas to expand the dashboard's capabilities:
     * Selectable fonts for digital display.
     * Date display options.
     * Timezone selection.
-* **Persistence:**
-    * Save dashboard layout and widget settings to `localStorage`.
-    * (Further Future) User accounts and cloud-based persistence.
 * **Theming:** More advanced theming options for the dashboard and widgets.
 * **Accessibility Improvements:** Continuously review and enhance accessibility.
 
