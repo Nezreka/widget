@@ -1,0 +1,56 @@
+Initial functionality ready -
+
+Here's the proposed action plan:
+
+File: src/app/page.tsx
+
+    Define a LocalStorage Key:
+        At the top of the file (or in your constants section), define a constant for the localStorage key. This makes it easy to change if needed and avoids typos.
+        Example: const LOCAL_STORAGE_KEY = 'dashboardLayout';
+
+    Modify Initial State Loading for widgets and history:
+        The widgets state is currently initialized with initialWidgets. We need to change this to load from localStorage on the client-side after the initial render.
+        Initial useState: Keep useState<PageWidgetConfig[]>(() => JSON.parse(JSON.stringify(initialWidgets))) for widgets and the corresponding history initialization. This ensures SSR compatibility and provides a default.
+        New useEffect for Loading (Client-Side Only):
+            Create a useEffect hook that runs only once on component mount (useEffect(() => { ... }, [])).
+            Inside this effect:
+                Check if window is defined (to ensure client-side).
+                Attempt to retrieve the saved layout from localStorage using LOCAL_STORAGE_KEY.
+                If data is found:
+                    Use a try-catch block to parse the JSON string (JSON.parse(savedLayoutJSON)).
+                    If parsing is successful and it's a valid array, update the widgets state with this loaded data (setWidgets(loadedWidgets)).
+                    Crucially, also reset the history state to start with this loaded layout: setHistory([JSON.parse(JSON.stringify(loadedWidgets))]) and setHistoryPointer(0).
+                If no data is found or parsing fails, the component will continue using the initialWidgets (or whatever widgets was already set to). We can log an error in case of parsing failure.
+
+    Implement Saving to localStorage:
+        New useEffect for Saving:
+            Create another useEffect hook that depends on the widgets state (useEffect(() => { ... }, [widgets])).
+            Inside this effect:
+                Check if window is defined.
+                To prevent saving the initialWidgets state immediately on first load before attempting to load from localStorage, we can use a useRef to track if the initial load attempt has completed. For example, const initialLoadAttempted = useRef(false);. Only save if initialLoadAttempted.current is true.
+                Set initialLoadAttempted.current = true; in the loading useEffect after the attempt.
+                Serialize the current widgets state to a JSON string (JSON.stringify(widgets)).
+                Save this string to localStorage using LOCAL_STORAGE_KEY.
+                Include basic error handling for localStorage.setItem (e.g., if storage is full, though less common for this amount of data).
+
+    Review updateWidgetsAndPushToHistory:
+        This function already updates the widgets state and the history state.
+        The useEffect hook created in step 3 (which listens to widgets changes) will automatically handle saving the updated widgets array to localStorage. No direct localStorage.setItem call is needed inside updateWidgetsAndPushToHistory itself.
+
+Summary of Changes in page.tsx:
+
+    Add LOCAL_STORAGE_KEY constant.
+    Add a useEffect for one-time loading from localStorage on mount, which also resets history if data is loaded.
+    Add a useRef to track if the initial load has been attempted.
+    Add a useEffect for saving to localStorage whenever widgets changes (and after the initial load attempt).
+
+This plan ensures that:
+
+    The app attempts to load a saved layout when it starts.
+    Any changes to the layout are automatically saved.
+    The undo/redo history correctly reflects the state, whether it's loaded from storage or started fresh.
+    SSR compatibility is maintained by interacting with localStorage only on the client side.
+
+
+We will take this one step at at a time, for each finished task, mark it completed in this file.
+
