@@ -1,26 +1,85 @@
 @import "tailwindcss";
 
 :root {
+  /* Base light theme (can be expanded later if needed) */
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #111827; /* gray-900 */
+  --surface: #ffffff;
+  /* --grid-line: #e5e7eb; /* gray-200 - Less relevant with canvas */
+  --accent-primary: #4f46e5; /* indigo-600 */
+  --text-primary: #111827; /* gray-900 */
+  --text-secondary: #6b7280; /* gray-500 */
+  --text-on-accent: #ffffff;
+
+  /* Dark theme variables */
+  --dark-background-start: hsl(222, 50%, 5%); 
+  --dark-background-mid: hsl(240, 50%, 8%);   
+  --dark-background-end: hsl(222, 50%, 5%);   
+  
+  --dark-foreground: hsl(210, 40%, 96%); 
+  --dark-surface: hsl(222, 47%, 11%); 
+  
+  /* Particle/Canvas Colors (NEW) */
+  --particle-color: hsla(190, 100%, 70%, 0.7); /* Bright cyan/blue for particles */
+  --particle-highlight-color: hsla(190, 100%, 90%, 0.9); /* Brighter for mouse interaction */
+  --line-color: hsla(210, 80%, 50%, 0.2); /* Fainter blue for lines */
+  --line-highlight-color: hsla(190, 80%, 60%, 0.5); /* Brighter blue for lines near mouse */
+
+
+  --dark-accent-primary: hsl(245, 70%, 65%); 
+  --dark-accent-primary-hover: hsl(245, 70%, 75%);
+  --dark-text-primary: hsl(210, 40%, 96%); 
+  --dark-text-secondary: hsl(215, 20%, 65%); 
+  --dark-text-on-accent: hsl(0, 0%, 100%);
+  --dark-border-interactive: hsl(222, 47%, 30%);
+  --dark-border-interactive-active: hsl(245, 70%, 65%);
+
+  /* Mouse Glow Variables for canvas (can be used to influence particle behavior) */
+  --mouse-x: 50%; /* Will be updated by JS */
+  --mouse-y: 50%; /* Will be updated by JS */
+  --mouse-interaction-radius: 150px; /* Radius for mouse interaction with particles */
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Keyframes for the main background gradient animation - kept for depth */
+@keyframes animateCosmicBackground {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: linear-gradient(135deg, 
+    var(--dark-background-start), 
+    var(--dark-background-mid), 
+    var(--dark-background-end)
+  );
+  background-size: 400% 400%; 
+  animation: animateCosmicBackground 45s ease infinite;
+  color: var(--dark-foreground);
+  font-family: 'Inter', Arial, Helvetica, sans-serif;
+  overflow: hidden; /* Important to prevent scrollbars if canvas is slightly off */
 }
+
+/* Helper classes */
+.text-page-foreground { color: var(--dark-foreground); }
+.bg-widget { background-color: var(--dark-surface); }
+.border-widget { border-color: var(--dark-border-interactive); }
+.border-widget-active { border-color: var(--dark-border-interactive-active); }
+.text-primary { color: var(--dark-text-primary); }
+.text-secondary { color: var(--dark-text-secondary); }
+.bg-accent-primary { background-color: var(--dark-accent-primary); }
+.hover\:bg-accent-primary-hover:hover { background-color: var(--dark-accent-primary-hover); }
+.text-on-accent { color: var(--dark-text-on-accent); }
+
+/* Modal Animation */
+@keyframes modalFadeInScale {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+.animate-modalFadeInScale { animation: modalFadeInScale 0.3s ease-out forwards; }
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--dark-surface); border-radius: 10px; }
+::-webkit-scrollbar-thumb { background: hsl(222, 30%, 20%); border-radius: 10px; } /* Using a static color */
+::-webkit-scrollbar-thumb:hover { background: var(--dark-accent-primary); }
