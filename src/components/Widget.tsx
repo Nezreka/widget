@@ -80,10 +80,12 @@ const Widget: React.FC<WidgetProps> = ({
   const [currentResizeDirection, setCurrentResizeDirection] = useState<ResizeDirection>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [visualDragOffset, setVisualDragOffset] = useState({ x: 0, y: 0 });
+  const [isHovered, setIsHovered] = useState(false); // New state for hover
 
   const dragStartMousePos = useRef({ x: 0, y: 0 });
   const resizeStartGeometry = useRef({ initialColStart: 0, initialRowStart: 0, initialColSpan: 0, initialRowSpan: 0 });
   const latestResizeGeometry = useRef<WidgetResizeDataType | null>(null);
+  const titleBarRef = useRef<HTMLDivElement>(null); // Ref for the title bar
 
   const baseShadowStyle = '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05)';
   const liftedShadowStyle = '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)';
@@ -94,7 +96,7 @@ const Widget: React.FC<WidgetProps> = ({
       return {
         position: 'fixed', top: '5vh', left: '5vw', width: '90vw', height: '90vh',
         zIndex: 50, boxShadow: maximizedShadowStyle,
-        transition: 'opacity 0.3s ease-in-out, transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out',
+        // Transitions for maximized state are handled by Tailwind classes on the main div
       };
     }
     return {
@@ -103,9 +105,7 @@ const Widget: React.FC<WidgetProps> = ({
       zIndex: isActive ? 30 : (isResizing || isDragging ? 20 : 10),
       position: 'relative',
       transform: isDragging ? `translate(${visualDragOffset.x}px, ${visualDragOffset.y}px)` : 'none',
-      opacity: isDragging ? 0.80 : 1,
-      transition: isDragging ? 'box-shadow 0.2s ease-out' : 'opacity 0.3s ease-in-out, box-shadow 0.3s ease-in-out, grid-column-start 0.3s ease, grid-row-start 0.3s ease, grid-column-end 0.3s ease, grid-row-end 0.3s ease',
-      boxShadow: isActive || isDragging || isResizing ? liftedShadowStyle : baseShadowStyle,
+      // Opacity and shadow transitions handled by Tailwind
     };
   };
   const widgetStyle = getWidgetStyle();
@@ -163,7 +163,7 @@ const Widget: React.FC<WidgetProps> = ({
 
   const handleMouseDownOnDrag = (e: React.MouseEvent<HTMLElement>) => {
     if ((e.target as HTMLElement).closest('.widget-control-button, .widget-resize-handle') || isMaximized) return;
-    if (e.button !== 0) return;
+    if (e.button !== 0) return; // Only allow left-click to drag
     if (onFocus) onFocus(id);
     e.preventDefault(); e.stopPropagation();
     setIsDragging(true); dragStartMousePos.current = { x: e.clientX, y: e.clientY };
@@ -188,7 +188,7 @@ const Widget: React.FC<WidgetProps> = ({
             if (onMove) onMove(id, { colStart: newColStart, rowStart: newRowStart });
         }
         setIsDragging(false); setVisualDragOffset({ x: 0, y: 0 });
-      } else if (isDragging && isMaximized) {
+      } else if (isDragging && isMaximized) { // Handle case where dragging might have started before maximizing
         setIsDragging(false); setVisualDragOffset({ x: 0, y: 0 });
       }
     };
@@ -202,35 +202,59 @@ const Widget: React.FC<WidgetProps> = ({
   const handleMaximizeToggleClick = (e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); if (onMaximizeToggle) onMaximizeToggle(id); };
   
   const handleWidgetClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Prevent focus change if a button or resize handle inside the widget was clicked
     if ((e.target as HTMLElement).closest('button, .widget-resize-handle')) return;
     if (onFocus && !isMaximized) onFocus(id);
   };
   
   const controlButtonClass = "widget-control-button p-0.5 rounded-full text-slate-400 hover:text-blue-600 hover:bg-blue-100 dark:text-slate-500 dark:hover:text-blue-400 dark:hover:bg-slate-700 focus:outline-none transition-colors";
   
-  // --- Constants for resize handle visuals ---
-  const visualEdgeHandleLength = '2rem'; // e.g., 32px, Tailwind: w-8
-  const visualSideHandleLength = '2rem'; // e.g., 32px, Tailwind: h-8
-  const visualCueThickness = '0.25rem';  // e.g., 4px, Tailwind: h-1 or w-1
-  const resizeHandleMarkerClass = "widget-resize-handle"; // For easy selection if needed
+  const visualEdgeHandleLength = '2rem'; 
+  const visualSideHandleLength = '2rem'; 
+  const visualCueThickness = '0.25rem';  
+  const resizeHandleMarkerClass = "widget-resize-handle";
+
+  // Determine title bar visibility based on hover, active, and minimized states
+  const titleBarActuallyVisible = isMinimized || isActive || isHovered;
+  // Determine if background should be solid or transparent
+  const showSolidBackground = isMinimized || isActive || isHovered || isResizing || isDragging;
+
 
   return (
     <div
       id={id}
       style={widgetStyle}
       className={`
-        bg-widget dark:bg-dark-surface 
         border
-        ${isActive && !isMaximized ? 'border-blue-500 dark:border-blue-400' : 'border-slate-300 dark:border-slate-700'}
+        ${(isActive && !isMaximized) ? 'border-blue-500 dark:border-blue-400' : 'border-slate-300 dark:border-slate-700'}
         ${isMaximized ? 'rounded-xl' : 'rounded-lg'} 
         flex flex-col overflow-hidden box-border group
         ${isMaximized ? '' : 'pointer-events-auto'} 
+        ${showSolidBackground ? 'bg-widget dark:bg-dark-surface' : 'bg-transparent'}
+        ${isDragging ? 'opacity-80' : 'opacity-100'}
+        ${isMaximized ? 
+            'transition-all duration-300 ease-in-out' : 
+            'transition-[opacity,box-shadow,grid-column-start,grid-row-start,grid-column-end,grid-row-end,background-color] duration-300 ease-in-out'
+        }
+        shadow-[${isActive || isDragging || isResizing ? liftedShadowStyle : baseShadowStyle}]
+        ${isMaximized && `shadow-[${maximizedShadowStyle}]`}
       `}
       onClick={handleWidgetClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       <div 
+        ref={titleBarRef}
         onMouseDown={!isMaximized ? handleMouseDownOnDrag : undefined}
-        className={`flex justify-between items-center px-3 py-2 ${title ? 'border-b border-slate-200 dark:border-slate-700' : ''} ${!isMaximized && onMove ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
+        className={`
+          flex justify-between items-center px-3
+          ${!isMaximized && onMove ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''}
+          transition-all duration-300 ease-in-out overflow-hidden
+          ${titleBarActuallyVisible 
+            ? `py-2 opacity-100 max-h-20 ${title ? 'border-b border-slate-200 dark:border-slate-700' : ''}`
+            : `py-0 opacity-0 max-h-0 ${title ? 'border-b border-transparent' : ''}`
+          }
+        `}
       >
         {title && (
           <h2 className="text-sm font-semibold text-primary truncate select-none flex-grow">
@@ -265,19 +289,23 @@ const Widget: React.FC<WidgetProps> = ({
         text-primary flex-grow overflow-auto min-h-0 select-none 
         ${isMinimized ? 'hidden' : 'block'}
         ${isMaximized ? 'p-4 text-sm' : 'px-3.5 py-3 text-sm'} 
+        transition-opacity duration-300 ease-in-out 
+        ${titleBarActuallyVisible || isMinimized ? 'opacity-100' : (isActive || isHovered ? 'opacity-100' : 'opacity-100')} 
+        // Content opacity can be always 100, or also fade if desired. Current request implies only title and bg change.
       `}>
         {children ? children : <p className="text-xs text-secondary italic">Widget content goes here.</p>}
       </div>
 
+      {/* Resize Handles: Conditionally rendered if not minimized or maximized and onResize is provided */}
       {!isMinimized && !isMaximized && onResize && (
         <>
-          {/* Corner Handles */}
+          {/* Corner Handles: Appear on group-hover (when mouse is over the widget) */}
           <div onMouseDown={(e) => handleMouseDownOnResize(e, 'top-left')} className={`${resizeHandleMarkerClass} absolute -top-1 -left-1 w-4 h-4 cursor-nwse-resize z-30 rounded-full hover:bg-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-150`} style={{ touchAction: 'none' }} />
           <div onMouseDown={(e) => handleMouseDownOnResize(e, 'top-right')} className={`${resizeHandleMarkerClass} absolute -top-1 -right-1 w-4 h-4 cursor-nesw-resize z-30 rounded-full hover:bg-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-150`} style={{ touchAction: 'none' }} />
           <div onMouseDown={(e) => handleMouseDownOnResize(e, 'bottom-left')} className={`${resizeHandleMarkerClass} absolute -bottom-1 -left-1 w-4 h-4 cursor-nesw-resize z-30 rounded-full hover:bg-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-150`} style={{ touchAction: 'none' }} />
           <div onMouseDown={(e) => handleMouseDownOnResize(e, 'bottom-right')} className={`${resizeHandleMarkerClass} absolute -bottom-1 -right-1 w-4 h-4 cursor-nwse-resize z-30 rounded-full hover:bg-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-150`} style={{ touchAction: 'none' }} />
           
-          {/* Edge Handles - WITH VISUAL CUES RESTORED */}
+          {/* Edge Handles with Visual Cues: Appear on group-hover */}
           <div onMouseDown={(e) => handleMouseDownOnResize(e, 'top')}
                className={`${resizeHandleMarkerClass} absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1/3 h-3 cursor-ns-resize z-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150`}
                style={{ touchAction: 'none' }} >

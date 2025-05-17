@@ -12,9 +12,9 @@
   --text-on-accent: #ffffff;
 
   /* Dark theme variables */
-  --dark-background-start: hsl(222, 50%, 5%); 
-  --dark-background-mid: hsl(240, 50%, 8%);   
-  --dark-background-end: hsl(222, 50%, 5%);   
+  --dark-background-start: hsl(222, 50%, 2%); /* Was 5% */
+  --dark-background-mid: hsl(240, 50%, 3%);  /* Was 8% */
+  --dark-background-end: hsl(222, 50%, 2%);   /* Was 5% */
   
   --dark-foreground: hsl(210, 40%, 96%); 
   --dark-surface: hsl(222, 47%, 11%); 
