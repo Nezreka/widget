@@ -8,9 +8,10 @@ import SettingsModal from '@/components/SettingsModal';
 import WeatherWidget, { WeatherSettingsPanel, WeatherWidgetSettings } from "@/components/WeatherWidget";
 import ClockWidget, { ClockSettingsPanel, ClockWidgetSettings } from "@/components/ClockWidget";
 import CalculatorWidget, { CalculatorSettingsPanel, CalculatorWidgetSettings } from "@/components/CalculatorWidget";
+import YoutubeWidget, { YoutubeSettingsPanel, YoutubeWidgetSettings } from "@/components/YoutubeWidget"; // Added YoutubeWidget
 
-import NotesWidget, { 
-    NotesSettingsPanel, 
+import NotesWidget, {
+    NotesSettingsPanel,
     NotesWidgetSettings as PageInstanceNotesSettings,
     Note
 } from "@/components/NotesWidget";
@@ -30,19 +31,26 @@ const ClockIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" view
 const CalculatorIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2 text-green-400"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 15.75V18m-7.5-6.75h.008v.008H8.25v-.008zm0 2.25h.008v.008H8.25V13.5zm0 2.25h.008v.008H8.25v-.008zm0 2.25h.008v.008H8.25V18zm2.498-6.75h.007v.008h-.007v-.008zm0 2.25h.007v.008h-.007V13.5zm0 2.25h.007v.008h-.007v-.008zm0 2.25h.007v.008h-.007V18zm2.504-6.75h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V13.5zm0 2.25h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V18zm2.498-6.75h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V13.5zM9 7.5h6m2.25 0V21H5.25V7.5M3 12h18M3 12a9 9 0 0018 0M3 12a9 9 0 0118 0m0 0V6a3 3 0 00-3-3H6a3 3 0 00-3 3v6c0 1.291.398 2.507 1.074 3.508M17.25 12V6" /></svg>;
 const TodoIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2 text-yellow-400"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
 const NotesIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2 text-indigo-400"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>;
+const YoutubeIcon = () => ( // Simple YouTube-like play button icon
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2 text-red-500">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15.91 11.672a.375.375 0 010 .656l-5.603 3.113A.375.375 0 019.75 15.113V8.887c0-.286.307-.466.557-.328l5.603 3.113z" />
+    </svg>
+);
+
 
 // --- Constants ---
 const CELL_SIZE = 30;
 const MAX_HISTORY_LENGTH = 50;
 const MINIMIZED_WIDGET_ROW_SPAN = 2;
-const DASHBOARD_LAYOUT_STORAGE_KEY = 'dashboardLayoutV3.1'; // Updated version
+const DASHBOARD_LAYOUT_STORAGE_KEY = 'dashboardLayoutV3.2'; // Updated version for YouTube widget
 const GLOBAL_NOTES_STORAGE_KEY = 'dashboardGlobalNotesCollection_v1';
-const GLOBAL_TODOS_STORAGE_KEY = 'dashboardGlobalSingleTodoList_v1'; // Key for the single global todo list
+const GLOBAL_TODOS_STORAGE_KEY = 'dashboardGlobalSingleTodoList_v1';
 const DATA_SAVE_DEBOUNCE_MS = 700;
 
 // --- Interfaces ---
-export type AllWidgetSettings = WeatherWidgetSettings | TodoWidgetSettings | ClockWidgetSettings | CalculatorWidgetSettings | PageInstanceNotesSettings | Record<string, any>;
-export type WidgetType = 'weather' | 'todo' | 'clock' | 'calculator' | 'notes' | 'generic';
+export type AllWidgetSettings = WeatherWidgetSettings | TodoWidgetSettings | ClockWidgetSettings | CalculatorWidgetSettings | PageInstanceNotesSettings | YoutubeWidgetSettings | Record<string, any>; // Added YoutubeWidgetSettings
+export type WidgetType = 'weather' | 'todo' | 'clock' | 'calculator' | 'notes' | 'youtube' | 'generic'; // Added 'youtube'
 
 export interface PageWidgetConfig {
   id: string;
@@ -61,8 +69,6 @@ interface NotesCollectionStorage {
     notes: Note[];
     activeNoteId: string | null;
 }
-
-// TodoItem is imported from TodoWidget.tsx, no need for TodoCollectionsStorage here anymore
 
 interface WidgetBlueprint {
   type: WidgetType;
@@ -83,12 +89,14 @@ const AVAILABLE_WIDGET_DEFINITIONS: WidgetBlueprint[] = [
   { type: 'calculator', defaultTitle: 'New Calculator', displayName: 'Calculator', description: "Perform quick calculations.", icon: CalculatorIcon, defaultColSpan: 12, defaultRowSpan: 18, minColSpan: 4, minRowSpan: 6, defaultSettings: {} },
   { type: 'todo', defaultTitle: 'Global To-Do List', displayName: 'To-Do List', description: "Organize your tasks.", icon: TodoIcon, defaultColSpan: 15, defaultRowSpan: 12, minColSpan: 5, minRowSpan: 6, defaultSettings: { showCompleted: true, sortBy: 'createdAt_desc', defaultFilter: 'all' } },
   { type: 'notes', defaultTitle: 'New Note Pad', displayName: 'Notes', description: "Jot down quick notes and ideas.", icon: NotesIcon, defaultColSpan: 15, defaultRowSpan: 15, minColSpan: 6, minRowSpan: 6, defaultSettings: { fontSize: 'base' } },
+  { type: 'youtube', defaultTitle: 'YouTube Player', displayName: 'YouTube', description: "Embed YouTube to watch videos.", icon: YoutubeIcon, defaultColSpan: 25, defaultRowSpan: 20, minColSpan: 10, minRowSpan: 10, defaultSettings: {} }, // Added YouTube definition
 ];
 
 const initialWidgetsLayout: PageWidgetConfig[] = [
   { "id": "weather-widget-main", "title": "Medford Weather", "type": "weather", "colStart": 3, "rowStart": 3, "colSpan": 10, "rowSpan": 14, "settings": { "location": "97504 US", "units": "imperial", "useCurrentLocation": false }, "isMinimized": false },
   { "id": "notes-widget-default", "title": "My Notes", "type": "notes", "colStart": 14, "rowStart": 3, "colSpan": 15, "rowSpan": 15, "settings": { "fontSize": "base" }, "isMinimized": false },
   { "id": "todo-widget-global", "title": "Shared Tasks", "type": "todo", "colStart": 30, "rowStart": 3, "colSpan": 8, "rowSpan": 10, "settings": { "showCompleted": true, "sortBy": "createdAt_desc", "defaultFilter": "all" }, "isMinimized": false },
+  { "id": "youtube-widget-main", "title": "Watch Videos", "type": "youtube", "colStart": 3, "rowStart": 18, "colSpan": 18, "rowSpan": 20, "settings": {}, "isMinimized": false }, // Added YouTube to initial layout
 ];
 
 export default function Home() {
@@ -96,13 +104,12 @@ export default function Home() {
   const [widgetContainerRows, setWidgetContainerRows] = useState(0);
   const [activeWidgetId, setActiveWidgetId] = useState<string | null>(null);
   const [widgets, setWidgets] = useState<PageWidgetConfig[]>(() => JSON.parse(JSON.stringify(initialWidgetsLayout)));
-  
+
   const [sharedNotes, setSharedNotes] = useState<Note[]>([]);
   const [activeSharedNoteId, setActiveSharedNoteId] = useState<string | null>(null);
   const notesSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // --- Centralized State for a SINGLE Global To-Do List ---
-  const [sharedTodos, setSharedTodos] = useState<TodoItem[]>([]); // Now a single array
+  const [sharedTodos, setSharedTodos] = useState<TodoItem[]>([]);
   const todosSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
 
@@ -128,7 +135,12 @@ export default function Home() {
         if (savedLayoutJSON) {
           const loadedWidgets = JSON.parse(savedLayoutJSON) as PageWidgetConfig[];
           if (Array.isArray(loadedWidgets) && (loadedWidgets.length === 0 || (loadedWidgets[0] && typeof loadedWidgets[0].id === 'string'))) {
-            layoutToUse = loadedWidgets;
+            // Basic validation to ensure it's an array of widgets
+            // More robust validation could check for all required fields or widget types
+            layoutToUse = loadedWidgets.map(w => ({ // Ensure all widgets have default settings if missing
+                ...w,
+                settings: w.settings || AVAILABLE_WIDGET_DEFINITIONS.find(def => def.type === w.type)?.defaultSettings || {}
+            }));
           }
         }
       } catch (error) { console.error("Error loading dashboard layout from localStorage:", error); }
@@ -179,7 +191,7 @@ export default function Home() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
         if (notesSaveTimeoutRef.current) clearTimeout(notesSaveTimeoutRef.current);
-        if (sharedNotes.length > 0 || activeSharedNoteId !== null) { 
+        if (sharedNotes.length > 0 || activeSharedNoteId !== null) {
             notesSaveTimeoutRef.current = setTimeout(() => {
                 try {
                     const notesCollection: NotesCollectionStorage = { notes: sharedNotes, activeNoteId: activeSharedNoteId };
@@ -204,7 +216,6 @@ export default function Home() {
                 setSharedTodos([]);
             }
         } else {
-             // Initialize with a default task if the list is empty/not found
             setSharedTodos([
                 { id: `todo-${Date.now()}-welcome`, text: "Welcome to your global to-do list!", completed: false, createdAt: Date.now() }
             ]);
@@ -216,19 +227,18 @@ export default function Home() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
         if (todosSaveTimeoutRef.current) clearTimeout(todosSaveTimeoutRef.current);
-        // Always save the current state of sharedTodos, even if it's an empty array.
         todosSaveTimeoutRef.current = setTimeout(() => {
             try {
                 localStorage.setItem(GLOBAL_TODOS_STORAGE_KEY, JSON.stringify(sharedTodos));
             } catch (e) { console.error("Error saving global to-do list to localStorage:", e); }
         }, DATA_SAVE_DEBOUNCE_MS);
-        
+
         return () => { if (todosSaveTimeoutRef.current) clearTimeout(todosSaveTimeoutRef.current); };
     }
   }, [sharedTodos]);
 
 
-  useEffect(() => { 
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (addWidgetMenuRef.current && !addWidgetMenuRef.current.contains(event.target as Node)) setIsAddWidgetMenuOpen(false);
     };
@@ -250,17 +260,17 @@ export default function Home() {
     setWidgets(newWidgetsState);
   }, [historyPointer]);
 
-  useEffect(() => { 
+  useEffect(() => {
     const determineWidgetContainerGridSize = () => {
       const screenWidth = window.innerWidth;
       const screenHeight = window.innerHeight;
-      const headerHeight = headerRef.current?.offsetHeight || 60; 
+      const headerHeight = headerRef.current?.offsetHeight || 60;
       const mainContentHeight = screenHeight - headerHeight;
       setWidgetContainerCols(Math.floor(screenWidth / CELL_SIZE));
       setWidgetContainerRows(Math.floor(mainContentHeight / CELL_SIZE));
     };
     determineWidgetContainerGridSize();
-    const timeoutId = setTimeout(determineWidgetContainerGridSize, 100); 
+    const timeoutId = setTimeout(determineWidgetContainerGridSize, 100);
     window.addEventListener('resize', determineWidgetContainerGridSize);
     return () => { clearTimeout(timeoutId); window.removeEventListener('resize', determineWidgetContainerGridSize); };
   }, []);
@@ -269,17 +279,17 @@ export default function Home() {
     if (typeof window === 'undefined') return;
     try {
       const layoutToExport = {
-        dashboardVersion: "3.1-global-single-todo-list", // Updated version
+        dashboardVersion: "3.2-youtube-widget", // Updated version
         widgets: widgets,
         notesCollection: { notes: sharedNotes, activeNoteId: activeSharedNoteId },
-        sharedGlobalTodos: sharedTodos // Export the single global list
+        sharedGlobalTodos: sharedTodos
       };
       const jsonString = JSON.stringify(layoutToExport, null, 2);
       const blob = new Blob([jsonString], { type: 'application/json' });
       const href = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = href;
-      link.download = 'dashboard-layout-with-global-todos.json';
+      link.download = 'dashboard-layout-v3.2.json';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -296,14 +306,15 @@ export default function Home() {
       try {
         const text = e.target?.result;
         if (typeof text !== 'string') throw new Error("Failed to read file content.");
-        
+
         const importedData = JSON.parse(text);
         let widgetsToImport: PageWidgetConfig[] = [];
         let notesToImport: Note[] = [];
         let activeNoteIdToImport: string | null = null;
         let globalTodosToImport: TodoItem[] = [];
 
-        if (importedData.dashboardVersion === "3.1-global-single-todo-list" && importedData.widgets) {
+        // Check for the newest version first
+        if (importedData.dashboardVersion === "3.2-youtube-widget" && importedData.widgets) {
             widgetsToImport = importedData.widgets;
             if (importedData.notesCollection) {
                 notesToImport = importedData.notesCollection.notes || [];
@@ -312,12 +323,18 @@ export default function Home() {
             if (importedData.sharedGlobalTodos && Array.isArray(importedData.sharedGlobalTodos)) {
                 globalTodosToImport = importedData.sharedGlobalTodos;
             }
-            alert("Dashboard layout, notes, and global to-do list (v3.1) imported successfully!");
+            alert("Dashboard layout, notes, and global to-do list (v3.2) imported successfully!");
+        } else if (importedData.dashboardVersion === "3.1-global-single-todo-list" && importedData.widgets) {
+            widgetsToImport = importedData.widgets;
+            if (importedData.notesCollection) {
+                notesToImport = importedData.notesCollection.notes || [];
+                activeNoteIdToImport = importedData.notesCollection.activeNoteId || null;
+            }
+            if (importedData.sharedGlobalTodos && Array.isArray(importedData.sharedGlobalTodos)) {
+                globalTodosToImport = importedData.sharedGlobalTodos;
+            }
+            alert("Dashboard layout, notes, and global to-do list (v3.1) imported. YouTube widget might not be present.");
         } else if (importedData.dashboardVersion === "3.0-global-todos" && importedData.widgets && importedData.todoCollections) {
-            // Handle previous version with instance-specific todos, convert first list or keep separate?
-            // For simplicity, we'll inform the user and not automatically merge.
-            // Or, we could attempt to merge all lists into one, or pick the first one.
-            // For now, let's just load the widgets and notes. User can manually re-create todos if needed from old export.
             widgetsToImport = importedData.widgets;
              if (importedData.notesCollection) {
                 notesToImport = importedData.notesCollection.notes || [];
@@ -329,7 +346,7 @@ export default function Home() {
             notesToImport = importedData.notesCollection.notes || [];
             activeNoteIdToImport = importedData.notesCollection.activeNoteId || null;
             alert("Dashboard layout and notes (v2.0) imported. To-do lists were not part of this version's global export.");
-        } else if (Array.isArray(importedData)) { 
+        } else if (Array.isArray(importedData)) {
             widgetsToImport = importedData;
             alert("Dashboard layout (legacy format) imported. Notes and To-dos were not part of this import.");
         } else {
@@ -339,7 +356,12 @@ export default function Home() {
         if (widgetsToImport.length > 0 && typeof widgetsToImport[0].id !== 'string') {
             throw new Error("Imported widget data seems invalid.");
         }
-        
+         // Ensure all imported widgets have default settings if missing
+        widgetsToImport = widgetsToImport.map(w => ({
+            ...w,
+            settings: w.settings || AVAILABLE_WIDGET_DEFINITIONS.find(def => def.type === w.type)?.defaultSettings || {}
+        }));
+
         setWidgets(widgetsToImport);
         updateWidgetsAndPushToHistory(widgetsToImport, 'import');
 
@@ -347,7 +369,7 @@ export default function Home() {
           setSharedNotes(notesToImport);
           setActiveSharedNoteId(activeNoteIdToImport);
         }
-        if (globalTodosToImport.length > 0 || importedData.dashboardVersion === "3.1-global-single-todo-list") {
+        if (globalTodosToImport.length > 0 || importedData.dashboardVersion?.includes("global-todo") || importedData.dashboardVersion?.includes("youtube-widget")) { // Check for new versions too
             setSharedTodos(globalTodosToImport);
         }
 
@@ -360,7 +382,7 @@ export default function Home() {
   };
 
   const triggerImportFileSelect = () => { if (fileInputRef.current) fileInputRef.current.click(); };
-  
+
   const doRectanglesOverlap = (r1Col: number,r1Row: number,r1ColSpan: number,r1RowSpan: number,r2Col: number,r2Row: number,r2ColSpan: number,r2RowSpan: number,buffer: number = 0): boolean => {
     const r1ActualColEnd = r1Col + r1ColSpan - 1; const r1ActualRowEnd = r1Row + r1RowSpan - 1;
     const r2BufferedColStart = Math.max(1, r2Col - buffer); const r2BufferedRowStart = Math.max(1, r2Row - buffer);
@@ -389,7 +411,7 @@ export default function Home() {
   };
 
   const handleAddNewWidget = (widgetType: WidgetType) => {
-    if (maximizedWidgetId) return; 
+    if (maximizedWidgetId) return;
     const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(def => def.type === widgetType);
     if (!blueprint) { alert(`Widget type "${widgetType}" is not available.`); setIsAddWidgetMenuOpen(false); return; }
     const { defaultColSpan, defaultRowSpan } = blueprint;
@@ -403,7 +425,6 @@ export default function Home() {
       settings: JSON.parse(JSON.stringify(blueprint.defaultSettings || {})), isMinimized: false,
     };
     updateWidgetsAndPushToHistory([...widgets, newWidget], 'add_widget');
-    // No need to initialize sharedTodos for new 'todo' widgets as they all use the global list.
     setIsAddWidgetMenuOpen(false);
   };
 
@@ -430,7 +451,6 @@ export default function Home() {
     if (maximizedWidgetId === idToDelete) setMaximizedWidgetId(null);
     const newWidgetsState = widgets.filter(widget => widget.id !== idToDelete);
     updateWidgetsAndPushToHistory(newWidgetsState, 'delete');
-    // No need to delete from sharedTodos as it's a global list, not instance-specific.
     if (activeWidgetId === idToDelete) setActiveWidgetId(null);
   };
   const handleWidgetFocus = (id: string) => {
@@ -463,8 +483,8 @@ export default function Home() {
   const handleWidgetMaximizeToggle = (widgetId: string) => {
     const widgetToToggle = widgets.find(w => w.id === widgetId);
     if (!widgetToToggle) return;
-    if (maximizedWidgetId === widgetId) { 
-        setMaximizedWidgetId(null); setMaximizedWidgetOriginalState(null); setActiveWidgetId(widgetId); 
+    if (maximizedWidgetId === widgetId) {
+        setMaximizedWidgetId(null); setMaximizedWidgetOriginalState(null); setActiveWidgetId(widgetId);
     } else {
       let originalStateForMaximize = { ...widgetToToggle };
       if (widgetToToggle.isMinimized) originalStateForMaximize = { ...originalStateForMaximize, isMinimized: false, rowSpan: widgetToToggle.originalRowSpan || widgetToToggle.rowSpan };
@@ -486,7 +506,6 @@ export default function Home() {
     }
   };
 
-  // Callback for TodoWidget to update the single global to-do list
   const handleSharedTodosChange = (newGlobalTodos: TodoItem[]) => {
     setSharedTodos(newGlobalTodos);
   };
@@ -496,12 +515,13 @@ export default function Home() {
       case 'weather': return <WeatherWidget id={widgetConfig.id} settings={widgetConfig.settings as WeatherWidgetSettings | undefined} />;
       case 'clock': return <ClockWidget id={widgetConfig.id} settings={widgetConfig.settings as ClockWidgetSettings | undefined} />;
       case 'calculator': return <CalculatorWidget id={widgetConfig.id} settings={widgetConfig.settings as CalculatorWidgetSettings | undefined} />;
-      case 'todo': 
-        return <TodoWidget 
-                    instanceId={widgetConfig.id} // For keys, ARIA, etc.
-                    settings={widgetConfig.settings as TodoWidgetSettings | undefined} 
-                    todos={sharedTodos} // Pass the single global list
-                    onTodosChange={handleSharedTodosChange} // Pass the updater for the global list
+      case 'youtube': return <YoutubeWidget id={widgetConfig.id} settings={widgetConfig.settings as YoutubeWidgetSettings | undefined} />; // Added YoutubeWidget
+      case 'todo':
+        return <TodoWidget
+                    instanceId={widgetConfig.id}
+                    settings={widgetConfig.settings as TodoWidgetSettings | undefined}
+                    todos={sharedTodos}
+                    onTodosChange={handleSharedTodosChange}
                 />;
       case 'notes':
         return <NotesWidget
@@ -521,6 +541,7 @@ export default function Home() {
       case 'weather': return <WeatherSettingsPanel widgetId={widgetConfig.id} currentSettings={widgetConfig.settings as WeatherWidgetSettings | undefined} onSave={boundSaveInstanceSettings} />;
       case 'clock': return <ClockSettingsPanel widgetId={widgetConfig.id} currentSettings={widgetConfig.settings as ClockWidgetSettings | undefined} onSave={boundSaveInstanceSettings} />;
       case 'calculator': return <CalculatorSettingsPanel widgetId={widgetConfig.id} currentSettings={widgetConfig.settings as CalculatorWidgetSettings | undefined} onSave={boundSaveInstanceSettings} />;
+      case 'youtube': return <YoutubeSettingsPanel widgetId={widgetConfig.id} currentSettings={widgetConfig.settings as YoutubeWidgetSettings | undefined} onSave={boundSaveInstanceSettings} />; // Added YoutubeSettingsPanel
       case 'notes':
         return <NotesSettingsPanel
                   widgetInstanceId={widgetConfig.id} currentSettings={widgetConfig.settings as PageInstanceNotesSettings | undefined}
@@ -532,11 +553,11 @@ export default function Home() {
                />;
       case 'todo':
         return <TodoSettingsPanel
-                  widgetId={widgetConfig.id} 
+                  widgetId={widgetConfig.id}
                   currentSettings={widgetConfig.settings as TodoWidgetSettings | undefined}
-                  onSave={boundSaveInstanceSettings} // Saves UI/view settings for this instance
-                  onClearAllTasks={() => { // Clears the *global* to-do list
-                    handleSharedTodosChange([]); 
+                  onSave={boundSaveInstanceSettings}
+                  onClearAllTasks={() => {
+                    handleSharedTodosChange([]);
                     alert(`The global to-do list has been cleared.`);
                   }}
                 />;
@@ -615,24 +636,24 @@ const styles = `
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0.5rem; 
+    padding: 0.5rem;
     background-color: var(--dark-accent-primary);
-    border-radius: 0.375rem; 
+    border-radius: 0.375rem;
     color: var(--dark-text-on-accent);
     transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); 
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   }
   .control-button:hover {
     background-color: var(--dark-accent-primary-hover);
-    box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.1); 
+    box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.1);
   }
   .control-button:disabled {
-    background-color: hsl(222, 47%, 25%); 
-    color: hsl(215, 20%, 55%); 
+    background-color: hsl(222, 47%, 25%);
+    color: hsl(215, 20%, 55%);
     cursor: not-allowed;
     box-shadow: none;
   }
-  .control-button:focus-visible { 
+  .control-button:focus-visible {
     outline: 2px solid var(--dark-accent-primary-hover);
     outline-offset: 2px;
   }
