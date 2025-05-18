@@ -2,9 +2,10 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import Widget, { WidgetResizeDataType, WidgetMoveDataType } from "@/components/Widget";
+import Widget, { WidgetResizeDataType, WidgetMoveDataType, WidgetContainerSettings } from "@/components/Widget";
 import GridBackground from "@/components/GridBackground";
-import SettingsModal from '@/components/SettingsModal';
+import SettingsModal from '@/components/SettingsModal'; // For widget content settings
+import WidgetContainerSettingsModal from '@/components/WidgetContainerSettingsModal'; // For widget container (appearance) settings
 import WeatherWidget, { WeatherSettingsPanel, WeatherWidgetSettings } from "@/components/WeatherWidget";
 import ClockWidget, { ClockSettingsPanel, ClockWidgetSettings } from "@/components/ClockWidget";
 import CalculatorWidget, { CalculatorSettingsPanel, CalculatorWidgetSettings } from "@/components/CalculatorWidget";
@@ -21,7 +22,7 @@ import CountdownStopwatchWidget, { CountdownStopwatchSettingsPanel, CountdownSto
 import PhotoWidget, { PhotoSettingsPanel, PhotoWidgetSettings, HistoricImage } from "@/components/PhotoWidget";
 
 
-// --- Icons (assuming these are defined elsewhere or you'll add them) ---
+// --- Icons ---
 const UndoIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" /></svg>;
 const RedoIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4"> <path strokeLinecap="round" strokeLinejoin="round" d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 000 12h3" /> </svg>;
 const ExportIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4"> <path strokeLinecap="round" strokeLinejoin="round" d="M12 9.75v6.75m0 0l-3-3m3 3l3-3m-8.25 6a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" /> </svg>;
@@ -64,15 +65,23 @@ const PhotoIcon = () => (
 const CELL_SIZE = 30;
 const MAX_HISTORY_LENGTH = 50;
 const MINIMIZED_WIDGET_ROW_SPAN = 2;
-const DASHBOARD_LAYOUT_STORAGE_KEY = 'dashboardLayoutV3.10'; // Ensure this matches if you have existing stored layouts
+const DASHBOARD_LAYOUT_STORAGE_KEY = 'dashboardLayoutV3.11'; // Version reflects containerSettings addition
 const GLOBAL_NOTES_STORAGE_KEY = 'dashboardGlobalNotesCollection_v1';
 const GLOBAL_TODOS_STORAGE_KEY = 'dashboardGlobalSingleTodoList_v1';
 const GLOBAL_PHOTO_HISTORY_STORAGE_KEY = 'dashboardGlobalPhotoHistory_v1';
 const DATA_SAVE_DEBOUNCE_MS = 700;
 const WIDGET_DESELECT_TIMEOUT_MS = 3000;
 
+// Default Widget Container Settings (Appearance)
+const DEFAULT_WIDGET_CONTAINER_SETTINGS: WidgetContainerSettings = {
+    alwaysShowTitleBar: false,
+    innerPadding: 'px-3.5 py-3', // Default padding as per user's original CSS
+    // containerBackgroundColor is undefined by default (theme default: transparent or solid based on state)
+};
+
+
 // --- Interfaces ---
-export type AllWidgetSettings =
+export type AllWidgetSettings = // For widget *content* settings
     WeatherWidgetSettings |
     TodoWidgetSettings |
     ClockWidgetSettings |
@@ -86,17 +95,8 @@ export type AllWidgetSettings =
     Record<string, any>;
 
 export type WidgetType =
-    'weather' |
-    'todo' |
-    'clock' |
-    'calculator' |
-    'notes' |
-    'youtube' |
-    'minesweeper' |
-    'unitConverter' |
-    'countdownStopwatch' |
-    'photo' |
-    'generic';
+    'weather' | 'todo' | 'clock' | 'calculator' | 'notes' | 'youtube' |
+    'minesweeper' | 'unitConverter' | 'countdownStopwatch' | 'photo' | 'generic';
 
 export interface PageWidgetConfig {
   id: string;
@@ -106,7 +106,8 @@ export interface PageWidgetConfig {
   rowStart: number;
   colSpan: number;
   rowSpan: number;
-  settings?: AllWidgetSettings;
+  settings?: AllWidgetSettings; // Content settings
+  containerSettings?: WidgetContainerSettings; // Appearance settings
   isMinimized?: boolean;
   originalRowSpan?: number;
 }
@@ -126,15 +127,11 @@ interface WidgetBlueprint {
   defaultRowSpan: number;
   minColSpan?: number;
   minRowSpan?: number;
-  defaultSettings: AllWidgetSettings | undefined;
+  defaultSettings: AllWidgetSettings | undefined; // Default content settings
 }
 
-// Default settings for a PhotoWidget instance, now with 'cover'
 const PHOTO_WIDGET_DEFAULT_INSTANCE_SETTINGS: PhotoWidgetSettings = {
-  imageUrl: null,
-  imageName: null,
-  objectFit: 'cover', // Changed default to 'cover'
-  isSidebarOpen: false
+  imageUrl: null, imageName: null, objectFit: 'cover', isSidebarOpen: false
 };
 
 const AVAILABLE_WIDGET_DEFINITIONS: WidgetBlueprint[] = [
@@ -146,50 +143,61 @@ const AVAILABLE_WIDGET_DEFINITIONS: WidgetBlueprint[] = [
   { type: 'youtube', defaultTitle: 'YouTube Player', displayName: 'YouTube', description: "Embed YouTube to watch videos.", icon: YoutubeIcon, defaultColSpan: 25, defaultRowSpan: 20, minColSpan: 10, minRowSpan: 10, defaultSettings: {} },
   { type: 'minesweeper', defaultTitle: 'Minesweeper', displayName: 'Minesweeper', description: "Classic Minesweeper game.", icon: MinesweeperIcon, defaultColSpan: 15, defaultRowSpan: 18, minColSpan: 8, minRowSpan: 10, defaultSettings: { difficulty: 'easy' } },
   { type: 'unitConverter', defaultTitle: 'Unit Converter', displayName: 'Unit Converter', description: "Convert various units.", icon: UnitConverterIcon, defaultColSpan: 15, defaultRowSpan: 13, minColSpan: 6, minRowSpan: 8, defaultSettings: { defaultCategory: 'Length', precision: 4 } as UnitConverterWidgetSettings },
-  { type: 'countdownStopwatch', defaultTitle: 'Timer / Stopwatch', displayName: 'Timer/Stopwatch', description: "Countdown timer and stopwatch.", icon: CountdownStopwatchIcon, defaultColSpan: 12, defaultRowSpan: 14, minColSpan: 6, minRowSpan: 6, defaultSettings: { defaultCountdownMinutes: 5, playSoundOnFinish: true } as CountdownStopwatchWidgetSettings },
-  { 
-    type: 'photo', 
-    defaultTitle: 'Photo Viewer', 
-    displayName: 'Photo Viewer', 
-    description: "Display an image from URL or upload.", 
-    icon: PhotoIcon, 
-    defaultColSpan: 12, 
-    defaultRowSpan: 12, 
-    minColSpan: 6, 
-    minRowSpan: 6,
-    defaultSettings: PHOTO_WIDGET_DEFAULT_INSTANCE_SETTINGS // Uses the updated default
-  },
+  { type: 'countdownStopwatch', defaultTitle: 'Timer / Stopwatch', displayName: 'Timer/Stopwatch', description: "Countdown timer and stopwatch.", icon: CountdownStopwatchIcon, defaultColSpan: 14, defaultRowSpan: 14, minColSpan: 6, minRowSpan: 6, defaultSettings: { defaultCountdownMinutes: 5, playSoundOnFinish: true } as CountdownStopwatchWidgetSettings },
+  { type: 'photo', defaultTitle: 'Photo Viewer', displayName: 'Photo Viewer', description: "Display an image from URL or upload.", icon: PhotoIcon, defaultColSpan: 12, defaultRowSpan: 12, minColSpan: 6, minRowSpan: 6, defaultSettings: PHOTO_WIDGET_DEFAULT_INSTANCE_SETTINGS },
 ];
 
+// Initial layout with default container settings for each widget
 const initialWidgetsLayout: PageWidgetConfig[] = [
-  { "id": "weather-widget-main", "title": "Medford Weather", "type": "weather", "colStart": 3, "rowStart": 3, "colSpan": 10, "rowSpan": 14, "settings": { "location": "97504 US", "units": "imperial", "useCurrentLocation": false }, "isMinimized": false },
-  { "id": "youtube-widget-main", "title": "Watch Videos", "type": "youtube", "colStart": 3, "rowStart": 18, "colSpan": 18, "rowSpan": 20, "settings": {}, "isMinimized": false },
-  { 
-    "id": "photo-widget-initial", 
-    "title": "My Photo", 
-    "type": "photo", 
-    "colStart": 22, 
-    "rowStart": 3, 
-    "colSpan": 12, 
-    "rowSpan": 12,
-    "settings": PHOTO_WIDGET_DEFAULT_INSTANCE_SETTINGS, // Will now default to 'cover'
-    "isMinimized": false 
-  },
+  { "id": "weather-widget-main", "title": "Medford Weather", "type": "weather", "colStart": 3, "rowStart": 3, "colSpan": 10, "rowSpan": 14, "settings": { "location": "97504 US", "units": "imperial", "useCurrentLocation": false }, "isMinimized": false, containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS } },
+  { "id": "youtube-widget-main", "title": "Watch Videos", "type": "youtube", "colStart": 3, "rowStart": 18, "colSpan": 18, "rowSpan": 20, "settings": {}, "isMinimized": false, containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS } },
+  { "id": "photo-widget-initial", "title": "My Photo", "type": "photo", "colStart": 22, "rowStart": 3, "colSpan": 12, "rowSpan": 12, "settings": PHOTO_WIDGET_DEFAULT_INSTANCE_SETTINGS, "isMinimized": false, containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS } },
 ];
 
-// This function ensures that loaded or newly created photo widgets adhere to the PhotoWidgetSettings structure,
-// especially applying the new default 'objectFit' if not specified.
+// Helper to ensure PhotoWidget instance settings are correctly formed
 const ensurePhotoWidgetInstanceSettings = (settings: AllWidgetSettings | undefined): PhotoWidgetSettings => {
-    const photoInstanceDefaults = PHOTO_WIDGET_DEFAULT_INSTANCE_SETTINGS; // This now has objectFit: 'cover'
+    const photoInstanceDefaults = PHOTO_WIDGET_DEFAULT_INSTANCE_SETTINGS;
     const currentPhotoSettings = settings as PhotoWidgetSettings | undefined;
-
     return {
         imageUrl: currentPhotoSettings?.imageUrl || photoInstanceDefaults.imageUrl,
         imageName: currentPhotoSettings?.imageName || photoInstanceDefaults.imageName,
-        objectFit: currentPhotoSettings?.objectFit || photoInstanceDefaults.objectFit, // Uses 'cover' if not specified
+        objectFit: currentPhotoSettings?.objectFit || photoInstanceDefaults.objectFit,
         isSidebarOpen: typeof currentPhotoSettings?.isSidebarOpen === 'boolean'
             ? currentPhotoSettings.isSidebarOpen
             : photoInstanceDefaults.isSidebarOpen,
+    };
+};
+
+// Helper to process and ensure defaults for any widget config (content and container settings)
+const processWidgetConfig = (widgetData: any): PageWidgetConfig => {
+    const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(def => def.type === widgetData.type);
+    
+    // Process content settings
+    let finalContentSettings = { ...(blueprint?.defaultSettings || {}), ...(widgetData.settings || {}) };
+    if (widgetData.type === 'photo') {
+        finalContentSettings = ensurePhotoWidgetInstanceSettings(finalContentSettings as PhotoWidgetSettings);
+    }
+
+    // Process container (appearance) settings, merging with defaults
+    const finalContainerSettings: WidgetContainerSettings = {
+        ...DEFAULT_WIDGET_CONTAINER_SETTINGS, // Start with global defaults
+        ...(widgetData.containerSettings || {}) // Overlay any saved container settings
+    };
+
+    return {
+        // Spread all properties from widgetData first to preserve all saved data
+        ...widgetData, 
+        // Then ensure core properties and processed settings are correctly set
+        id: widgetData.id || `generic-${Date.now()}`, // Fallback ID
+        title: widgetData.title || blueprint?.defaultTitle || "Untitled Widget",
+        type: widgetData.type || 'generic', // Fallback type
+        colStart: widgetData.colStart || 1,
+        rowStart: widgetData.rowStart || 1,
+        colSpan: widgetData.colSpan || blueprint?.defaultColSpan || 6,
+        rowSpan: widgetData.rowSpan || blueprint?.defaultRowSpan || 6,
+        isMinimized: widgetData.isMinimized || false,
+        settings: finalContentSettings, // Fully processed content settings
+        containerSettings: finalContainerSettings, // Fully processed container settings
     };
 };
 
@@ -199,725 +207,279 @@ export default function Home() {
   const [widgetContainerRows, setWidgetContainerRows] = useState(0);
   const [activeWidgetId, setActiveWidgetId] = useState<string | null>(null);
 
-  // Initialize widgets state, ensuring photo widgets get correct default settings
+  // Initialize widgets state, processing each with defaults
   const [widgets, setWidgets] = useState<PageWidgetConfig[]>(() => {
     if (typeof window !== 'undefined') {
         try {
             const savedLayoutJSON = window.localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY);
             if (savedLayoutJSON) {
-                const loadedWidgets = JSON.parse(savedLayoutJSON) as PageWidgetConfig[];
-                // Check if loadedWidgets is a valid array and its elements are structured as expected
-                if (Array.isArray(loadedWidgets) && (loadedWidgets.length > 0 ? typeof loadedWidgets[0].id === 'string' : true)) {
-                    return loadedWidgets.map(w => {
-                        const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(def => def.type === w.type);
-                        // Start with blueprint defaults, then overlay widget's saved settings
-                        let finalSettings = { ...(blueprint?.defaultSettings || {}), ...(w.settings || {}) };
-                        
-                        // Specifically ensure photo widget settings are correctly formed
-                        if (w.type === 'photo') {
-                            finalSettings = ensurePhotoWidgetInstanceSettings(finalSettings as PhotoWidgetSettings);
-                        }
-                        return { ...w, settings: finalSettings };
-                    });
+                const loadedWidgetsRaw = JSON.parse(savedLayoutJSON) as any[]; // Load as any first
+                // Basic validation of loaded data structure
+                if (Array.isArray(loadedWidgetsRaw) && (loadedWidgetsRaw.length > 0 ? typeof loadedWidgetsRaw[0].id === 'string' : true)) {
+                    return loadedWidgetsRaw.map(processWidgetConfig); // Process each loaded widget
                 }
             }
         } catch (error) {
             console.error("[page.tsx] Error loading dashboard layout from localStorage, using initial layout:", error);
         }
     }
-    // Fallback to initialWidgetsLayout if no valid saved layout or if not in browser
-    return JSON.parse(JSON.stringify(initialWidgetsLayout)).map((w: PageWidgetConfig) => {
-        const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(def => def.type === w.type);
-        let finalSettings = { ...(blueprint?.defaultSettings || {}), ...(w.settings || {}) };
-        if (w.type === 'photo') {
-            finalSettings = ensurePhotoWidgetInstanceSettings(finalSettings as PhotoWidgetSettings);
-        }
-        return { ...w, settings: finalSettings };
-    });
+    // Fallback to initialWidgetsLayout, processing each with defaults
+    return initialWidgetsLayout.map(processWidgetConfig);
   });
 
-  // Global states for shared data
+  // Global states for shared data (notes, todos, photo history)
   const [sharedNotes, setSharedNotes] = useState<Note[]>([]);
   const [activeSharedNoteId, setActiveSharedNoteId] = useState<string | null>(null);
   const [sharedTodos, setSharedTodos] = useState<TodoItem[]>([]);
   const [sharedPhotoHistory, setSharedPhotoHistory] = useState<HistoricImage[]>([]);
 
-  // Refs for debounced saving
+  // Refs for debounced saving, timers, history, etc.
   const notesSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const todosSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const photoHistorySaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const deselectTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const [history, setHistory] = useState<PageWidgetConfig[][]>([]);
-  const [historyPointer, setHistoryPointer] = useState<number>(-1);
+  const history = useRef<PageWidgetConfig[][]>([]); // Using ref for history array
+  const historyPointer = useRef<number>(-1);       // Using ref for history pointer
   const isPerformingUndoRedo = useRef(false);
   const headerRef = useRef<HTMLElement>(null);
   const initialLoadAttempted = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // State for widget content settings modal
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [selectedWidgetForSettings, setSelectedWidgetForSettings] = useState<PageWidgetConfig | null>(null);
+  
+  // State for widget container (appearance) settings modal
+  const [isContainerSettingsModalOpen, setIsContainerSettingsModalOpen] = useState(false);
+  const [selectedWidgetForContainerSettings, setSelectedWidgetForContainerSettings] = useState<PageWidgetConfig | null>(null);
+
   const [maximizedWidgetId, setMaximizedWidgetId] = useState<string | null>(null);
   const [maximizedWidgetOriginalState, setMaximizedWidgetOriginalState] = useState<PageWidgetConfig | null>(null);
   const [isAddWidgetMenuOpen, setIsAddWidgetMenuOpen] = useState(false);
   const addWidgetMenuRef = useRef<HTMLDivElement>(null);
+  const [historyDisplay, setHistoryDisplay] = useState({ pointer: 0, length: 0 }); // For displaying history status in UI
 
+
+   // Effect for initializing history after widgets state is set
    useEffect(() => {
-    // Initialize history and mark initial load as attempted
-    // This effect runs after the `widgets` state has been initialized from localStorage or defaults.
-    if (!initialLoadAttempted.current) {
-        setHistory([JSON.parse(JSON.stringify(widgets))]); // History can be initialized with an empty array if widgets is empty
-        setHistoryPointer(0);
+    if (!initialLoadAttempted.current) { // Only run once after initial widgets are set
+        history.current = [JSON.parse(JSON.stringify(widgets))]; // Deep copy initial state
+        historyPointer.current = 0;
+        setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length });
         initialLoadAttempted.current = true;
     }
-  }, [widgets]); // This dependency ensures it runs after widgets is set.
+  }, [widgets]); // Depends on widgets to ensure it runs after they are loaded/initialized
 
 
   // Effect for saving widget layout to localStorage
   useEffect(() => {
-    if (typeof window !== 'undefined' && initialLoadAttempted.current) { // Only save after initial load attempt
+    if (typeof window !== 'undefined' && initialLoadAttempted.current) { // Only save after initial load
       try {
         window.localStorage.setItem(DASHBOARD_LAYOUT_STORAGE_KEY, JSON.stringify(widgets));
       } catch (error) { console.error("Error saving dashboard layout to localStorage:", error); }
     }
   }, [widgets]);
 
-  // --- Load and Save Global Notes ---
+  // --- Load and Save Global Notes, Todos, Photo History (existing effects, unchanged) ---
   useEffect(() => {
     if (typeof window !== 'undefined') {
         const savedNotesJSON = localStorage.getItem(GLOBAL_NOTES_STORAGE_KEY);
-        let notesToSet: Note[] = [];
-        let activeIdToSet: string | null = null;
-        if (savedNotesJSON) {
-            try {
-                const notesCollection: NotesCollectionStorage = JSON.parse(savedNotesJSON);
-                notesToSet = notesCollection.notes || [];
-                activeIdToSet = notesCollection.activeNoteId || null;
-                if (activeIdToSet && !notesToSet.some(n => n.id === activeIdToSet)) activeIdToSet = null;
-            } catch (e) { console.error("Error parsing global notes from localStorage:", e); }
-        }
-        if (notesToSet.length === 0) { // Initialize with a default note if empty
-            const defaultNoteId = `note-${Date.now()}-default`;
-            notesToSet = [{ id: defaultNoteId, title: "My First Note", content: "<p>Welcome to your notes!</p>", lastModified: Date.now() }];
-            activeIdToSet = defaultNoteId;
-        } else if (!activeIdToSet && notesToSet.length > 0) { // Ensure an active note if one exists
-            activeIdToSet = notesToSet.sort((a, b) => b.lastModified - a.lastModified)[0].id;
-        }
-        setSharedNotes(notesToSet);
-        setActiveSharedNoteId(activeIdToSet);
+        let notesToSet: Note[] = []; let activeIdToSet: string | null = null;
+        if (savedNotesJSON) { try { const nc: NotesCollectionStorage = JSON.parse(savedNotesJSON); notesToSet = nc.notes || []; activeIdToSet = nc.activeNoteId || null; if (activeIdToSet && !notesToSet.some(n => n.id === activeIdToSet)) activeIdToSet = null; } catch (e) { console.error("Err parse notes:", e); } }
+        if (notesToSet.length === 0) { const dId = `note-${Date.now()}-default`; notesToSet = [{ id: dId, title: "My First Note", content: "<p>Welcome!</p>", lastModified: Date.now() }]; activeIdToSet = dId; } else if (!activeIdToSet && notesToSet.length > 0) { activeIdToSet = notesToSet.sort((a,b)=>b.lastModified-a.lastModified)[0].id; }
+        setSharedNotes(notesToSet); setActiveSharedNoteId(activeIdToSet);
     }
-  }, []); // Runs once on mount
-
+  }, []);
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-        if (notesSaveTimeoutRef.current) clearTimeout(notesSaveTimeoutRef.current);
-        // Only save if there's something to save or if it's different from an empty default
-        if (sharedNotes.length > 0 || activeSharedNoteId !== null) {
-            notesSaveTimeoutRef.current = setTimeout(() => {
-                try {
-                    const notesCollection: NotesCollectionStorage = { notes: sharedNotes, activeNoteId: activeSharedNoteId };
-                    localStorage.setItem(GLOBAL_NOTES_STORAGE_KEY, JSON.stringify(notesCollection));
-                } catch (e) { console.error("Error saving global notes to localStorage:", e); }
-            }, DATA_SAVE_DEBOUNCE_MS);
-        } else if (localStorage.getItem(GLOBAL_NOTES_STORAGE_KEY)) { // Clear if it was previously set but now empty
-            localStorage.setItem(GLOBAL_NOTES_STORAGE_KEY, JSON.stringify({ notes: [], activeNoteId: null }));
-        }
-        return () => { if (notesSaveTimeoutRef.current) clearTimeout(notesSaveTimeoutRef.current); };
-    }
+    if (typeof window !== 'undefined') { if (notesSaveTimeoutRef.current) clearTimeout(notesSaveTimeoutRef.current); if (sharedNotes.length > 0 || activeSharedNoteId !== null) { notesSaveTimeoutRef.current = setTimeout(() => { try { const nc: NotesCollectionStorage = { notes: sharedNotes, activeNoteId: activeSharedNoteId }; localStorage.setItem(GLOBAL_NOTES_STORAGE_KEY, JSON.stringify(nc)); } catch (e) { console.error("Err save notes:", e); } }, DATA_SAVE_DEBOUNCE_MS); } else if (localStorage.getItem(GLOBAL_NOTES_STORAGE_KEY)) { localStorage.setItem(GLOBAL_NOTES_STORAGE_KEY, JSON.stringify({ notes: [], activeNoteId: null })); } return () => { if (notesSaveTimeoutRef.current) clearTimeout(notesSaveTimeoutRef.current); }; }
   }, [sharedNotes, activeSharedNoteId]);
+  useEffect(() => { if (typeof window !== 'undefined') { const sT = localStorage.getItem(GLOBAL_TODOS_STORAGE_KEY); if (sT) { try { const lT = JSON.parse(sT) as TodoItem[]; setSharedTodos(Array.isArray(lT) ? lT : []); } catch (e) { console.error("Err parse todos:", e); setSharedTodos([]); } } else { setSharedTodos([]); } } }, []);
+  useEffect(() => { if (typeof window !== 'undefined') { if (todosSaveTimeoutRef.current) clearTimeout(todosSaveTimeoutRef.current); todosSaveTimeoutRef.current = setTimeout(() => { try { localStorage.setItem(GLOBAL_TODOS_STORAGE_KEY, JSON.stringify(sharedTodos)); } catch (e) { console.error("Err save todos:", e); } }, DATA_SAVE_DEBOUNCE_MS); return () => { if (todosSaveTimeoutRef.current) clearTimeout(todosSaveTimeoutRef.current); }; } }, [sharedTodos]);
+  useEffect(() => { if (typeof window !== 'undefined') { const sPH = localStorage.getItem(GLOBAL_PHOTO_HISTORY_STORAGE_KEY); if (sPH) { try { const lPH = JSON.parse(sPH) as HistoricImage[]; setSharedPhotoHistory(Array.isArray(lPH) ? lPH : []); } catch (e) { console.error("Err parse photo hist:", e); setSharedPhotoHistory([]); } } else { setSharedPhotoHistory([]); } } }, []);
+  useEffect(() => { if (typeof window !== 'undefined') { if (photoHistorySaveTimeoutRef.current) clearTimeout(photoHistorySaveTimeoutRef.current); photoHistorySaveTimeoutRef.current = setTimeout(() => { try { localStorage.setItem(GLOBAL_PHOTO_HISTORY_STORAGE_KEY, JSON.stringify(sharedPhotoHistory)); } catch (e) { console.error("Err save photo hist:", e); } }, DATA_SAVE_DEBOUNCE_MS); return () => { if (photoHistorySaveTimeoutRef.current) clearTimeout(photoHistorySaveTimeoutRef.current); }; } }, [sharedPhotoHistory]);
 
-  // --- Load and Save Global To-Dos ---
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-        const savedTodosJSON = localStorage.getItem(GLOBAL_TODOS_STORAGE_KEY);
-        if (savedTodosJSON) {
-            try {
-                const loadedTodos = JSON.parse(savedTodosJSON) as TodoItem[];
-                setSharedTodos(Array.isArray(loadedTodos) ? loadedTodos : []);
-            } catch (e) {
-                console.error("Error parsing global to-do list from localStorage:", e);
-                setSharedTodos([]); // Default to empty array on error
-            }
-        } else {
-             setSharedTodos([]); // Default to empty if not found
-        }
-    }
-  }, []); // Runs once on mount
+  // --- Auto-deselect Timer & Add Widget Menu Click Outside (existing effects, unchanged) ---
+  useEffect(() => { if (deselectTimerRef.current) { clearTimeout(deselectTimerRef.current); deselectTimerRef.current = null; } if (activeWidgetId && !maximizedWidgetId) { deselectTimerRef.current = setTimeout(() => { setActiveWidgetId(null); }, WIDGET_DESELECT_TIMEOUT_MS); } return () => { if (deselectTimerRef.current) { clearTimeout(deselectTimerRef.current); deselectTimerRef.current = null; } }; }, [activeWidgetId, maximizedWidgetId]);
+  useEffect(() => { const ho = (e: MouseEvent) => { if (addWidgetMenuRef.current && !addWidgetMenuRef.current.contains(e.target as Node)) { setIsAddWidgetMenuOpen(false); } }; if (isAddWidgetMenuOpen) { document.addEventListener('mousedown', ho); } else { document.removeEventListener('mousedown', ho); } return () => { document.removeEventListener('mousedown', ho); }; }, [isAddWidgetMenuOpen]);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-        if (todosSaveTimeoutRef.current) clearTimeout(todosSaveTimeoutRef.current);
-        todosSaveTimeoutRef.current = setTimeout(() => {
-            try {
-                localStorage.setItem(GLOBAL_TODOS_STORAGE_KEY, JSON.stringify(sharedTodos));
-            } catch (e) { console.error("Error saving global to-do list to localStorage:", e); }
-        }, DATA_SAVE_DEBOUNCE_MS);
-
-        return () => { if (todosSaveTimeoutRef.current) clearTimeout(todosSaveTimeoutRef.current); };
-    }
-  }, [sharedTodos]);
-
-  // --- Load and Save Global Photo History ---
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-        const savedHistoryJSON = localStorage.getItem(GLOBAL_PHOTO_HISTORY_STORAGE_KEY);
-        if (savedHistoryJSON) {
-            try {
-                const loadedHistory = JSON.parse(savedHistoryJSON) as HistoricImage[];
-                setSharedPhotoHistory(Array.isArray(loadedHistory) ? loadedHistory : []);
-            } catch (e) {
-                console.error("Error parsing global photo history from localStorage:", e);
-                setSharedPhotoHistory([]);
-            }
-        } else {
-            setSharedPhotoHistory([]);
-        }
-    }
-  }, []); // Runs once on mount
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-        if (photoHistorySaveTimeoutRef.current) clearTimeout(photoHistorySaveTimeoutRef.current);
-        photoHistorySaveTimeoutRef.current = setTimeout(() => {
-            try {
-                localStorage.setItem(GLOBAL_PHOTO_HISTORY_STORAGE_KEY, JSON.stringify(sharedPhotoHistory));
-            } catch (e) { console.error("Error saving global photo history to localStorage:", e); }
-        }, DATA_SAVE_DEBOUNCE_MS);
-        return () => { if (photoHistorySaveTimeoutRef.current) clearTimeout(photoHistorySaveTimeoutRef.current); };
-    }
-  }, [sharedPhotoHistory]);
-
-
-  // --- Auto-deselect Timer Logic ---
-  useEffect(() => {
-    if (deselectTimerRef.current) {
-      clearTimeout(deselectTimerRef.current);
-      deselectTimerRef.current = null;
-    }
-    if (activeWidgetId && !maximizedWidgetId) { // Only run timer if a widget is active AND not maximized
-      deselectTimerRef.current = setTimeout(() => {
-        setActiveWidgetId(null);
-      }, WIDGET_DESELECT_TIMEOUT_MS);
-    }
-    return () => {
-      if (deselectTimerRef.current) {
-        clearTimeout(deselectTimerRef.current);
-        deselectTimerRef.current = null;
-      }
-    };
-  }, [activeWidgetId, maximizedWidgetId]);
-
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (addWidgetMenuRef.current && !addWidgetMenuRef.current.contains(event.target as Node)) {
-        setIsAddWidgetMenuOpen(false);
-      }
-    };
-    if (isAddWidgetMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    } else {
-      document.removeEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isAddWidgetMenuOpen]);
-
+  // --- History Management ---
   const updateWidgetsAndPushToHistory = useCallback((newWidgetsState: PageWidgetConfig[], actionType?: string) => {
-    // Prevent history push during undo/redo operations unless explicitly internal
-    if (isPerformingUndoRedo.current && actionType !== 'undo_redo_internal') {
-        // console.log("Skipping history push during undo/redo for action:", actionType);
-        return;
-    }
+    if (isPerformingUndoRedo.current && actionType !== 'undo_redo_internal') return;
 
-    // Avoid pushing identical states to history
-    const currentHistoryTop = historyPointer >= 0 && historyPointer < history.length ? history[historyPointer] : null;
-    if (currentHistoryTop && JSON.stringify(currentHistoryTop) === JSON.stringify(newWidgetsState)) {
-        // console.log("Skipping history push, state is identical for action:", actionType);
-        return;
-    }
+    const currentHistoryTop = historyPointer.current >= 0 && historyPointer.current < history.current.length ? history.current[historyPointer.current] : null;
+    if (currentHistoryTop && JSON.stringify(currentHistoryTop) === JSON.stringify(newWidgetsState)) return;
 
-    // console.log("Pushing to history for action:", actionType, "New pointer will be:", historyPointer + 1);
     const newHistoryEntry = JSON.parse(JSON.stringify(newWidgetsState)); // Deep copy
+    const newHistoryBase = history.current.slice(0, historyPointer.current + 1);
+    let finalHistory = [...newHistoryBase, newHistoryEntry];
+    if (finalHistory.length > MAX_HISTORY_LENGTH) {
+      finalHistory = finalHistory.slice(finalHistory.length - MAX_HISTORY_LENGTH);
+    }
+    history.current = finalHistory;
+    historyPointer.current = finalHistory.length - 1;
+    setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length }); // Update UI display
+  }, []); // No dependencies needed as it uses refs and parameters
 
-    setHistory(prevHistory => {
-      // Slice history up to the current pointer, effectively discarding "redo" states if a new action is taken
-      const newHistoryBase = prevHistory.slice(0, historyPointer + 1);
-      let finalHistory = [...newHistoryBase, newHistoryEntry];
-
-      // Limit history length
-      if (finalHistory.length > MAX_HISTORY_LENGTH) {
-        finalHistory = finalHistory.slice(finalHistory.length - MAX_HISTORY_LENGTH);
-      }
-      // Update pointer to the new latest state
-      setHistoryPointer(finalHistory.length - 1);
-      return finalHistory;
-    });
-  }, [history, historyPointer]); // Removed 'widgets' from dependencies to avoid loops with its own update effect
-
+  // --- Grid Dimensions ---
   useEffect(() => {
     const determineWidgetContainerGridSize = () => {
-      const screenWidth = window.innerWidth;
-      const screenHeight = window.innerHeight;
+      const screenWidth = window.innerWidth; const screenHeight = window.innerHeight;
       const headerHeight = headerRef.current?.offsetHeight || 60; // Default header height
       const mainContentHeight = screenHeight - headerHeight;
-
       setWidgetContainerCols(Math.floor(screenWidth / CELL_SIZE));
       setWidgetContainerRows(Math.floor(mainContentHeight / CELL_SIZE));
     };
-
-    determineWidgetContainerGridSize(); // Initial call
-    const timeoutId = setTimeout(determineWidgetContainerGridSize, 100); // Call again after a short delay for potential layout shifts
-
+    determineWidgetContainerGridSize(); const timeoutId = setTimeout(determineWidgetContainerGridSize, 100);
     window.addEventListener('resize', determineWidgetContainerGridSize);
-    return () => {
-      clearTimeout(timeoutId);
-      window.removeEventListener('resize', determineWidgetContainerGridSize);
-    };
-  }, []); // Empty dependency array means this runs once on mount and cleans up on unmount
+    return () => { clearTimeout(timeoutId); window.removeEventListener('resize', determineWidgetContainerGridSize); };
+  }, []);
 
+  // --- Import/Export ---
   const handleExportLayout = () => {
     if (typeof window === 'undefined') return;
     try {
-      const layoutToExport = {
-        dashboardVersion: DASHBOARD_LAYOUT_STORAGE_KEY.replace('dashboardLayoutV','v'), // e.g., v3.10
-        widgets: widgets,
-        notesCollection: { notes: sharedNotes, activeNoteId: activeSharedNoteId },
-        sharedGlobalTodos: sharedTodos,
-        sharedGlobalPhotoHistory: sharedPhotoHistory
-      };
-      const jsonString = JSON.stringify(layoutToExport, null, 2);
-      const blob = new Blob([jsonString], { type: 'application/json' });
-      const href = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = href;
-      link.download = `dashboard-layout-${layoutToExport.dashboardVersion}.json`; // Dynamic filename
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(href);
-    } catch (error) {
-      console.error("Error exporting layout:", error);
-      alert("Error exporting layout.");
-    }
+      const layoutToExport = { dashboardVersion: DASHBOARD_LAYOUT_STORAGE_KEY.replace('dashboardLayoutV','v'), widgets: widgets, notesCollection: { notes: sharedNotes, activeNoteId: activeSharedNoteId }, sharedGlobalTodos: sharedTodos, sharedGlobalPhotoHistory: sharedPhotoHistory };
+      const jsonString = JSON.stringify(layoutToExport, null, 2); const blob = new Blob([jsonString],{type:'application/json'}); const href = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = href; link.download = `dashboard-layout-${layoutToExport.dashboardVersion}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(href);
+    } catch (error) { console.error("Error exporting layout:", error); alert("Error exporting layout."); }
   };
 
   const handleImportLayout = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (typeof window === 'undefined') return;
-    const file = event.target.files?.[0];
-    if (!file) return;
-
+    if (typeof window === 'undefined') return; const file = event.target.files?.[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const text = e.target?.result;
-        if (typeof text !== 'string') {
-          throw new Error("Failed to read file content.");
-        }
-
+        const text = e.target?.result; if (typeof text !== 'string') throw new Error("Failed to read file content.");
         const importedData = JSON.parse(text);
-        let widgetsToImport: PageWidgetConfig[] = [];
-        let notesToImport: Note[] = sharedNotes; // Default to current if not in file
-        let activeNoteIdToImport: string | null = activeSharedNoteId;
-        let globalTodosToImport: TodoItem[] = sharedTodos;
-        let globalPhotoHistoryToImport: HistoricImage[] = sharedPhotoHistory;
+        let widgetsToImportRaw: any[] = []; // Use any[] for raw loaded data before processing
+        let notesToImport: Note[] = sharedNotes; let activeNoteIdToImport: string | null = activeSharedNoteId;
+        let globalTodosToImport: TodoItem[] = sharedTodos; let globalPhotoHistoryToImport: HistoricImage[] = sharedPhotoHistory;
 
-
-        // Check for new format (with version and specific keys)
-        if (importedData.dashboardVersion && importedData.widgets) {
-            widgetsToImport = importedData.widgets;
-            if (importedData.notesCollection) {
-                notesToImport = importedData.notesCollection.notes || [];
-                activeNoteIdToImport = importedData.notesCollection.activeNoteId || null;
-            }
-            if (importedData.sharedGlobalTodos && Array.isArray(importedData.sharedGlobalTodos)) {
-                globalTodosToImport = importedData.sharedGlobalTodos;
-            }
-            if (importedData.sharedGlobalPhotoHistory && Array.isArray(importedData.sharedGlobalPhotoHistory)) {
-                globalPhotoHistoryToImport = importedData.sharedGlobalPhotoHistory;
-            }
+        if (importedData.dashboardVersion && importedData.widgets) { // New format
+            widgetsToImportRaw = importedData.widgets;
+            if (importedData.notesCollection) { notesToImport = importedData.notesCollection.notes || []; activeNoteIdToImport = importedData.notesCollection.activeNoteId || null; }
+            if (importedData.sharedGlobalTodos && Array.isArray(importedData.sharedGlobalTodos)) { globalTodosToImport = importedData.sharedGlobalTodos; }
+            if (importedData.sharedGlobalPhotoHistory && Array.isArray(importedData.sharedGlobalPhotoHistory)) { globalPhotoHistoryToImport = importedData.sharedGlobalPhotoHistory; }
             alert(`Dashboard layout and global data (version ${importedData.dashboardVersion}) imported successfully!`);
         } else if (Array.isArray(importedData)) { // Legacy format (just an array of widgets)
-            widgetsToImport = importedData;
+            widgetsToImportRaw = importedData;
             alert("Dashboard layout (legacy format) imported. Global data (notes, todos, photo history) will use defaults or existing data.");
-        } else {
-            throw new Error("Invalid file format. Could not recognize dashboard structure.");
-        }
+        } else { throw new Error("Invalid file format. Could not recognize dashboard structure."); }
 
-        // Validate basic structure of imported widgets
-        if (widgetsToImport.length > 0 && typeof widgetsToImport[0].id !== 'string') {
-            throw new Error("Imported widget data seems invalid.");
-        }
+        if (widgetsToImportRaw.length > 0 && typeof widgetsToImportRaw[0].id !== 'string') throw new Error("Imported widget data seems invalid.");
         
-        // Process widgets to ensure they have correct settings structure
-        const processedWidgetsToImport = widgetsToImport.map(w => {
-            const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(def => def.type === w.type);
-            let finalSettings = { ...(blueprint?.defaultSettings || {}), ...(w.settings || {}) };
-            if (w.type === 'photo') {
-                finalSettings = ensurePhotoWidgetInstanceSettings(finalSettings as PhotoWidgetSettings);
-            }
-            return { ...w, settings: finalSettings };
-        });
+        const processedWidgetsToImport = widgetsToImportRaw.map(processWidgetConfig); // Process each widget
 
-        // Update all states
-        setWidgets(processedWidgetsToImport);
-        setSharedNotes(notesToImport);
-        setActiveSharedNoteId(activeNoteIdToImport);
-        setSharedTodos(globalTodosToImport);
-        setSharedPhotoHistory(globalPhotoHistoryToImport);
+        setWidgets(processedWidgetsToImport); setSharedNotes(notesToImport); setActiveSharedNoteId(activeNoteIdToImport);
+        setSharedTodos(globalTodosToImport); setSharedPhotoHistory(globalPhotoHistoryToImport);
+        setActiveWidgetId(null); setMaximizedWidgetId(null);
+        // Reset history after import
+        history.current = [JSON.parse(JSON.stringify(processedWidgetsToImport))]; historyPointer.current = 0;
+        setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length });
 
-        // Reset UI states
-        setActiveWidgetId(null);
-        setMaximizedWidgetId(null);
-        // Crucially, reset history after import
-        setHistory([JSON.parse(JSON.stringify(processedWidgetsToImport))]);
-        setHistoryPointer(0);
-
-      } catch (err: any) {
-        console.error("Error importing layout:", err);
-        alert(`Error importing layout: ${err.message || 'Invalid file content.'}`);
-      }
-      finally {
-        // Reset file input to allow importing the same file again if needed
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
-        }
-      }
+      } catch (err: any) { console.error("Error importing layout:", err); alert(`Error importing layout: ${err.message || 'Invalid file content.'}`); }
+      finally { if (fileInputRef.current) fileInputRef.current.value = ""; }
     };
-    reader.onerror = () => {
-      alert("Error reading file.");
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    };
+    reader.onerror = () => { alert("Error reading file."); if (fileInputRef.current) fileInputRef.current.value = ""; };
     reader.readAsText(file);
   };
 
-  const triggerImportFileSelect = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  };
+  const triggerImportFileSelect = () => { if (fileInputRef.current) fileInputRef.current.click(); };
 
-  // Helper to check for overlaps with a buffer
-  const doRectanglesOverlap = (
-    r1Col: number, r1Row: number, r1ColSpan: number, r1RowSpan: number,
-    r2Col: number, r2Row: number, r2ColSpan: number, r2RowSpan: number,
-    buffer: number = 0 // Cells to buffer around r2
-  ): boolean => {
-    // Adjust r2 with buffer, ensuring it stays within grid boundaries if known
-    const r2BufferedColStart = Math.max(1, r2Col - buffer);
-    const r2BufferedRowStart = Math.max(1, r2Row - buffer);
-    const r2BufferedColEnd = Math.min(widgetContainerCols > 0 ? widgetContainerCols : Infinity, r2Col + r2ColSpan - 1 + buffer);
-    const r2BufferedRowEnd = Math.min(widgetContainerRows > 0 ? widgetContainerRows : Infinity, r2Row + r2RowSpan - 1 + buffer);
+  // --- Widget Placement Logic (existing, unchanged) ---
+  const doRectanglesOverlap = (r1C:number,r1R:number,r1CS:number,r1RS:number,r2C:number,r2R:number,r2CS:number,r2RS:number,b:number=0):boolean => { const r2BSC=Math.max(1,r2C-b); const r2BSR=Math.max(1,r2R-b); const r2BCE=Math.min(widgetContainerCols>0?widgetContainerCols:Infinity,r2C+r2CS-1+b); const r2BRE=Math.min(widgetContainerRows>0?widgetContainerRows:Infinity,r2R+r2RS-1+b); const r1ACE=r1C+r1CS-1; const r1ARE=r1R+r1RS-1; return r1C<=r2BCE&&r1ACE>=r2BSC&&r1R<=r2BRE&&r1ARE>=r2BSR; };
+  const findNextAvailablePosition = (pCS:number,pRS:number):{colStart:number,rowStart:number}|null => { if(widgetContainerCols===0||widgetContainerRows===0)return null; for(let r=1;r<=widgetContainerRows;r++){for(let c=1;c<=widgetContainerCols;c++){ if(r+pRS-1>widgetContainerRows||c+pCS-1>widgetContainerCols){if(c+pCS-1>widgetContainerCols)break;continue;} let coll=false; for(const ew of widgets){if(doRectanglesOverlap(c,r,pCS,pRS,ew.colStart,ew.rowStart,ew.colSpan,ew.rowSpan,1)){coll=true;break;}} if(!coll)return{colStart:c,rowStart:r};}} return null; };
 
-    // Standard overlap check with r1 and buffered r2
-    const r1ActualColEnd = r1Col + r1ColSpan - 1;
-    const r1ActualRowEnd = r1Row + r1RowSpan - 1;
-
-    return r1Col <= r2BufferedColEnd &&
-           r1ActualColEnd >= r2BufferedColStart &&
-           r1Row <= r2BufferedRowEnd &&
-           r1ActualRowEnd >= r2BufferedRowStart;
-  };
-
-  const findNextAvailablePosition = (
-    placingColSpan: number,
-    placingRowSpan: number
-  ): { colStart: number, rowStart: number } | null => {
-    if (widgetContainerCols === 0 || widgetContainerRows === 0) return null; // Grid not ready
-
-    for (let r = 1; r <= widgetContainerRows; r++) {
-      for (let c = 1; c <= widgetContainerCols; c++) {
-        // Check if the widget fits within the grid boundaries from this starting point
-        if (r + placingRowSpan - 1 > widgetContainerRows || c + placingColSpan - 1 > widgetContainerCols) {
-          if (c + placingColSpan - 1 > widgetContainerCols) break; // Move to next row if it won't fit in this col
-          continue; // Try next column in the current row
-        }
-
-        let collision = false;
-        for (const existingWidget of widgets) {
-          // Use a buffer of 1 cell to ensure some spacing
-          if (doRectanglesOverlap(c, r, placingColSpan, placingRowSpan,
-                                  existingWidget.colStart, existingWidget.rowStart,
-                                  existingWidget.colSpan, existingWidget.rowSpan, 1)) {
-            collision = true;
-            break;
-          }
-        }
-        if (!collision) {
-          return { colStart: c, rowStart: r };
-        }
-      }
-    }
-    return null; // No suitable position found
-  };
-
+  // --- Widget Actions ---
   const handleAddNewWidget = (widgetType: WidgetType) => {
-    if (maximizedWidgetId) return; // Don't add widgets when one is maximized
-
+    if (maximizedWidgetId) return;
     const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(def => def.type === widgetType);
-    if (!blueprint) {
-      alert(`Widget type "${widgetType}" is not available.`);
-      setIsAddWidgetMenuOpen(false);
-      return;
-    }
-
+    if (!blueprint) { alert(`Widget type "${widgetType}" is not available.`); setIsAddWidgetMenuOpen(false); return; }
     const { defaultColSpan, defaultRowSpan } = blueprint;
-    if (widgetContainerCols === 0 || widgetContainerRows === 0) {
-        alert("Grid not fully initialized. Please wait a moment and try again.");
-        setIsAddWidgetMenuOpen(false);
-        return;
-    }
-
+    if (widgetContainerCols === 0 || widgetContainerRows === 0) { alert("Grid not fully initialized. Please wait a moment and try again."); setIsAddWidgetMenuOpen(false); return; }
     const position = findNextAvailablePosition(defaultColSpan, defaultRowSpan);
-    if (!position) {
-      alert("No available space to add this widget. Try making some room or resizing existing widgets.");
-      setIsAddWidgetMenuOpen(false);
-      return;
-    }
+    if (!position) { alert("No available space to add this widget. Try making some room or resizing existing widgets."); setIsAddWidgetMenuOpen(false); return; }
 
-    const newWidgetId = `${blueprint.type}-${Date.now()}`;
-    
-    // Ensure correct settings structure, especially for photo widgets
     let newWidgetInstanceSettings = JSON.parse(JSON.stringify(blueprint.defaultSettings || {}));
-    if (blueprint.type === 'photo') {
-        newWidgetInstanceSettings = ensurePhotoWidgetInstanceSettings(newWidgetInstanceSettings as PhotoWidgetSettings);
-    }
+    if (blueprint.type === 'photo') { newWidgetInstanceSettings = ensurePhotoWidgetInstanceSettings(newWidgetInstanceSettings as PhotoWidgetSettings); }
 
     const newWidget: PageWidgetConfig = {
-      id: newWidgetId,
-      title: blueprint.defaultTitle,
-      type: blueprint.type,
-      colStart: position.colStart,
-      rowStart: position.rowStart,
-      colSpan: defaultColSpan,
-      rowSpan: defaultRowSpan,
-      settings: newWidgetInstanceSettings,
+      id: `${blueprint.type}-${Date.now()}`, title: blueprint.defaultTitle, type: blueprint.type,
+      colStart: position.colStart, rowStart: position.rowStart, colSpan: defaultColSpan, rowSpan: defaultRowSpan,
+      settings: newWidgetInstanceSettings, // Content settings
+      containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS }, // Appearance settings
       isMinimized: false,
-      // originalRowSpan is not set initially
     };
     
-    setWidgets(prev => {
-        const updatedWidgets = [...prev, newWidget];
-        updateWidgetsAndPushToHistory(updatedWidgets, `add_widget_${widgetType}`);
-        return updatedWidgets;
-    });
-    setActiveWidgetId(newWidgetId); // This will trigger the auto-deselect timer
-    setIsAddWidgetMenuOpen(false);
+    setWidgets(prev => { const updatedWidgets = [...prev, newWidget]; updateWidgetsAndPushToHistory(updatedWidgets, `add_widget_${widgetType}`); return updatedWidgets; });
+    setActiveWidgetId(newWidget.id); setIsAddWidgetMenuOpen(false);
   };
 
+  const handleWidgetResizeLive = (id: string, newGeometry: WidgetResizeDataType) => { if (isPerformingUndoRedo.current || maximizedWidgetId) return; setWidgets(currentWidgets => currentWidgets.map(w => w.id === id ? { ...w, ...newGeometry, isMinimized: false } : w)); };
+  const handleWidgetResizeEnd = (id: string, finalGeometry: WidgetResizeDataType) => { if (maximizedWidgetId) return; setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.map(w => w.id === id ? { ...w, ...finalGeometry, isMinimized: false, originalRowSpan: undefined } : w); updateWidgetsAndPushToHistory(updatedWidgets, `resize_end_${id}`); return updatedWidgets; }); setActiveWidgetId(id); };
+  const handleWidgetMove = (id: string, newPosition: WidgetMoveDataType) => { if (maximizedWidgetId) return; const currentWidget = widgets.find(w => w.id === id); if (!currentWidget) return; if (currentWidget.colStart !== newPosition.colStart || currentWidget.rowStart !== newPosition.rowStart) { setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.map(w => w.id === id ? { ...w, ...newPosition } : w); updateWidgetsAndPushToHistory(updatedWidgets, `move_${id}`); return updatedWidgets; }); } setActiveWidgetId(id); };
+  const handleWidgetDelete = (idToDelete: string) => { if (maximizedWidgetId === idToDelete) { setMaximizedWidgetId(null); setMaximizedWidgetOriginalState(null); } setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.filter(widget => widget.id !== idToDelete); updateWidgetsAndPushToHistory(updatedWidgets, `delete_${idToDelete}`); return updatedWidgets; }); if (activeWidgetId === idToDelete) setActiveWidgetId(null); };
+  const handleWidgetFocus = (id: string) => { if (maximizedWidgetId && maximizedWidgetId !== id) return; setActiveWidgetId(id); };
 
-  // Live resize, no history update yet
-  const handleWidgetResizeLive = (id: string, newGeometry: WidgetResizeDataType) => {
-    if (isPerformingUndoRedo.current || maximizedWidgetId) return; // Prevent changes during undo/redo or when maximized
-    setWidgets(currentWidgets =>
-      currentWidgets.map(w =>
-        w.id === id ? { ...w, ...newGeometry, isMinimized: false } : w
-      )
-    );
-  };
+  // For widget *content* settings
+  const handleOpenWidgetSettings = (widgetId: string) => { if (maximizedWidgetId && maximizedWidgetId !== widgetId) return; const widgetToEdit = widgets.find(w => w.id === widgetId); if (widgetToEdit) { setActiveWidgetId(widgetId); setSelectedWidgetForSettings(widgetToEdit); setIsSettingsModalOpen(true); } };
+  const handleCloseSettingsModal = () => { setIsSettingsModalOpen(false); setSelectedWidgetForSettings(null); };
+  const handleSaveWidgetInstanceSettings = useCallback((widgetId: string, newInstanceSettings: AllWidgetSettings) => { setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.map(w => w.id === widgetId ? { ...w, settings: { ...(w.settings || {}), ...newInstanceSettings } } : w); updateWidgetsAndPushToHistory(updatedWidgets, `save_settings_${widgetId}`); return updatedWidgets; }); setActiveWidgetId(widgetId); }, [updateWidgetsAndPushToHistory]);
 
-  // Resize end, update history
-  const handleWidgetResizeEnd = (id: string, finalGeometry: WidgetResizeDataType) => {
-    if (maximizedWidgetId) return; // Should not happen if interaction is disabled on maximized
-    setWidgets(currentWidgets => {
-        const updatedWidgets = currentWidgets.map(w =>
-          w.id === id ? { ...w, ...finalGeometry, isMinimized: false, originalRowSpan: undefined } : w
-        );
-        updateWidgetsAndPushToHistory(updatedWidgets, `resize_end_${id}`);
-        return updatedWidgets;
-    });
-    setActiveWidgetId(id); // Re-activate to reset its deselect timer
-  };
-
-  const handleWidgetMove = (id: string, newPosition: WidgetMoveDataType) => {
-    if (maximizedWidgetId) return; // Should not happen
-
-    const currentWidget = widgets.find(w => w.id === id);
-    if (!currentWidget) return;
-
-    // Only update and push to history if position actually changed
-    if (currentWidget.colStart !== newPosition.colStart || currentWidget.rowStart !== newPosition.rowStart) {
-        setWidgets(currentWidgets => {
-            const updatedWidgets = currentWidgets.map(w =>
-              w.id === id ? { ...w, ...newPosition } : w
-            );
-            updateWidgetsAndPushToHistory(updatedWidgets, `move_${id}`);
-            return updatedWidgets;
-        });
-    }
-    setActiveWidgetId(id); // Re-activate to reset its deselect timer
-  };
-
-  const handleWidgetDelete = (idToDelete: string) => {
-    if (maximizedWidgetId === idToDelete) { // If deleting the maximized widget
-        setMaximizedWidgetId(null);
-        // No need to restore original state as it's being deleted
-    }
-    setWidgets(currentWidgets => {
-        const updatedWidgets = currentWidgets.filter(widget => widget.id !== idToDelete);
-        updateWidgetsAndPushToHistory(updatedWidgets, `delete_${idToDelete}`);
-        return updatedWidgets;
-    });
-    if (activeWidgetId === idToDelete) {
-      setActiveWidgetId(null); // This will clear the timer via useEffect
-    }
-  };
-
-
-  const handleWidgetFocus = (id: string) => {
-    if (maximizedWidgetId && maximizedWidgetId !== id) return; // Don't change focus if a different widget is maximized
-    // Setting the activeWidgetId (even if it's the same) will trigger the
-    // useEffect for the deselect timer, effectively resetting it.
-    setActiveWidgetId(id);
-  };
-
-  const handleOpenWidgetSettings = (widgetId: string) => {
-    if (maximizedWidgetId && maximizedWidgetId !== widgetId) return; // Don't open settings if a different widget is maximized
+  // For widget *container/appearance* settings
+  const handleOpenContainerSettingsModal = (widgetId: string) => {
+    if (maximizedWidgetId && maximizedWidgetId !== widgetId) return;
     const widgetToEdit = widgets.find(w => w.id === widgetId);
-    if (widgetToEdit) { 
-        setActiveWidgetId(widgetId); // Keep widget active (or make it active) when opening settings
-        setSelectedWidgetForSettings(widgetToEdit); 
-        setIsSettingsModalOpen(true); 
+    if (widgetToEdit) {
+      setActiveWidgetId(widgetId); // Keep widget active
+      setSelectedWidgetForContainerSettings(widgetToEdit);
+      setIsContainerSettingsModalOpen(true);
     }
   };
-
-  const handleCloseSettingsModal = () => { 
-    setIsSettingsModalOpen(false); 
-    setSelectedWidgetForSettings(null); 
-    // The activeWidgetId's deselect timer will continue or restart via its useEffect dependency.
+  const handleCloseContainerSettingsModal = () => {
+    setIsContainerSettingsModalOpen(false);
+    setSelectedWidgetForContainerSettings(null);
   };
-  
-  // Centralized settings save function for all widget types
-  const handleSaveWidgetInstanceSettings = useCallback((widgetId: string, newInstanceSettings: AllWidgetSettings) => {
+  const handleSaveWidgetContainerSettings = useCallback((widgetId: string, newContainerSettings: WidgetContainerSettings) => {
     setWidgets(currentWidgets => {
         const updatedWidgets = currentWidgets.map(w => {
             if (w.id === widgetId) {
-                // The newInstanceSettings should be the complete settings object for that widget type
-                const mergedSettings = { ...(w.settings || {}), ...newInstanceSettings };
-                return { ...w, settings: mergedSettings };
+                // Ensure we merge with existing container settings or defaults if none exist
+                const existingContainerSettings = w.containerSettings || DEFAULT_WIDGET_CONTAINER_SETTINGS;
+                return { ...w, containerSettings: { ...existingContainerSettings, ...newContainerSettings } };
             }
             return w;
         });
-        updateWidgetsAndPushToHistory(updatedWidgets, `save_settings_${widgetId}`);
+        updateWidgetsAndPushToHistory(updatedWidgets, `save_container_settings_${widgetId}`);
         return updatedWidgets;
     });
-    // After saving settings, ensure the widget remains active and its timer is reset.
-    setActiveWidgetId(widgetId); 
+    setActiveWidgetId(widgetId); // Keep active
   }, [updateWidgetsAndPushToHistory]);
 
 
-  const handleWidgetMinimizeToggle = (widgetId: string) => {
-    if (maximizedWidgetId) return; // Don't minimize/restore if any widget is maximized
+  const handleWidgetMinimizeToggle = (widgetId: string) => { if (maximizedWidgetId) return; setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.map(w => { if (w.id === widgetId) { if (w.isMinimized) { return { ...w, isMinimized: false, rowSpan: w.originalRowSpan || w.rowSpan, originalRowSpan: undefined }; } else { return { ...w, isMinimized: true, originalRowSpan: w.rowSpan, rowSpan: MINIMIZED_WIDGET_ROW_SPAN }; } } return w; }); updateWidgetsAndPushToHistory(updatedWidgets, `minimize_toggle_${widgetId}`); return updatedWidgets; }); setActiveWidgetId(widgetId); };
+  const handleWidgetMaximizeToggle = (widgetId: string) => { const widgetToToggle = widgets.find(w => w.id === widgetId); if (!widgetToToggle) return; if (maximizedWidgetId === widgetId) { setMaximizedWidgetId(null); setMaximizedWidgetOriginalState(null); setActiveWidgetId(widgetId); } else { let originalStateForMaximize = JSON.parse(JSON.stringify(widgetToToggle)); if (widgetToToggle.isMinimized) { originalStateForMaximize = { ...originalStateForMaximize, isMinimized: false, rowSpan: widgetToToggle.originalRowSpan || widgetToToggle.rowSpan, originalRowSpan: undefined }; } setMaximizedWidgetOriginalState(originalStateForMaximize); setMaximizedWidgetId(widgetId); setActiveWidgetId(widgetId); } };
 
-    setWidgets(currentWidgets => {
-        const updatedWidgets = currentWidgets.map(w => {
-          if (w.id === widgetId) {
-            if (w.isMinimized) {
-              // Restore: use originalRowSpan if available, otherwise keep current rowSpan (should be MINIMIZED_WIDGET_ROW_SPAN)
-              return { ...w, isMinimized: false, rowSpan: w.originalRowSpan || w.rowSpan, originalRowSpan: undefined };
-            } else {
-              // Minimize: save current rowSpan as originalRowSpan, set rowSpan to minimized height
-              return { ...w, isMinimized: true, originalRowSpan: w.rowSpan, rowSpan: MINIMIZED_WIDGET_ROW_SPAN };
-            }
-          }
-          return w;
-        });
-        updateWidgetsAndPushToHistory(updatedWidgets, `minimize_toggle_${widgetId}`);
-        return updatedWidgets;
-    });
-    setActiveWidgetId(widgetId); // Keep active and reset timer
-  };
+  // --- Undo/Redo ---
+  const handleUndo = () => { if (historyPointer.current > 0) { isPerformingUndoRedo.current = true; const newPointer = historyPointer.current - 1; historyPointer.current = newPointer; const historicWidgets = JSON.parse(JSON.stringify(history.current[newPointer])); setWidgets(historicWidgets); setActiveWidgetId(null); setMaximizedWidgetId(null); setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length }); requestAnimationFrame(() => { isPerformingUndoRedo.current = false; }); } };
+  const handleRedo = () => { if (historyPointer.current < history.current.length - 1) { isPerformingUndoRedo.current = true; const newPointer = historyPointer.current + 1; historyPointer.current = newPointer; const historicWidgets = JSON.parse(JSON.stringify(history.current[newPointer])); setWidgets(historicWidgets); setActiveWidgetId(null); setMaximizedWidgetId(null); setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length }); requestAnimationFrame(() => { isPerformingUndoRedo.current = false; }); } };
 
-  const handleWidgetMaximizeToggle = (widgetId: string) => {
-    const widgetToToggle = widgets.find(w => w.id === widgetId);
-    if (!widgetToToggle) return;
-
-    if (maximizedWidgetId === widgetId) { // Currently maximized, so un-maximize
-        setMaximizedWidgetId(null);
-        setMaximizedWidgetOriginalState(null); // Clear stored original state
-        setActiveWidgetId(widgetId); // Make it active, timer will start via useEffect
-    } else { // Not maximized (or a different one is), so maximize this one
-      // Store a deep copy of its current state before altering for maximization
-      let originalStateForMaximize = JSON.parse(JSON.stringify(widgetToToggle));
-      
-      // If it was minimized, ensure its originalRowSpan is used for the stored state
-      if (widgetToToggle.isMinimized) {
-        originalStateForMaximize = {
-            ...originalStateForMaximize,
-            isMinimized: false, // It won't be minimized when maximized
-            rowSpan: widgetToToggle.originalRowSpan || widgetToToggle.rowSpan, // Use original if available
-            originalRowSpan: undefined // Clear this as it's no longer relevant for the "maximized" state itself
-        };
-      }
-
-      setMaximizedWidgetOriginalState(originalStateForMaximize);
-      setMaximizedWidgetId(widgetId);
-      setActiveWidgetId(widgetId); // Ensure it's active; timer will be paused by maximizedWidgetId condition in useEffect
-    }
-  };
-
-  const handleUndo = () => {
-    if (historyPointer > 0) {
-      isPerformingUndoRedo.current = true;
-      const newPointer = historyPointer - 1;
-      setHistoryPointer(newPointer);
-      // Get a deep copy of the historic state to prevent direct mutation issues
-      const historicWidgets = JSON.parse(JSON.stringify(history[newPointer]));
-      setWidgets(historicWidgets);
-      setActiveWidgetId(null); // Deselect any active widget
-      setMaximizedWidgetId(null); // Ensure no widget is maximized
-      // Defer resetting the flag until after React has processed state updates
-      requestAnimationFrame(() => { isPerformingUndoRedo.current = false; });
-    }
-  };
-
-  const handleRedo = () => {
-    if (historyPointer < history.length - 1) {
-      isPerformingUndoRedo.current = true;
-      const newPointer = historyPointer + 1;
-      setHistoryPointer(newPointer);
-      const historicWidgets = JSON.parse(JSON.stringify(history[newPointer]));
-      setWidgets(historicWidgets);
-      setActiveWidgetId(null);
-      setMaximizedWidgetId(null);
-      requestAnimationFrame(() => { isPerformingUndoRedo.current = false; });
-    }
-  };
-
-  // This effect synchronizes the history if widgets state is changed externally (e.g., by import)
-  // or if an undo/redo operation itself needs to be "committed" if it were the last action.
-  // However, its primary role is to ensure direct manipulations of `widgets` (outside undo/redo) update history.
+  // Sync history if widgets change externally (e.g., import) or after undo/redo if it's the last action
   useEffect(() => {
-    // Only run if not currently performing an undo/redo and initial load is done
     if (initialLoadAttempted.current && !isPerformingUndoRedo.current) {
-        const currentHistoryTop = historyPointer >= 0 && historyPointer < history.length ? history[historyPointer] : null;
-        // If the current widgets state is different from what's at the top of history, update history
+        const currentHistoryTop = historyPointer.current >= 0 && historyPointer.current < history.current.length ? history.current[historyPointer.current] : null;
         if (!currentHistoryTop || JSON.stringify(currentHistoryTop) !== JSON.stringify(widgets)) {
-            // console.log("Syncing widgets to history due to external change or divergence.");
             updateWidgetsAndPushToHistory(widgets, 'direct_widgets_change_sync');
         }
     }
-  }, [widgets, history, historyPointer, updateWidgetsAndPushToHistory]);
+  }, [widgets, updateWidgetsAndPushToHistory]); // Depends on widgets and the memoized update function
 
+  // Callbacks for widgets that modify shared global state
+  const handleSharedTodosChange = (newGlobalTodos: TodoItem[]) => { setSharedTodos(newGlobalTodos); };
+  const handleSharedPhotoHistoryChange = (newGlobalPhotoHistory: HistoricImage[]) => { setSharedPhotoHistory(newGlobalPhotoHistory); };
 
-  // Callback for TodoWidget to update the global list
-  const handleSharedTodosChange = (newGlobalTodos: TodoItem[]) => {
-    setSharedTodos(newGlobalTodos);
-    // Note: History for todos themselves is not part of the main widget layout history here.
-    // If you need undo/redo for todo items, that would be a separate mechanism.
-  };
-
-  // Callback for PhotoWidget to update global history
-  const handleSharedPhotoHistoryChange = (newGlobalPhotoHistory: HistoricImage[]) => {
-    setSharedPhotoHistory(newGlobalPhotoHistory);
-  };
-
-
+  // --- Render Functions ---
   const renderWidgetContent = (widgetConfig: PageWidgetConfig) => {
-    const currentWidgetSettings = widgetConfig.settings || {};
-
+    const currentWidgetSettings = widgetConfig.settings || {}; // Content settings
     switch (widgetConfig.type) {
       case 'weather': return <WeatherWidget id={widgetConfig.id} settings={currentWidgetSettings as WeatherWidgetSettings | undefined} />;
       case 'clock': return <ClockWidget id={widgetConfig.id} settings={currentWidgetSettings as ClockWidgetSettings | undefined} />;
@@ -926,205 +488,80 @@ export default function Home() {
       case 'minesweeper': return <MinesweeperWidget id={widgetConfig.id} settings={currentWidgetSettings as MinesweeperWidgetSettings | undefined} />;
       case 'unitConverter': return <UnitConverterWidget id={widgetConfig.id} settings={currentWidgetSettings as UnitConverterWidgetSettings | undefined} />;
       case 'countdownStopwatch': return <CountdownStopwatchWidget id={widgetConfig.id} settings={currentWidgetSettings as CountdownStopwatchWidgetSettings | undefined} />;
-      case 'photo':
-        return (
-          <PhotoWidget
-            id={widgetConfig.id}
-            settings={currentWidgetSettings as PhotoWidgetSettings | undefined} // Will use 'cover' by default now
-            onSettingsChange={handleSaveWidgetInstanceSettings} // Centralized save
-            sharedHistory={sharedPhotoHistory}
-            onSharedHistoryChange={handleSharedPhotoHistoryChange}
-          />
-        );
-      case 'todo':
-        return <TodoWidget
-                    instanceId={widgetConfig.id}
-                    settings={currentWidgetSettings as TodoWidgetSettings | undefined}
-                    todos={sharedTodos} // Pass the global list
-                    onTodosChange={handleSharedTodosChange} // Pass the updater for the global list
-                />;
-      case 'notes':
-        return <NotesWidget
-                  instanceId={widgetConfig.id} settings={currentWidgetSettings as PageInstanceNotesSettings | undefined}
-                  notes={sharedNotes} activeNoteId={activeSharedNoteId}
-                  onNotesChange={setSharedNotes} onActiveNoteIdChange={setActiveSharedNoteId}
-               />;
+      case 'photo': return <PhotoWidget id={widgetConfig.id} settings={currentWidgetSettings as PhotoWidgetSettings | undefined} onSettingsChange={handleSaveWidgetInstanceSettings} sharedHistory={sharedPhotoHistory} onSharedHistoryChange={handleSharedPhotoHistoryChange} />;
+      case 'todo': return <TodoWidget instanceId={widgetConfig.id} settings={currentWidgetSettings as TodoWidgetSettings | undefined} todos={sharedTodos} onTodosChange={handleSharedTodosChange} />;
+      case 'notes': return <NotesWidget instanceId={widgetConfig.id} settings={currentWidgetSettings as PageInstanceNotesSettings | undefined} notes={sharedNotes} activeNoteId={activeSharedNoteId} onNotesChange={setSharedNotes} onActiveNoteIdChange={setActiveSharedNoteId} />;
       default: return <p className="text-xs text-secondary italic">Generic widget content.</p>;
     }
   };
 
-  const getSettingsPanelForWidget = (widgetConfig: PageWidgetConfig | null) => {
-    if (!widgetConfig) return null;
-    const currentWidgetSettings = widgetConfig.settings || {};
-
-    // This function will be called by the specific settings panel when its "Save" button is clicked.
-    // It uses the centralized handleSaveWidgetInstanceSettings.
-    const boundSaveInstanceSettingsAndCloseModal = (newInstanceSettings: AllWidgetSettings) => {
-        handleSaveWidgetInstanceSettings(widgetConfig.id, newInstanceSettings);
-        handleCloseSettingsModal();
-    };
-    
-    // Specific handler for PhotoWidget as its settings panel might have a slightly different save signature if it were more complex.
-    // However, with the current PhotoSettingsPanel, it also just passes PhotoWidgetSettings.
-    const boundSavePhotoInstanceSettingsAndCloseModal = (newInstanceSettings: PhotoWidgetSettings) => {
-        handleSaveWidgetInstanceSettings(widgetConfig.id, newInstanceSettings);
-        handleCloseSettingsModal();
-    };
-
+  const getSettingsPanelForWidget = (widgetConfig: PageWidgetConfig | null) => { // For widget content settings
+    if (!widgetConfig) return null; const currentContentSettings = widgetConfig.settings || {};
+    const boundSaveInstanceContentSettings = (newInstanceContentSettings: AllWidgetSettings) => { handleSaveWidgetInstanceSettings(widgetConfig.id, newInstanceContentSettings); handleCloseSettingsModal(); };
+    const boundSavePhotoInstanceContentSettings = (newInstancePhotoSettings: PhotoWidgetSettings) => { handleSaveWidgetInstanceSettings(widgetConfig.id, newInstancePhotoSettings); handleCloseSettingsModal(); };
     switch (widgetConfig.type) {
-      case 'weather': return <WeatherSettingsPanel widgetId={widgetConfig.id} currentSettings={currentWidgetSettings as WeatherWidgetSettings | undefined} onSave={boundSaveInstanceSettingsAndCloseModal} />;
-      case 'clock': return <ClockSettingsPanel widgetId={widgetConfig.id} currentSettings={currentWidgetSettings as ClockWidgetSettings | undefined} onSave={boundSaveInstanceSettingsAndCloseModal} />;
-      case 'calculator': return <CalculatorSettingsPanel widgetId={widgetConfig.id} currentSettings={currentWidgetSettings as CalculatorWidgetSettings | undefined} onSave={boundSaveInstanceSettingsAndCloseModal} />;
-      case 'youtube': return <YoutubeSettingsPanel widgetId={widgetConfig.id} currentSettings={currentWidgetSettings as YoutubeWidgetSettings | undefined} onSave={boundSaveInstanceSettingsAndCloseModal} />;
-      case 'minesweeper': return <MinesweeperSettingsPanel widgetId={widgetConfig.id} currentSettings={currentWidgetSettings as MinesweeperWidgetSettings | undefined} onSave={boundSaveInstanceSettingsAndCloseModal} />;
-      case 'unitConverter': return <UnitConverterSettingsPanel widgetId={widgetConfig.id} currentSettings={currentWidgetSettings as UnitConverterWidgetSettings | undefined} onSave={boundSaveInstanceSettingsAndCloseModal} />;
-      case 'countdownStopwatch': return <CountdownStopwatchSettingsPanel widgetId={widgetConfig.id} currentSettings={currentWidgetSettings as CountdownStopwatchWidgetSettings | undefined} onSave={boundSaveInstanceSettingsAndCloseModal} />;
-      case 'photo':
-        return <PhotoSettingsPanel
-                  widgetId={widgetConfig.id}
-                  currentSettings={currentWidgetSettings as PhotoWidgetSettings | undefined} // Will reflect 'cover' as default
-                  onSaveInstanceSettings={boundSavePhotoInstanceSettingsAndCloseModal} // Centralized save
-                  onClearGlobalHistory={() => {
-                      handleSharedPhotoHistoryChange([]); // Clears the global state
-                      alert('Global photo history has been cleared.');
-                  }}
-                  globalHistoryLength={sharedPhotoHistory.length}
-               />;
-      case 'notes':
-        return <NotesSettingsPanel
-                  widgetInstanceId={widgetConfig.id} currentSettings={currentWidgetSettings as PageInstanceNotesSettings | undefined}
-                  onSaveLocalSettings={boundSaveInstanceSettingsAndCloseModal} // Centralized save
-                  onClearAllNotesGlobal={() => {
-                      setSharedNotes([]); setActiveSharedNoteId(null); // Clear global notes state
-                      alert("All notes have been cleared from the dashboard.");
-                  }}
-               />;
-      case 'todo':
-        return <TodoSettingsPanel
-                  widgetId={widgetConfig.id}
-                  currentSettings={currentWidgetSettings as TodoWidgetSettings | undefined}
-                  onSave={boundSaveInstanceSettingsAndCloseModal} // Centralized save
-                  onClearAllTasks={() => {
-                    handleSharedTodosChange([]); // Clears the global list
-                    alert(`The global to-do list has been cleared.`);
-                  }}
-                />;
-      default: return <p className="text-sm text-secondary">No specific settings available for this widget type.</p>;
+      case 'weather': return <WeatherSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as WeatherWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} />;
+      case 'clock': return <ClockSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as ClockWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} />;
+      case 'calculator': return <CalculatorSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as CalculatorWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} />;
+      case 'youtube': return <YoutubeSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as YoutubeWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} />;
+      case 'minesweeper': return <MinesweeperSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as MinesweeperWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} />;
+      case 'unitConverter': return <UnitConverterSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as UnitConverterWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} />;
+      case 'countdownStopwatch': return <CountdownStopwatchSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as CountdownStopwatchWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} />;
+      case 'photo': return <PhotoSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as PhotoWidgetSettings | undefined} onSaveInstanceSettings={boundSavePhotoInstanceContentSettings} onClearGlobalHistory={() => { handleSharedPhotoHistoryChange([]); alert('Global photo history has been cleared.'); }} globalHistoryLength={sharedPhotoHistory.length} />;
+      case 'notes': return <NotesSettingsPanel widgetInstanceId={widgetConfig.id} currentSettings={currentContentSettings as PageInstanceNotesSettings | undefined} onSaveLocalSettings={boundSaveInstanceContentSettings} onClearAllNotesGlobal={() => { setSharedNotes([]); setActiveSharedNoteId(null); alert("All notes have been cleared from the dashboard."); }} />;
+      case 'todo': return <TodoSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as TodoWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} onClearAllTasks={() => { handleSharedTodosChange([]); alert(`The global to-do list has been cleared.`); }} />;
+      default: return <p className="text-sm text-secondary">No specific content settings available for this widget type.</p>;
     }
   };
   
-  // Loading screen until initial setup (especially grid dimensions) is complete
+  // Loading screen until initial setup (grid dimensions) is complete
   if (!initialLoadAttempted.current || widgetContainerCols === 0 || widgetContainerRows === 0) {
     return <div className="w-full h-screen bg-page-background flex items-center justify-center text-page-foreground">Loading Dashboard...</div>;
   }
 
   return (
     <main className="w-full h-screen bg-page-background text-page-foreground overflow-hidden relative flex flex-col"
-      onClick={(e) => { 
-        // Deselect active widget if clicking on the main background itself, and no widget is maximized
-        if (e.target === e.currentTarget && !maximizedWidgetId) {
-          setActiveWidgetId(null); // This will clear the timer via useEffect
-        }
-      }}
+      onClick={(e) => { if (e.target === e.currentTarget && !maximizedWidgetId) setActiveWidgetId(null); }}
     >
       <header ref={headerRef} className="p-3 bg-dark-surface text-primary flex items-center justify-between shadow-lg z-40 shrink-0 border-b border-[var(--dark-border-interactive)]">
-        {/* Header Controls: Undo, Redo, Add Widget, Export, Import */}
         <div className="flex items-center space-x-2">
-          <button onClick={handleUndo} disabled={historyPointer <= 0 || !!maximizedWidgetId} className="control-button" aria-label="Undo"><UndoIcon /></button>
-          <button onClick={handleRedo} disabled={historyPointer >= history.length - 1 || !!maximizedWidgetId} className="control-button" aria-label="Redo"><RedoIcon /></button>
-          
+          <button onClick={handleUndo} disabled={historyPointer.current <= 0 || !!maximizedWidgetId} className="control-button" aria-label="Undo"><UndoIcon /></button>
+          <button onClick={handleRedo} disabled={historyPointer.current >= history.current.length - 1 || !!maximizedWidgetId} className="control-button" aria-label="Redo"><RedoIcon /></button>
           <div className="relative" ref={addWidgetMenuRef}>
-            <button id="add-widget-button" onClick={() => setIsAddWidgetMenuOpen(prev => !prev)} disabled={!!maximizedWidgetId} className="control-button flex items-center" aria-expanded={isAddWidgetMenuOpen} aria-haspopup="true" aria-label="Add New Widget" >
-              <AddIcon /> <span className="ml-1.5 text-xs hidden sm:inline">Add Widget</span>
-            </button>
-            {isAddWidgetMenuOpen && (
-              <div className="absolute backdrop-blur-md left-0 mt-2 w-56 origin-top-left rounded-md bg-dark-surface border border-dark-border-interactive shadow-xl py-1 z-50 focus:outline-none animate-modalFadeInScale" role="menu" aria-orientation="vertical" aria-labelledby="add-widget-button" >
-                {AVAILABLE_WIDGET_DEFINITIONS.map(widgetDef => (
-                  <button key={widgetDef.type} onClick={() => handleAddNewWidget(widgetDef.type)} className="group flex items-center w-full text-left px-3 py-2.5 text-sm text-dark-text-primary hover:bg-dark-accent-primary hover:text-dark-text-on-accent focus:bg-dark-accent-primary focus:text-dark-text-on-accent focus:outline-none transition-all duration-150 ease-in-out hover:pl-4" role="menuitem" disabled={!!maximizedWidgetId} >
-                    {widgetDef.icon && <widgetDef.icon />} <span className="flex-grow">{widgetDef.displayName || widgetDef.defaultTitle.replace("New ", "")}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+            <button id="add-widget-button" onClick={() => setIsAddWidgetMenuOpen(prev => !prev)} disabled={!!maximizedWidgetId} className="control-button flex items-center" aria-expanded={isAddWidgetMenuOpen} aria-haspopup="true" aria-label="Add New Widget" > <AddIcon /> <span className="ml-1.5 text-xs hidden sm:inline">Add Widget</span> </button>
+            {isAddWidgetMenuOpen && ( <div className="absolute backdrop-blur-md left-0 mt-2 w-56 origin-top-left rounded-md bg-dark-surface border border-dark-border-interactive shadow-xl py-1 z-50 focus:outline-none animate-modalFadeInScale" role="menu" aria-orientation="vertical" aria-labelledby="add-widget-button" > {AVAILABLE_WIDGET_DEFINITIONS.map(widgetDef => ( <button key={widgetDef.type} onClick={() => handleAddNewWidget(widgetDef.type)} className="group flex items-center w-full text-left px-3 py-2.5 text-sm text-dark-text-primary hover:bg-dark-accent-primary hover:text-dark-text-on-accent focus:bg-dark-accent-primary focus:text-dark-text-on-accent focus:outline-none transition-all duration-150 ease-in-out hover:pl-4" role="menuitem" disabled={!!maximizedWidgetId} > {widgetDef.icon && <widgetDef.icon />} <span className="flex-grow">{widgetDef.displayName || widgetDef.defaultTitle.replace("New ", "")}</span> </button> ))} </div> )}
           </div>
-
           <button onClick={handleExportLayout} disabled={!!maximizedWidgetId} className="control-button" aria-label="Export Layout"><ExportIcon /></button>
           <button onClick={triggerImportFileSelect} disabled={!!maximizedWidgetId} className="control-button" aria-label="Import Layout"><ImportIcon /></button>
           <input type="file" ref={fileInputRef} onChange={handleImportLayout} accept=".json" style={{ display: 'none' }} />
         </div>
-        <div className="text-xs text-secondary px-3 py-1 bg-slate-700 rounded-md">History: {historyPointer + 1} / {history.length}</div>
+        <div className="text-xs text-secondary px-3 py-1 bg-slate-700 rounded-md">History: {historyDisplay.pointer} / {historyDisplay.length}</div>
       </header>
 
-      {/* Backdrop for maximized widget */}
-      {maximizedWidgetId && (
-        <div 
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-30" 
-          onClick={() => maximizedWidgetId && handleWidgetMaximizeToggle(maximizedWidgetId)} // Click backdrop to unmaximize
-        />
-      )}
+      {maximizedWidgetId && ( <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-30" onClick={() => maximizedWidgetId && handleWidgetMaximizeToggle(maximizedWidgetId)} /> )}
 
-      {/* Main content area with grid background and widgets */}
       <div className={`flex-grow relative ${maximizedWidgetId ? 'pointer-events-none' : ''}`}>
         <GridBackground />
-        <div 
-          className="absolute inset-0 grid gap-0" 
-          style={{ 
-            gridTemplateColumns: `repeat(${widgetContainerCols}, ${CELL_SIZE}px)`, 
-            gridTemplateRows: `repeat(${widgetContainerRows}, ${CELL_SIZE}px)`, 
-            alignContent: 'start' // Important for grid layout
-          }}
-        >
+        <div className="absolute inset-0 grid gap-0" style={{ gridTemplateColumns: `repeat(${widgetContainerCols}, ${CELL_SIZE}px)`, gridTemplateRows: `repeat(${widgetContainerRows}, ${CELL_SIZE}px)`, alignContent: 'start' }}>
           {widgets.map((widgetConfig) => {
-            // If a widget is maximized, only render that one. Otherwise, render all.
             if (maximizedWidgetId && maximizedWidgetId !== widgetConfig.id) return null;
-
-            // Determine the state to render: normal, minimized, or maximized
-            const currentWidgetState = maximizedWidgetId === widgetConfig.id && maximizedWidgetOriginalState 
-              ? { // Maximized state overrides geometry
-                  ...maximizedWidgetOriginalState, // Use original data but override geometry
-                  colStart: 1, 
-                  rowStart: 1, 
-                  colSpan: widgetContainerCols > 2 ? widgetContainerCols - 2 : widgetContainerCols, // Adjust for some padding if desired
-                  rowSpan: widgetContainerRows > 2 ? widgetContainerRows - 2 : widgetContainerRows,
-                  isMinimized: false // Cannot be minimized when maximized
-                } 
-              : widgetConfig; // Normal or minimized state from the array
-
-            const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(def => def.type === widgetConfig.type);
-            let minCol = blueprint?.minColSpan || 3;
-            let minRow = blueprint?.minRowSpan || 3;
-            
-            // If minimized (and not currently being rendered as maximized), adjust min dimensions
-            if (widgetConfig.isMinimized && maximizedWidgetId !== widgetConfig.id) {
-              minCol = widgetConfig.colSpan; // Minimized width is its current width
-              minRow = MINIMIZED_WIDGET_ROW_SPAN; // Minimized height
-            }
+            const currentWidgetState = maximizedWidgetId === widgetConfig.id && maximizedWidgetOriginalState ? { ...maximizedWidgetOriginalState, colStart: 1, rowStart: 1, colSpan: widgetContainerCols > 2 ? widgetContainerCols - 2 : widgetContainerCols, rowSpan: widgetContainerRows > 2 ? widgetContainerRows - 2 : widgetContainerRows, isMinimized: false } : widgetConfig;
+            const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(def => def.type === widgetConfig.type); let minCol = blueprint?.minColSpan || 3; let minRow = blueprint?.minRowSpan || 3;
+            if (widgetConfig.isMinimized && maximizedWidgetId !== widgetConfig.id) { minCol = widgetConfig.colSpan; minRow = MINIMIZED_WIDGET_ROW_SPAN; }
             
             return (
               <Widget
-                key={widgetConfig.id}
-                id={widgetConfig.id}
-                title={widgetConfig.title}
-                colStart={currentWidgetState.colStart}
-                rowStart={currentWidgetState.rowStart}
-                colSpan={currentWidgetState.colSpan}
-                rowSpan={currentWidgetState.rowSpan}
-                onResize={handleWidgetResizeLive}
-                onResizeEnd={handleWidgetResizeEnd}
-                onMove={handleWidgetMove}
-                onDelete={handleWidgetDelete}
-                onFocus={handleWidgetFocus}
-                onOpenSettings={handleOpenWidgetSettings}
-                isActive={widgetConfig.id === activeWidgetId && !maximizedWidgetId} // Active only if not maximized
-                CELL_SIZE={CELL_SIZE}
-                minColSpan={minCol}
-                minRowSpan={minRow}
-                totalGridCols={widgetContainerCols}
-                totalGridRows={widgetContainerRows}
-                isMinimized={widgetConfig.isMinimized && maximizedWidgetId !== widgetConfig.id} // True if minimized and not the one being maximized
-                onMinimizeToggle={() => handleWidgetMinimizeToggle(widgetConfig.id)}
-                isMaximized={maximizedWidgetId === widgetConfig.id} // True if this is the maximized widget
-                onMaximizeToggle={() => handleWidgetMaximizeToggle(widgetConfig.id)}
+                key={widgetConfig.id} id={widgetConfig.id} title={widgetConfig.title}
+                colStart={currentWidgetState.colStart} rowStart={currentWidgetState.rowStart} colSpan={currentWidgetState.colSpan} rowSpan={currentWidgetState.rowSpan}
+                onResize={handleWidgetResizeLive} onResizeEnd={handleWidgetResizeEnd} onMove={handleWidgetMove}
+                onDelete={handleWidgetDelete} onFocus={handleWidgetFocus}
+                onOpenSettings={handleOpenWidgetSettings} // For widget content settings
+                onOpenContainerSettings={handleOpenContainerSettingsModal} // For widget appearance settings
+                containerSettings={widgetConfig.containerSettings} // Pass current appearance settings
+                isActive={widgetConfig.id === activeWidgetId && !maximizedWidgetId} CELL_SIZE={CELL_SIZE}
+                minColSpan={minCol} minRowSpan={minRow} totalGridCols={widgetContainerCols} totalGridRows={widgetContainerRows}
+                isMinimized={widgetConfig.isMinimized && maximizedWidgetId !== widgetConfig.id} onMinimizeToggle={() => handleWidgetMinimizeToggle(widgetConfig.id)}
+                isMaximized={maximizedWidgetId === widgetConfig.id} onMaximizeToggle={() => handleWidgetMaximizeToggle(widgetConfig.id)}
               >
                 {renderWidgetContent(widgetConfig)}
               </Widget>
@@ -1132,7 +569,8 @@ export default function Home() {
           })}
         </div>
       </div>
-      {/* Settings Modal */}
+      
+      {/* Settings Modal for Widget Content */}
       {isSettingsModalOpen && selectedWidgetForSettings && (
         <SettingsModal 
           isOpen={isSettingsModalOpen} 
@@ -1141,46 +579,22 @@ export default function Home() {
           settingsContent={getSettingsPanelForWidget(selectedWidgetForSettings)} 
         />
       )}
+
+      {/* Settings Modal for Widget Container (Appearance) */}
+      {isContainerSettingsModalOpen && selectedWidgetForContainerSettings && (
+        <WidgetContainerSettingsModal
+          isOpen={isContainerSettingsModalOpen}
+          onClose={handleCloseContainerSettingsModal}
+          widgetId={selectedWidgetForContainerSettings.id}
+          widgetTitle={selectedWidgetForContainerSettings.title}
+          currentSettings={selectedWidgetForContainerSettings.containerSettings} // Pass current container settings
+          onSave={handleSaveWidgetContainerSettings} // Pass save handler for container settings
+        />
+      )}
     </main>
   );
 }
 
 // Inline styles for control buttons (can be moved to globals.css or a Tailwind plugin if preferred)
-const styles = `
-  .control-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.5rem; /* 8px */
-    background-color: var(--dark-accent-primary); /* Using CSS variable */
-    border-radius: 0.375rem; /* 6px */
-    color: var(--dark-text-on-accent); /* Using CSS variable */
-    transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* Subtle shadow */
-  }
-  .control-button:hover {
-    background-color: var(--dark-accent-primary-hover); /* Using CSS variable */
-    box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.1); /* Slightly larger shadow on hover */
-  }
-  .control-button:disabled {
-    background-color: hsl(222, 47%, 25%); /* A muted color for disabled state */
-    color: hsl(215, 20%, 55%);
-    cursor: not-allowed;
-    box-shadow: none;
-  }
-  .control-button:focus-visible { /* For keyboard navigation */
-    outline: 2px solid var(--dark-accent-primary-hover);
-    outline-offset: 2px;
-  }
-`;
-
-// Inject styles into the document head (client-side only)
-if (typeof window !== 'undefined') {
-  if (!document.getElementById('custom-dashboard-styles')) {
-    const styleSheet = document.createElement("style");
-    styleSheet.id = 'custom-dashboard-styles';
-    styleSheet.type = "text/css";
-    styleSheet.innerText = styles;
-    document.head.appendChild(styleSheet);
-  }
-}
+const styles = ` .control-button { display:flex; align-items:center; justify-content:center; padding:0.5rem; background-color:var(--dark-accent-primary); border-radius:0.375rem; color:var(--dark-text-on-accent); transition:background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out; box-shadow:0 1px 2px 0 rgba(0,0,0,0.05); } .control-button:hover { background-color:var(--dark-accent-primary-hover); box-shadow:0 2px 4px 0 rgba(0,0,0,0.1); } .control-button:disabled { background-color:hsl(222,47%,25%); color:hsl(215,20%,55%); cursor:not-allowed; box-shadow:none; } .control-button:focus-visible { outline:2px solid var(--dark-accent-primary-hover); outline-offset:2px; } `;
+if (typeof window !== 'undefined') { if (!document.getElementById('custom-dashboard-styles')) { const styleSheet = document.createElement("style"); styleSheet.id = 'custom-dashboard-styles'; styleSheet.type = "text/css"; styleSheet.innerText = styles; document.head.appendChild(styleSheet); } }
