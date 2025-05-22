@@ -21,6 +21,8 @@ import UnitConverterWidget, { UnitConverterSettingsPanel, UnitConverterWidgetSet
 import CountdownStopwatchWidget, { CountdownStopwatchSettingsPanel, CountdownStopwatchWidgetSettings } from "@/components/CountdownStopwatchWidget";
 import PhotoWidget, { PhotoSettingsPanel, PhotoWidgetSettings, HistoricImage } from "@/components/PhotoWidget";
 import PortfolioWidget, { PortfolioSettingsPanel, PortfolioWidgetSettings } from "@/components/PortfolioWidget";
+// Import the new GeminiChatWidget and its settings panel
+import GeminiChatWidget, { GeminiChatSettingsPanel, GeminiChatWidgetSettings } from "@/components/GeminiChatWidget";
 
 
 // --- Icons ---
@@ -67,13 +69,24 @@ const PortfolioIcon = () => (
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21V16.5m16.5 4.5V16.5m-16.5 0a2.25 2.25 0 012.25-2.25h12a2.25 2.25 0 012.25 2.25m-16.5 0h16.5" />
     </svg>
 );
+// Gemini Chat Icon
+const GeminiChatIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2 text-emerald-400">
+        {/* A simple chat bubble with a star or sparkle - more distinct for AI */}
+        <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3.697-3.697c-.022.012-.044.023-.066.034a5.106 5.106 0 01-2.193-.325 9.75 9.75 0 01-4.252-5.688 9.75 9.75 0 011.438-9.049c1.128-1.223 2.712-2.058 4.498-2.213.01-.002.02-.003.03-.005a.75.75 0 01.729.734c.006.014.008.028.008.042v.444a5.062 5.062 0 002.474 3.578z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 12.75h.008v.008H6.75v-.008zm3.75 0h.008v.008h-.008v-.008zm3.75 0h.008v.008h-.008v-.008z" /> {/* Dots for thinking */}
+        {/* Sparkle / Star element */}
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15.375 19.5l-1.06-2.121L12 16.318l-2.315 1.06L8.625 19.5l1.06 2.121L12 22.682l2.315-1.061 1.06-2.121z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 3.75l.938-.469L12 2.25l-.938 1.031L12 3.75zm0 0v1.5m0 0V3.75m0 1.5h1.5m-1.5 0H10.5m1.5 1.5l.938.469L12 7.75l-.938-.469L12 6.75zm0 0v-1.5m0 0V6.75m0-1.5h-1.5m1.5 0H13.5" />
+    </svg>
+);
 
 
 // --- Constants ---
 const CELL_SIZE = 30;
 const MAX_HISTORY_LENGTH = 50;
 const MINIMIZED_WIDGET_ROW_SPAN = 2;
-const DASHBOARD_LAYOUT_STORAGE_KEY = 'dashboardLayoutV3.15';
+const DASHBOARD_LAYOUT_STORAGE_KEY = 'dashboardLayoutV3.16'; // Incremented for Gemini Chat Widget
 const GLOBAL_NOTES_STORAGE_KEY = 'dashboardGlobalNotesCollection_v1';
 const GLOBAL_TODOS_STORAGE_KEY = 'dashboardGlobalSingleTodoList_v1';
 const GLOBAL_PHOTO_HISTORY_STORAGE_KEY = 'dashboardGlobalPhotoHistory_v1';
@@ -87,9 +100,6 @@ const DEFAULT_WIDGET_CONTAINER_SETTINGS: WidgetContainerSettings = {
 };
 
 // --- Interfaces ---
-// Using Record<string, unknown> instead of Record<string, any> for better type safety.
-// This means that if a widget has settings not explicitly defined in the union,
-// their values will be of type `unknown` and require type checking or casting.
 export type AllWidgetSettings =
     WeatherWidgetSettings |
     TodoWidgetSettings |
@@ -102,11 +112,14 @@ export type AllWidgetSettings =
     CountdownStopwatchWidgetSettings |
     PhotoWidgetSettings |
     PortfolioWidgetSettings |
-    Record<string, unknown>; // Changed from any to unknown
+    GeminiChatWidgetSettings | // Add GeminiChatWidgetSettings
+    Record<string, unknown>;
 
 export type WidgetType =
     'weather' | 'todo' | 'clock' | 'calculator' | 'notes' | 'youtube' |
-    'minesweeper' | 'unitConverter' | 'countdownStopwatch' | 'photo' | 'portfolio' | 'generic';
+    'minesweeper' | 'unitConverter' | 'countdownStopwatch' | 'photo' | 'portfolio' |
+    'geminiChat' | // Add geminiChat type
+    'generic';
 
 export interface PageWidgetConfig {
   id: string;
@@ -149,6 +162,11 @@ const PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS: PortfolioWidgetSettings = {
     showAnimatedBackground: true,
 };
 
+// Default settings for the Gemini Chat Widget
+const GEMINI_CHAT_WIDGET_DEFAULT_INSTANCE_SETTINGS: GeminiChatWidgetSettings = {
+    customSystemPrompt: '', // Default empty system prompt
+};
+
 
 const AVAILABLE_WIDGET_DEFINITIONS: WidgetBlueprint[] = [
   { type: 'weather', defaultTitle: 'New Weather', displayName: 'Weather', description: "Live weather updates and forecasts.", icon: WeatherIcon, defaultColSpan: 12, defaultRowSpan: 14, minColSpan: 6, minRowSpan: 8, defaultSettings: { location: '97504 US', units: 'imperial', useCurrentLocation: false } },
@@ -161,11 +179,48 @@ const AVAILABLE_WIDGET_DEFINITIONS: WidgetBlueprint[] = [
   { type: 'unitConverter', defaultTitle: 'Unit Converter', displayName: 'Unit Converter', description: "Convert various units.", icon: UnitConverterIcon, defaultColSpan: 15, defaultRowSpan: 13, minColSpan: 6, minRowSpan: 8, defaultSettings: { defaultCategory: 'Length', precision: 4 } as UnitConverterWidgetSettings },
   { type: 'countdownStopwatch', defaultTitle: 'Timer / Stopwatch', displayName: 'Timer/Stopwatch', description: "Countdown timer and stopwatch.", icon: CountdownStopwatchIcon, defaultColSpan: 14, defaultRowSpan: 14, minColSpan: 6, minRowSpan: 6, defaultSettings: { defaultCountdownMinutes: 5, playSoundOnFinish: true } as CountdownStopwatchWidgetSettings },
   { type: 'photo', defaultTitle: 'Photo Viewer', displayName: 'Photo Viewer', description: "Display an image from URL or upload.", icon: PhotoIcon, defaultColSpan: 12, defaultRowSpan: 12, minColSpan: 6, minRowSpan: 6, defaultSettings: PHOTO_WIDGET_DEFAULT_INSTANCE_SETTINGS },
-  { type: 'portfolio', defaultTitle: "Broque's Portfolio", displayName: 'My Portfolio', description: "A showcase of my work and experience.", icon: PortfolioIcon, defaultColSpan: 40, defaultRowSpan: 40, minColSpan: 20, minRowSpan: 18, defaultSettings: PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS },
+  { type: 'portfolio', defaultTitle: "Broque's Portfolio", displayName: 'My Portfolio', description: "A showcase of my work and experience.", icon: PortfolioIcon, defaultColSpan: 30, defaultRowSpan: 30, minColSpan: 20, minRowSpan: 18, defaultSettings: PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS },
+  // Add Gemini Chat Widget Definition
+  { 
+    type: 'geminiChat', 
+    defaultTitle: 'AI Chat', 
+    displayName: 'Gemini AI Chat', 
+    description: "Chat with a Gemini-powered AI assistant.", 
+    icon: GeminiChatIcon, 
+    defaultColSpan: 15, // Adjusted for new layout
+    defaultRowSpan: 20, // Adjusted for new layout
+    minColSpan: 8, 
+    minRowSpan: 10, 
+    defaultSettings: GEMINI_CHAT_WIDGET_DEFAULT_INSTANCE_SETTINGS 
+  },
 ];
 
-// Initial layout: colStart values are placeholders, will be dynamically centered.
+// Initial layout: Adjusted for Portfolio | Gemini Chat | Clock
 const initialWidgetsLayout: PageWidgetConfig[] = [
+  {
+    "id": "portfolio-main",
+    "title": "Broque Thomas - Portfolio",
+    "type": "portfolio",
+    "colStart": 1, // Placeholder, will be dynamically centered
+    "rowStart": 3,
+    "colSpan": 30, 
+    "rowSpan": 30, 
+    "settings": PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS,
+    "isMinimized": false,
+    containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS, innerPadding: 'p-0' }
+  },
+  {
+    "id": "gemini-chat-main", 
+    "title": "Gemini AI Assistant",
+    "type": "geminiChat",
+    "colStart": 1, // Placeholder, will be dynamically centered
+    "rowStart": 3,
+    "colSpan": 15,
+    "rowSpan": 20,
+    "settings": GEMINI_CHAT_WIDGET_DEFAULT_INSTANCE_SETTINGS,
+    "isMinimized": false,
+    containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS, innerPadding: 'p-0' } 
+  },
   {
     "id": "clock-widget-main",
     "title": "Digital Clock",
@@ -175,30 +230,6 @@ const initialWidgetsLayout: PageWidgetConfig[] = [
     "colSpan": 8,
     "rowSpan": 8,
     "settings": { displayType: 'digital', showSeconds: true, hourFormat: '12' },
-    "isMinimized": false,
-    containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS }
-  },
-  {
-    "id": "portfolio-main",
-    "title": "Broque Thomas - Portfolio",
-    "type": "portfolio",
-    "colStart": 1, // Placeholder, will be dynamically centered
-    "rowStart": 3,
-    "colSpan": 40,
-    "rowSpan": 40,
-    "settings": PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS,
-    "isMinimized": false,
-    containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS, innerPadding: 'p-0' }
-  },
-  {
-    "id": "weather-widget-main",
-    "title": "Medford Weather",
-    "type": "weather",
-    "colStart": 1, // Placeholder, will be dynamically centered
-    "rowStart": 3,
-    "colSpan": 12,
-    "rowSpan": 14,
-    "settings": { "location": "97504 US", "units": "imperial", "useCurrentLocation": false },
     "isMinimized": false,
     containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS }
   },
@@ -230,11 +261,16 @@ const ensurePortfolioWidgetInstanceSettings = (settings: AllWidgetSettings | und
     };
 };
 
+// Helper to ensure GeminiChatWidget instance settings are correctly formed
+const ensureGeminiChatWidgetInstanceSettings = (settings: AllWidgetSettings | undefined): GeminiChatWidgetSettings => {
+    const geminiChatInstanceDefaults = GEMINI_CHAT_WIDGET_DEFAULT_INSTANCE_SETTINGS;
+    const currentGeminiChatSettings = settings as GeminiChatWidgetSettings | undefined;
+    return {
+        customSystemPrompt: currentGeminiChatSettings?.customSystemPrompt || geminiChatInstanceDefaults.customSystemPrompt,
+    };
+};
 
-// Helper to process and ensure defaults for any widget config (content and container settings)
-// Changed widgetData type from 'any' to 'Partial<PageWidgetConfig>' for better type safety.
-// This assumes widgetData will generally conform to the PageWidgetConfig structure,
-// even if some fields are missing (which the function then defaults).
+
 const processWidgetConfig = (widgetData: Partial<PageWidgetConfig>): PageWidgetConfig => {
     const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(def => def.type === widgetData.type);
 
@@ -243,23 +279,31 @@ const processWidgetConfig = (widgetData: Partial<PageWidgetConfig>): PageWidgetC
         finalContentSettings = ensurePhotoWidgetInstanceSettings(finalContentSettings as PhotoWidgetSettings);
     } else if (widgetData.type === 'portfolio') {
         finalContentSettings = ensurePortfolioWidgetInstanceSettings(finalContentSettings as PortfolioWidgetSettings);
+    } else if (widgetData.type === 'geminiChat') { // Add processing for Gemini Chat
+        finalContentSettings = ensureGeminiChatWidgetInstanceSettings(finalContentSettings as GeminiChatWidgetSettings);
     }
+
 
     const finalContainerSettings: WidgetContainerSettings = {
         ...DEFAULT_WIDGET_CONTAINER_SETTINGS,
         ...(widgetData.containerSettings || {})
     };
+    // Specific inner padding overrides for certain widget types
     if (widgetData.type === 'portfolio' && widgetData.containerSettings?.innerPadding === undefined) {
         finalContainerSettings.innerPadding = 'p-0';
     }
     if (widgetData.type === 'notes' && widgetData.containerSettings?.innerPadding === undefined) {
         finalContainerSettings.innerPadding = 'p-0';
     }
+    if (widgetData.type === 'geminiChat' && widgetData.containerSettings?.innerPadding === undefined) { 
+        finalContainerSettings.innerPadding = 'p-0';
+    }
+
 
     return {
         id: widgetData.id || `generic-${Date.now()}`,
         title: widgetData.title || blueprint?.defaultTitle || "Untitled Widget",
-        type: widgetData.type || 'generic', // Fallback type
+        type: widgetData.type || 'generic', 
         colStart: widgetData.colStart || 1,
         rowStart: widgetData.rowStart || 1,
         colSpan: widgetData.colSpan || blueprint?.defaultColSpan || 6,
@@ -267,7 +311,6 @@ const processWidgetConfig = (widgetData: Partial<PageWidgetConfig>): PageWidgetC
         isMinimized: widgetData.isMinimized || false,
         settings: finalContentSettings,
         containerSettings: finalContainerSettings,
-        // Ensure all PageWidgetConfig fields are present in the return
         originalRowSpan: widgetData.originalRowSpan,
     };
 };
@@ -278,8 +321,8 @@ export default function Home() {
   const [widgetContainerRows, setWidgetContainerRows] = useState(0);
   const [activeWidgetId, setActiveWidgetId] = useState<string | null>(null);
 
-  const initialLayoutIsDefaultRef = useRef(false); // Tracks if the initial layout is from defaults
-  const initialCenteringDoneRef = useRef(false); // Tracks if dynamic centering has been applied
+  const initialLayoutIsDefaultRef = useRef(false); 
+  const initialCenteringDoneRef = useRef(false); 
 
   const [widgets, setWidgets] = useState<PageWidgetConfig[]>(() => {
     if (typeof window !== 'undefined') {
@@ -287,22 +330,18 @@ export default function Home() {
             const savedLayoutJSON = window.localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY);
             if (savedLayoutJSON) {
                 const savedData = JSON.parse(savedLayoutJSON);
-                // Check if savedData is an object and has the expected structure
                 if (savedData && typeof savedData === 'object' && !Array.isArray(savedData) && savedData.dashboardVersion && Array.isArray(savedData.widgets)) {
                     const loadedVersion = String(savedData.dashboardVersion).replace('v','V');
                     const currentVersion = DASHBOARD_LAYOUT_STORAGE_KEY.replace('dashboardLayoutV','V');
 
                     if (loadedVersion === currentVersion) {
-                        initialLayoutIsDefaultRef.current = false; // Loaded from storage
-                        // Assuming savedData.widgets are Partial<PageWidgetConfig> or conformant
+                        initialLayoutIsDefaultRef.current = false; 
                         return (savedData.widgets as Partial<PageWidgetConfig>[]).map(processWidgetConfig);
                     } else {
                         console.log(`[page.tsx] Storage key version mismatch (Saved: ${loadedVersion}, Current: ${currentVersion}). Using new initial layout.`);
                     }
-                } else if (Array.isArray(savedData)) { // Handle legacy array-only format
+                } else if (Array.isArray(savedData)) { 
                      console.log(`[page.tsx] Legacy layout format detected. Using new initial layout for ${DASHBOARD_LAYOUT_STORAGE_KEY}.`);
-                     // Potentially attempt to process legacy data if a structure is known, or discard.
-                     // For now, discarding and using new initial layout.
                 } else {
                     console.log(`[page.tsx] Invalid saved layout structure. Using new initial layout.`);
                 }
@@ -311,7 +350,7 @@ export default function Home() {
             console.error("[page.tsx] Error loading/parsing dashboard layout from localStorage, using initial layout:", error);
         }
     }
-    initialLayoutIsDefaultRef.current = true; // Default layout is being used
+    initialLayoutIsDefaultRef.current = true; 
     return initialWidgetsLayout.map(processWidgetConfig);
   });
 
@@ -343,7 +382,6 @@ export default function Home() {
   const addWidgetMenuRef = useRef<HTMLDivElement>(null);
   const [historyDisplay, setHistoryDisplay] = useState({ pointer: 0, length: 0 });
 
-  // Moved updateWidgetsAndPushToHistory definition before its use in useEffect
   const updateWidgetsAndPushToHistory = useCallback((newWidgetsState: PageWidgetConfig[], actionType?: string) => {
     if (isPerformingUndoRedo.current && actionType !== 'undo_redo_internal') return;
 
@@ -384,35 +422,34 @@ export default function Home() {
     }
   }, [widgets]);
 
-  // Dynamic initial centering logic
+  // Dynamic initial centering logic for Portfolio | Gemini Chat | Clock
   useEffect(() => {
     if (widgetContainerCols > 0 && initialLayoutIsDefaultRef.current && !initialCenteringDoneRef.current) {
-        const clockWidgetConfig = initialWidgetsLayout.find(w => w.id === "clock-widget-main");
         const portfolioWidgetConfig = initialWidgetsLayout.find(w => w.id === "portfolio-main");
-        const weatherWidgetConfig = initialWidgetsLayout.find(w => w.id === "weather-widget-main");
+        const geminiChatWidgetConfig = initialWidgetsLayout.find(w => w.id === "gemini-chat-main");
+        const clockWidgetConfig = initialWidgetsLayout.find(w => w.id === "clock-widget-main");
 
-        if (clockWidgetConfig && portfolioWidgetConfig && weatherWidgetConfig) {
-            const clockSpan = clockWidgetConfig.colSpan;
+        if (portfolioWidgetConfig && geminiChatWidgetConfig && clockWidgetConfig) {
             const portfolioSpan = portfolioWidgetConfig.colSpan;
-            const weatherSpan = weatherWidgetConfig.colSpan;
-            const gap = 2; // Define the gap between widgets
+            const geminiChatSpan = geminiChatWidgetConfig.colSpan;
+            const clockSpan = clockWidgetConfig.colSpan;
+            const gap = 2; 
 
-            const totalBlockSpan = clockSpan + gap + portfolioSpan + gap + weatherSpan;
+            const totalBlockSpan = portfolioSpan + gap + geminiChatSpan + gap + clockSpan;
 
             let leftOffset = Math.floor((widgetContainerCols - totalBlockSpan) / 2);
-            if (leftOffset < 1) leftOffset = 0; // Ensure it's not negative, start at 0 for colStart 1
+            if (leftOffset < 1) leftOffset = 0; 
 
-            const newClockColStart = Math.max(1, leftOffset + 1);
-            const newPortfolioColStart = newClockColStart + clockSpan + gap;
-            const newWeatherColStart = newPortfolioColStart + portfolioSpan + gap;
-
-            // Check if new positions are valid (don't overflow)
-            if (newWeatherColStart + weatherSpan -1 <= widgetContainerCols) {
+            const newPortfolioColStart = Math.max(1, leftOffset + 1);
+            const newGeminiChatColStart = newPortfolioColStart + portfolioSpan + gap;
+            const newClockColStart = newGeminiChatColStart + geminiChatSpan + gap;
+            
+            if (newClockColStart + clockSpan -1 <= widgetContainerCols) { 
                 setWidgets(currentWidgets => {
                     const updated = currentWidgets.map(w => {
-                        if (w.id === "clock-widget-main") return { ...w, colStart: newClockColStart };
                         if (w.id === "portfolio-main") return { ...w, colStart: newPortfolioColStart };
-                        if (w.id === "weather-widget-main") return { ...w, colStart: newWeatherColStart };
+                        if (w.id === "gemini-chat-main") return { ...w, colStart: newGeminiChatColStart };
+                        if (w.id === "clock-widget-main") return { ...w, colStart: newClockColStart };
                         return w;
                     });
                     updateWidgetsAndPushToHistory(updated, 'initial_dynamic_center_layout');
@@ -421,13 +458,13 @@ export default function Home() {
                 initialCenteringDoneRef.current = true;
                 initialLayoutIsDefaultRef.current = false;
             } else {
-                console.warn("[page.tsx] Calculated dynamic centered layout would overflow. Widgets will start at column 1.");
-                initialCenteringDoneRef.current = true;
+                console.warn("[page.tsx] Calculated dynamic centered layout (Portfolio | Gemini | Clock) would overflow. Widgets will start at column 1.");
+                initialCenteringDoneRef.current = true; 
                 initialLayoutIsDefaultRef.current = false;
             }
         }
     }
-  }, [widgetContainerCols, updateWidgetsAndPushToHistory]); // Removed 'widgets' from dependency array to prevent potential loops. Relies on refs for control.
+  }, [widgetContainerCols, updateWidgetsAndPushToHistory]);
 
 
   useEffect(() => {
@@ -472,10 +509,9 @@ export default function Home() {
     } catch (error) { console.error("Error exporting layout:", error); alert("Error exporting layout."); }
   };
 
-  // Define a more specific type for the imported data structure
   interface ImportedLayoutData {
     dashboardVersion?: string;
-    widgets?: Partial<PageWidgetConfig>[]; // Assuming widgets might be partially formed
+    widgets?: Partial<PageWidgetConfig>[]; 
     notesCollection?: NotesCollectionStorage;
     sharedGlobalTodos?: TodoItem[];
     sharedGlobalPhotoHistory?: HistoricImage[];
@@ -488,11 +524,9 @@ export default function Home() {
     reader.onload = (e) => {
       try {
         const text = e.target?.result; if (typeof text !== 'string') throw new Error("Failed to read file content.");
-        // Parse the JSON, assuming it could be an object or an array (for legacy)
         const parsedJson = JSON.parse(text);
         let importedData: ImportedLayoutData | Partial<PageWidgetConfig>[];
 
-        // Type guard or check to determine structure
         if (typeof parsedJson === 'object' && !Array.isArray(parsedJson) && (parsedJson.dashboardVersion || parsedJson.widgets)) {
             importedData = parsedJson as ImportedLayoutData;
         } else if (Array.isArray(parsedJson)) {
@@ -506,13 +540,13 @@ export default function Home() {
         let notesToImport: Note[] = sharedNotes; let activeNoteIdToImport: string | null = activeSharedNoteId;
         let globalTodosToImport: TodoItem[] = sharedTodos; let globalPhotoHistoryToImport: HistoricImage[] = sharedPhotoHistory;
 
-        if ('dashboardVersion' in importedData && 'widgets' in importedData && Array.isArray(importedData.widgets)) { // Modern format
+        if ('dashboardVersion' in importedData && 'widgets' in importedData && Array.isArray(importedData.widgets)) { 
             widgetsToImportRaw = importedData.widgets || [];
             if (importedData.notesCollection) { notesToImport = importedData.notesCollection.notes || []; activeNoteIdToImport = importedData.notesCollection.activeNoteId || null; }
             if (importedData.sharedGlobalTodos && Array.isArray(importedData.sharedGlobalTodos)) { globalTodosToImport = importedData.sharedGlobalTodos; }
             if (importedData.sharedGlobalPhotoHistory && Array.isArray(importedData.sharedGlobalPhotoHistory)) { globalPhotoHistoryToImport = importedData.sharedGlobalPhotoHistory; }
             alert(`Dashboard layout and global data (version ${importedData.dashboardVersion}) imported successfully!`);
-        } else if (Array.isArray(importedData)) { // Legacy format (array of widgets)
+        } else if (Array.isArray(importedData)) { 
             widgetsToImportRaw = importedData;
             alert("Dashboard layout (legacy format) imported. Global data (notes, todos, photo history) will use defaults or existing data.");
         } else {
@@ -521,9 +555,7 @@ export default function Home() {
 
 
         if (widgetsToImportRaw.length > 0 && typeof widgetsToImportRaw[0]?.id !== 'string') {
-             // Add a more robust check if needed, e.g., check for other essential properties
              console.warn("Imported widget data might be invalid or incomplete.", widgetsToImportRaw[0]);
-             // Depending on strictness, you might throw an error or attempt to process anyway
         }
 
 
@@ -534,10 +566,10 @@ export default function Home() {
         setActiveWidgetId(null); setMaximizedWidgetId(null);
         history.current = [JSON.parse(JSON.stringify(processedWidgetsToImport))]; historyPointer.current = 0;
         setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length });
-        initialLayoutIsDefaultRef.current = false; // Data loaded from import, not default
-        initialCenteringDoneRef.current = true; // Assume imported layout is as intended
+        initialLayoutIsDefaultRef.current = false; 
+        initialCenteringDoneRef.current = true; 
 
-      } catch (err: unknown) { // Changed from any to unknown
+      } catch (err: unknown) { 
           let message = 'Invalid file content.';
           if (err instanceof Error) {
             message = err.message;
@@ -570,11 +602,13 @@ export default function Home() {
         newWidgetInstanceSettings = ensurePhotoWidgetInstanceSettings(newWidgetInstanceSettings as PhotoWidgetSettings);
     } else if (blueprint.type === 'portfolio') {
         newWidgetInstanceSettings = ensurePortfolioWidgetInstanceSettings(newWidgetInstanceSettings as PortfolioWidgetSettings);
+    } else if (blueprint.type === 'geminiChat') { // Ensure settings for Gemini Chat
+        newWidgetInstanceSettings = ensureGeminiChatWidgetInstanceSettings(newWidgetInstanceSettings as GeminiChatWidgetSettings);
     }
 
-    // Initialize containerSettings with potential overrides
+
     const newWidgetContainerSettings = { ...DEFAULT_WIDGET_CONTAINER_SETTINGS };
-    if (blueprint.type === 'portfolio' || blueprint.type === 'notes') {
+    if (blueprint.type === 'portfolio' || blueprint.type === 'notes' || blueprint.type === 'geminiChat') { 
         newWidgetContainerSettings.innerPadding = 'p-0';
     }
 
@@ -641,9 +675,6 @@ export default function Home() {
   const handleUndo = () => { if (historyPointer.current > 0) { isPerformingUndoRedo.current = true; const newPointer = historyPointer.current - 1; historyPointer.current = newPointer; const historicWidgets = JSON.parse(JSON.stringify(history.current[newPointer])); setWidgets(historicWidgets); setActiveWidgetId(null); setMaximizedWidgetId(null); setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length }); requestAnimationFrame(() => { isPerformingUndoRedo.current = false; }); } };
   const handleRedo = () => { if (historyPointer.current < history.current.length - 1) { isPerformingUndoRedo.current = true; const newPointer = historyPointer.current + 1; historyPointer.current = newPointer; const historicWidgets = JSON.parse(JSON.stringify(history.current[newPointer])); setWidgets(historicWidgets); setActiveWidgetId(null); setMaximizedWidgetId(null); setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length }); requestAnimationFrame(() => { isPerformingUndoRedo.current = false; }); } };
 
-  // Removed the general useEffect that was causing issues with resize undo.
-  // History is now managed more explicitly by individual action handlers.
-
   const handleSharedTodosChange = (newGlobalTodos: TodoItem[]) => { setSharedTodos(newGlobalTodos); };
   const handleSharedPhotoHistoryChange = (newGlobalPhotoHistory: HistoricImage[]) => { setSharedPhotoHistory(newGlobalPhotoHistory); };
 
@@ -660,7 +691,9 @@ export default function Home() {
       case 'photo': return <PhotoWidget id={widgetConfig.id} settings={currentWidgetSettings as PhotoWidgetSettings | undefined} onSettingsChange={handleSaveWidgetInstanceSettings} sharedHistory={sharedPhotoHistory} onSharedHistoryChange={handleSharedPhotoHistoryChange} />;
       case 'todo': return <TodoWidget instanceId={widgetConfig.id} settings={currentWidgetSettings as TodoWidgetSettings | undefined} todos={sharedTodos} onTodosChange={handleSharedTodosChange} />;
       case 'notes': return <NotesWidget instanceId={widgetConfig.id} settings={currentWidgetSettings as PageInstanceNotesSettings | undefined} notes={sharedNotes} activeNoteId={activeSharedNoteId} onNotesChange={setSharedNotes} onActiveNoteIdChange={setActiveSharedNoteId} />;
-      case 'portfolio': return <PortfolioWidget /*id={widgetConfig.id}*/ settings={currentWidgetSettings as PortfolioWidgetSettings | undefined} />; // ID was removed from PortfolioWidget props
+      case 'portfolio': return <PortfolioWidget settings={currentWidgetSettings as PortfolioWidgetSettings | undefined} />;
+      // Add Gemini Chat Widget rendering
+      case 'geminiChat': return <GeminiChatWidget instanceId={widgetConfig.id} settings={currentWidgetSettings as GeminiChatWidgetSettings | undefined} />;
       default: return <p className="text-xs text-secondary italic">Generic widget content.</p>;
     }
   };
@@ -681,6 +714,8 @@ export default function Home() {
       case 'notes': return <NotesSettingsPanel widgetInstanceId={widgetConfig.id} currentSettings={currentContentSettings as PageInstanceNotesSettings | undefined} onSaveLocalSettings={boundSaveInstanceContentSettings} onClearAllNotesGlobal={() => { setSharedNotes([]); setActiveSharedNoteId(null); alert("All notes have been cleared from the dashboard."); }} />;
       case 'todo': return <TodoSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as TodoWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} onClearAllTasks={() => { handleSharedTodosChange([]); alert(`The global to-do list has been cleared.`); }} />;
       case 'portfolio': return <PortfolioSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as PortfolioWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} />;
+      // Add Gemini Chat Widget settings panel
+      case 'geminiChat': return <GeminiChatSettingsPanel widgetInstanceId={widgetConfig.id} currentSettings={currentContentSettings as GeminiChatWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} />;
       default: return <p className="text-sm text-secondary">No specific content settings available for this widget type.</p>;
     }
   };
