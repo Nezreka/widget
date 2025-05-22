@@ -1,16 +1,15 @@
 // src/components/PortfolioWidget.tsx
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 
 // --- Interfaces & Types ---
 export interface PortfolioWidgetSettings {
   accentColor?: string;
-  showAnimatedBackground?: boolean; 
+  showAnimatedBackground?: boolean;
 }
 
 interface PortfolioWidgetProps {
-  id: string;
   settings?: PortfolioWidgetSettings;
 }
 
@@ -35,12 +34,6 @@ const LinkIcon = () => (
   </svg>
 );
 
-const ChevronRightIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 opacity-70 group-hover:opacity-100 transition-opacity">
-        <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
-    </svg>
-);
-
 const CodeBracketIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 opacity-80">
         <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
@@ -54,7 +47,7 @@ export const PortfolioSettingsPanel: React.FC<{
   currentSettings: PortfolioWidgetSettings | undefined;
   onSave: (newSettings: PortfolioWidgetSettings) => void;
 }> = ({ widgetId, currentSettings, onSave }) => {
-  const [accentColor, setAccentColor] = useState(currentSettings?.accentColor || '#0ea5e9'); 
+  const [accentColor, setAccentColor] = useState(currentSettings?.accentColor || '#0ea5e9');
   const [showAnimatedBg, setShowAnimatedBg] = useState(currentSettings?.showAnimatedBackground === undefined ? true : currentSettings.showAnimatedBackground);
 
   const handleSaveSettings = () => {
@@ -98,9 +91,9 @@ export const PortfolioSettingsPanel: React.FC<{
 };
 
 // --- Main PortfolioWidget Component ---
-const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ id, settings }) => {
+const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ settings }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const accentColor = settings?.accentColor || '#0ea5e9'; 
+  const accentColor = settings?.accentColor || '#0ea5e9';
   const showAnimatedBackground = settings?.showAnimatedBackground === undefined ? true : settings.showAnimatedBackground;
 
   const name = "Broque Thomas";
@@ -108,13 +101,13 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ id, settings }) => {
   const university = "Southern Oregon University";
   const graduationYear = "2020";
   const previousCompany = "CherieYoung";
-  const experienceDuration = "2020 - 2025"; 
+  const experienceDuration = "2020 - 2025";
 
   const skills = [
-    "React", "Next.js", "TypeScript", "Node.js", "GraphQL", "PostgreSQL", 
+    "React", "Next.js", "TypeScript", "Node.js", "GraphQL", "PostgreSQL",
     "Tailwind CSS", "Firebase", "AWS", "Docker", "CI/CD", "Agile Methodologies", "RESTful APIs", "Git"
   ];
-  
+
   const projects = [
     { name: "Widget Dashboard (This Project)", description: "A dynamic, customizable user dashboard with real-time widget updates, persistent layout, and a focus on interactive UI/UX.", tech: ["Next.js", "TypeScript", "Tailwind CSS", "React Hooks"], link: "https://github.com/Nezreka/widget" },
     { name: "Template Designer", description: "A web-based application for users to visually create and customize document or UI templates with a drag-and-drop interface.", tech: ["Next.js", "TypeScript", "Tailwind CSS", "Konva.js"], link: "https://github.com/Nezreka/Template-Designer" },
@@ -132,11 +125,11 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ id, settings }) => {
   const sectionTitleClass = "text-2xl md:text-3xl font-bold mb-5 md:mb-8 text-slate-100 flex items-center border-b-2 border-[var(--portfolio-accent-color)]/30 pb-3";
   const cardBaseClass = "bg-slate-800/70 backdrop-blur-md p-6 rounded-xl shadow-xl transition-all duration-300 ease-out hover:shadow-[0_0_30px_-5px_var(--portfolio-accent-color)] hover:ring-2 hover:ring-[var(--portfolio-accent-color)]";
   const textContentClass = "text-slate-300 leading-relaxed text-base";
-  
-  const getDelayClass = (index: number) => `delay-${index * 150}`; // Slightly increased delay for more pronounced stagger
+
+  const getDelayClass = (index: number) => `delay-${index * 150}`;
 
   return (
-    <div 
+    <div
       className={`w-full h-full flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-slate-100 overflow-hidden p-0 transition-opacity duration-1000 ease-in-out relative ${isVisible ? 'opacity-100' : 'opacity-0'}`}
       style={{ '--portfolio-accent-color': accentColor, '--color-slate-700': 'hsl(222, 47%, 11%)', '--color-slate-800': 'hsl(222, 47%, 18%)' } as React.CSSProperties}
     >
@@ -148,7 +141,7 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ id, settings }) => {
         </div>
       )}
 
-      <header 
+      <header
         className={`p-6 md:p-10 bg-slate-900/60 backdrop-blur-lg shadow-2xl relative z-10 transform transition-all duration-1000 ease-out ${isVisible ? 'translate-y-0 opacity-100' : '-translate-y-16 opacity-0'}`}
         style={{ borderBottom: `4px solid var(--portfolio-accent-color)` }}
       >
@@ -203,7 +196,7 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ id, settings }) => {
                 <ul className="list-disc list-inside space-y-2 text-sm text-slate-300">
                     <li>Comprehensive curriculum in software engineering, algorithms, data structures, and web technologies.</li>
                     <li>Developed a full-stack web application for a capstone project, showcasing practical application of learned concepts.</li>
-                    <li>Awarded Dean's List for academic excellence.</li>
+                    <li>Awarded Dean&apos;s List for academic excellence.</li>
                 </ul>
                 </div>
             </section>
@@ -215,8 +208,8 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ id, settings }) => {
             </h2>
             <div className="flex flex-wrap gap-3 md:gap-4">
                 {skills.map((skill, index) => (
-                <span 
-                    key={index} 
+                <span
+                    key={index}
                     className={`px-5 py-2.5 text-sm font-medium rounded-lg bg-slate-700/80 text-slate-100 shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl hover:text-white transform hover:-translate-y-0.5`}
                     style={{
                         backgroundColor: `color-mix(in srgb, var(--portfolio-accent-color) 18%, var(--color-slate-800))`,
@@ -236,8 +229,8 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ id, settings }) => {
             </h2>
             <div className="grid md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8">
                 {projects.map((project, index) => (
-                <div 
-                    key={index} 
+                <div
+                    key={index}
                     className={`${cardBaseClass} group flex flex-col justify-between hover:-translate-y-2`}
                 >
                     <div>
@@ -248,10 +241,10 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ id, settings }) => {
                         </div>
                     </div>
                     {project.link !== "#" && (
-                        <a 
-                            href={project.link} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
+                        <a
+                            href={project.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="inline-flex items-center text-sm font-semibold text-[var(--portfolio-accent-color)] hover:underline group mt-auto self-start transition-transform duration-200 hover:translate-x-1"
                         >
                             Explore Project <LinkIcon />
@@ -266,13 +259,12 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ id, settings }) => {
             <p className={`${textContentClass} text-xl md:text-2xl mb-6 font-light`}>
                 Ready to build something amazing together?
             </p>
-            <a 
-                href="mailto:broque.thomas.dev@example.com" 
-                className="inline-block px-10 py-4 text-lg font-semibold rounded-lg text-white shadow-xl transition-all duration-300 ease-out transform hover:scale-105 hover:shadow-2xl focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-offset-slate-900"
-                style={{ 
+            <a
+                href="mailto:broque.thomas.dev@example.com" // Intentionally a placeholder email
+                className="inline-block px-10 py-4 text-lg font-semibold rounded-lg text-white shadow-xl transition-all duration-300 ease-out transform hover:scale-105 hover:shadow-2xl focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-[var(--portfolio-accent-color)]"
+                style={{
                     backgroundColor: 'var(--portfolio-accent-color)',
                     boxShadow: `0 6px 20px 0 color-mix(in srgb, var(--portfolio-accent-color) 30%, transparent)`,
-                    '--tw-ring-color': `color-mix(in srgb, var(--portfolio-accent-color) 50%, transparent)`
                 }}
                 onMouseOver={e => {
                     e.currentTarget.style.backgroundColor = `color-mix(in srgb, var(--portfolio-accent-color) 80%, black)`;
@@ -283,7 +275,7 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ id, settings }) => {
                     e.currentTarget.style.boxShadow = `0 6px 20px 0 color-mix(in srgb, var(--portfolio-accent-color) 30%, transparent)`;
                 }}
             >
-                Let's Connect
+                Let&apos;s Connect
             </a>
             <p className="text-xs text-slate-500 mt-10">
                 &copy; {new Date().getFullYear()} Broque Thomas. All rights reserved.

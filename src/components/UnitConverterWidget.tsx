@@ -195,9 +195,10 @@ const UnitConverterWidget: React.FC<UnitConverterWidgetProps> = ({ settings, id 
     try {
       const valueInBaseUnit = fromUnit.toBase(numValue);
       const convertedValue = toUnit.fromBase(valueInBaseUnit);
-      
+
       // Format with specified precision, removing trailing zeros for whole numbers or numbers with fewer decimals
-      let formattedResult = parseFloat(convertedValue.toFixed(precision)).toString();
+      // Changed let to const for formattedResult as it's not reassigned
+      const formattedResult = parseFloat(convertedValue.toFixed(precision)).toString();
       setOutputValue(formattedResult);
 
     } catch (error) {
@@ -219,9 +220,9 @@ const UnitConverterWidget: React.FC<UnitConverterWidgetProps> = ({ settings, id 
     setFromUnitSymbol(toUnitSymbol);
     setToUnitSymbol(currentFrom);
     // Optionally, swap input and output values if desired, or just re-trigger conversion
-    setInputValue(outputValue); 
+    setInputValue(outputValue);
   };
-  
+
   const commonSelectClass = "w-full px-3 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary text-sm text-primary placeholder-slate-400/70 transition-colors duration-150 appearance-none";
   const selectArrowSVG = `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`;
 

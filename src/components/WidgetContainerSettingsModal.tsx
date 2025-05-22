@@ -4,6 +4,16 @@
 import React, { useState, useEffect } from 'react';
 import { WidgetContainerSettings } from './Widget'; // Assuming Widget.tsx exports this
 
+// Define a specific type for the padding options
+export type InnerPaddingType = 
+  | 'p-0' 
+  | 'px-1.5 py-1' 
+  | 'px-2.5 py-2' 
+  | 'px-3.5 py-3' 
+  | 'px-5 py-4';
+
+const DEFAULT_INNER_PADDING: InnerPaddingType = 'px-3.5 py-3';
+
 interface WidgetContainerSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -24,14 +34,18 @@ const WidgetContainerSettingsModal: React.FC<WidgetContainerSettingsModalProps> 
   // Initialize state with current settings or sensible defaults
   const [containerBackgroundColor, setContainerBackgroundColor] = useState(currentSettings?.containerBackgroundColor || '');
   const [alwaysShowTitleBar, setAlwaysShowTitleBar] = useState(currentSettings?.alwaysShowTitleBar ?? false);
-  const [innerPadding, setInnerPadding] = useState(currentSettings?.innerPadding || 'px-3.5 py-3');
+  // Use the specific InnerPaddingType for state and provide a default
+  const [innerPadding, setInnerPadding] = useState<InnerPaddingType>(
+    (currentSettings?.innerPadding as InnerPaddingType) || DEFAULT_INNER_PADDING
+  );
 
   // Effect to reset local state if currentSettings prop changes or when the modal opens
   useEffect(() => {
     if (isOpen) {
         setContainerBackgroundColor(currentSettings?.containerBackgroundColor || '');
         setAlwaysShowTitleBar(currentSettings?.alwaysShowTitleBar ?? false);
-        setInnerPadding(currentSettings?.innerPadding || 'px-3.5 py-3');
+        // Ensure innerPadding is set to a valid InnerPaddingType
+        setInnerPadding((currentSettings?.innerPadding as InnerPaddingType) || DEFAULT_INNER_PADDING);
     }
   }, [currentSettings, isOpen]);
 
@@ -44,15 +58,15 @@ const WidgetContainerSettingsModal: React.FC<WidgetContainerSettingsModalProps> 
       // Save undefined if the string is empty, so Widget.tsx uses its default logic (transparent/theme-based)
       containerBackgroundColor: containerBackgroundColor.trim() === '' ? undefined : containerBackgroundColor,
       alwaysShowTitleBar,
-      innerPadding,
+      innerPadding, // innerPadding state is already correctly typed
     });
     onClose(); // Close modal after saving
   };
 
-  // Define padding options for the dropdown
-  const paddingOptions: { label: string; value: WidgetContainerSettings['innerPadding'] }[] = [
+  // Define padding options for the dropdown, ensuring values match InnerPaddingType
+  const paddingOptions: { label: string; value: InnerPaddingType }[] = [
     { label: 'None (0px)', value: 'p-0' },
-    { label: 'X-Small (6px / 4px)', value: 'px-1.5 py-1'}, // Approx based on Tailwind's rem scale
+    { label: 'X-Small (6px / 4px)', value: 'px-1.5 py-1'},
     { label: 'Small (10px / 8px)', value: 'px-2.5 py-2' },
     { label: 'Medium (14px / 12px - Default)', value: 'px-3.5 py-3' },
     { label: 'Large (20px / 16px)', value: 'px-5 py-4' },
@@ -64,11 +78,11 @@ const WidgetContainerSettingsModal: React.FC<WidgetContainerSettingsModalProps> 
   return (
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity duration-300 ease-in-out"
-      onClick={onClose} 
+      onClick={onClose}
     >
       <div
         className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-2xl w-full max-w-md transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modalFadeInScale"
-        onClick={(e) => e.stopPropagation()} 
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
         <div className="flex justify-between items-center mb-6 pb-3 border-b border-slate-200 dark:border-slate-700">
@@ -114,7 +128,7 @@ const WidgetContainerSettingsModal: React.FC<WidgetContainerSettingsModalProps> 
                 className={`${commonInputClass} flex-grow`}
                 aria-label="Background color hex code"
               />
-              <button 
+              <button
                 onClick={() => setContainerBackgroundColor('')}
                 className="px-3 py-2 text-xs bg-slate-500 hover:bg-slate-600 text-white rounded-md transition-colors"
                 title="Clear background color to use theme default"
@@ -149,7 +163,8 @@ const WidgetContainerSettingsModal: React.FC<WidgetContainerSettingsModalProps> 
             <select
               id={`inner-padding-${widgetId}`}
               value={innerPadding}
-              onChange={(e) => setInnerPadding(e.target.value as WidgetContainerSettings['innerPadding'])}
+              // Cast e.target.value to the specific InnerPaddingType
+              onChange={(e) => setInnerPadding(e.target.value as InnerPaddingType)}
               className={commonInputClass}
             >
               {paddingOptions.map(option => (

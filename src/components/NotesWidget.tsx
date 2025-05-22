@@ -20,7 +20,7 @@ interface NotesWidgetProps {
   activeNoteId: string | null;
   onNotesChange: (notes: Note[]) => void;
   onActiveNoteIdChange: (id: string | null) => void;
-  instanceId: string; 
+  instanceId: string;
   settings?: NotesWidgetSettings;
 }
 
@@ -37,13 +37,18 @@ const EMOJI_LIST = ['😀', '😂', '😍', '🤔', '🎉', '👍', '❤️', '�
 
 // --- Settings Panel (Manages instance-specific settings like fontSize) ---
 export const NotesSettingsPanel: React.FC<{
-  widgetInstanceId: string; 
+  widgetInstanceId: string;
   currentSettings: NotesWidgetSettings | undefined;
   onSaveLocalSettings: (newSettings: NotesWidgetSettings) => void;
   onClearAllNotesGlobal?: () => void;
 }> = ({ widgetInstanceId, currentSettings, onSaveLocalSettings, onClearAllNotesGlobal }) => {
-  const [fontSize, setFontSize] = useState(currentSettings?.fontSize || 'base');
-  const handleSave = () => { onSaveLocalSettings({ fontSize }); };
+  // Initialize state with a guaranteed 'sm', 'base', or 'lg'
+  const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg'>(currentSettings?.fontSize || 'base');
+
+  const handleSave = () => {
+    // Pass the correctly typed fontSize to the save function
+    onSaveLocalSettings({ fontSize: fontSize });
+  };
 
   return (
     <div className="space-y-6 text-primary"> {/* Increased spacing */}
@@ -52,7 +57,8 @@ export const NotesSettingsPanel: React.FC<{
         <select
           id={`notes-font-size-${widgetInstanceId}`}
           value={fontSize}
-          onChange={(e) => setFontSize(e.target.value as NotesWidgetSettings['fontSize'])}
+          // Correctly cast e.target.value to the specific union type expected by setFontSize
+          onChange={(e) => setFontSize(e.target.value as 'sm' | 'base' | 'lg')}
           className="mt-1 block w-full px-3 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary sm:text-sm text-primary transition-colors duration-150"
         >
           <option value="sm">Small</option> <option value="base">Normal</option> <option value="lg">Large</option>
@@ -61,6 +67,7 @@ export const NotesSettingsPanel: React.FC<{
       {onClearAllNotesGlobal && (
         <button
           onClick={() => {
+            // Consider using a custom modal here instead of window.confirm for better UX and consistency
             if (window.confirm("Are you sure you want to delete ALL notes globally? This action cannot be undone.")) {
                 onClearAllNotesGlobal();
             }
@@ -92,26 +99,33 @@ const NotesWidget: React.FC<NotesWidgetProps> = ({
   useEffect(() => {
     const noteToLoad = notes.find(n => n.id === activeNoteId);
     if (editorRef.current) {
-      const newContent = noteToLoad ? noteToLoad.content : "<p><br></p>";
+      const newContent = noteToLoad ? noteToLoad.content : "<p><br></p>"; // Default to empty paragraph
       if (editorRef.current.innerHTML !== newContent) {
         editorRef.current.innerHTML = newContent;
       }
     }
   }, [activeNoteId, notes]);
 
-  const handleContentChange = useCallback(() => {
-    if (editorRef.current && activeNoteId) {
-      const newContent = editorRef.current.innerHTML;
-      const currentNote = notes.find(n => n.id === activeNoteId);
-      if (currentNote && currentNote.content !== newContent) {
-        const updatedNotes = notes.map(note =>
-          note.id === activeNoteId ? { ...note, content: newContent, lastModified: Date.now() } : note
-        ).sort((a, b) => b.lastModified - a.lastModified);
-        onNotesChange(updatedNotes);
+  // Debounced content change handler
+  const debouncedContentChange = useCallback(
+    // The function being debounced is defined inline here
+    debounce(() => {
+      if (editorRef.current && activeNoteId) {
+        const newContent = editorRef.current.innerHTML;
+        const currentNote = notes.find(n => n.id === activeNoteId);
+        // Only update if content actually changed to prevent unnecessary re-renders/saves
+        if (currentNote && currentNote.content !== newContent) {
+          const updatedNotes = notes.map(note =>
+            note.id === activeNoteId ? { ...note, content: newContent, lastModified: Date.now() } : note
+          ).sort((a, b) => b.lastModified - a.lastModified); // Keep sorting for consistency
+          onNotesChange(updatedNotes);
+        }
       }
-    }
-  }, [activeNoteId, notes, onNotesChange]);
+    }, 500),
+    [activeNoteId, notes, onNotesChange] // Dependencies of the inner debounced function
+  );
 
+  // Title change handler (can be immediate as it's less frequent)
   const handleTitleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (activeNoteId) {
       const newTitle = event.target.value;
@@ -128,8 +142,11 @@ const NotesWidget: React.FC<NotesWidgetProps> = ({
   const handleNewNote = () => {
     const newNoteId = generateId();
     const newNote: Note = { id: newNoteId, title: "Untitled Note", content: "<p><br></p>", lastModified: Date.now() };
-    onNotesChange([newNote, ...notes].sort((a, b) => b.lastModified - a.lastModified));
+    // Add new note to the beginning and then sort (or just sort after adding)
+    const updatedNotes = [newNote, ...notes].sort((a, b) => b.lastModified - a.lastModified);
+    onNotesChange(updatedNotes);
     onActiveNoteIdChange(newNoteId);
+    // Focus and select title input for quick editing
     requestAnimationFrame(() => {
         if (titleInputRef.current) {
             titleInputRef.current.focus();
@@ -139,29 +156,70 @@ const NotesWidget: React.FC<NotesWidgetProps> = ({
   };
 
   const handleDeleteNote = () => {
-    if (!activeNoteId || notes.length <= 1) {
-      alert(notes.length <= 1 ? "Cannot delete the last note." : "No active note to delete."); return;
+    if (!activeNoteId) {
+      // Consider a less obtrusive notification (e.g., a toast or inline message)
+      alert("No active note to delete."); return;
+    }
+    if (notes.length <= 1) {
+      alert("Cannot delete the last note. Create a new one first if you wish to delete this one."); return;
     }
     const noteToDelete = notes.find(n => n.id === activeNoteId);
-    if (window.confirm(`Are you sure you want to delete "${noteToDelete?.title || 'this note'}"?`)) {
+    // Use a custom modal for confirmation if possible
+    if (window.confirm(`Are you sure you want to delete "${noteToDelete?.title || 'this note'}"? This action cannot be undone.`)) {
       const updatedNotes = notes.filter(note => note.id !== activeNoteId).sort((a, b) => b.lastModified - a.lastModified);
       onNotesChange(updatedNotes);
-      if (updatedNotes.length > 0) onActiveNoteIdChange(updatedNotes[0].id);
-      else onActiveNoteIdChange(null);
+      // Set new active note (most recent if available, otherwise null)
+      if (updatedNotes.length > 0) {
+        onActiveNoteIdChange(updatedNotes[0].id);
+      } else {
+        // This case should ideally not be reached if we prevent deleting the last note,
+        // but as a fallback, create a new default note.
+        const newDefaultNoteId = generateId();
+        const defaultNote: Note = { id: newDefaultNoteId, title: "My Note", content: "<p><br></p>", lastModified: Date.now() };
+        onNotesChange([defaultNote]);
+        onActiveNoteIdChange(newDefaultNoteId);
+      }
     }
   };
-  
-  const applyFormat = (command: string) => { document.execCommand(command, false, undefined); editorRef.current?.focus(); handleContentChange(); };
-  const insertEmoji = (emoji: string) => { editorRef.current?.focus(); document.execCommand('insertText', false, emoji); setShowEmojiPicker(false); handleContentChange(); };
 
-  const activeNoteForDisplay = notes.find(n => n.id === activeNoteId);
+  const applyFormat = (command: string) => {
+    document.execCommand(command, false, undefined);
+    editorRef.current?.focus();
+    debouncedContentChange(); // Trigger debounced save after formatting
+  };
+
+  const insertEmoji = (emoji: string) => {
+    editorRef.current?.focus();
+    document.execCommand('insertText', false, emoji);
+    setShowEmojiPicker(false);
+    debouncedContentChange(); // Trigger debounced save after inserting emoji
+  };
+
+  // Memoize active note to prevent unnecessary re-renders of title input and editor
+  const activeNoteForDisplay = React.useMemo(() => {
+    return notes.find(n => n.id === activeNoteId);
+  }, [notes, activeNoteId]);
+
   const textSizeClass = settings?.fontSize === 'sm' ? 'text-sm' : settings?.fontSize === 'lg' ? 'text-lg' : 'text-base';
+
   const formatTimestamp = (timestamp: number): string => {
     if (!timestamp) return 'N/A';
     return new Date(timestamp).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
   };
 
   const toolbarButtonClass = "p-1.5 rounded-md text-slate-300 hover:bg-slate-700 hover:text-white focus:bg-slate-600 focus:text-white focus:outline-none focus:ring-2 focus:ring-accent-primary/70 transition-all duration-150";
+
+  // Close emoji picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showEmojiPicker && !(event.target as HTMLElement).closest('.emoji-picker-container') && !(event.target as HTMLElement).closest('.emoji-toggle-button')) {
+        setShowEmojiPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showEmojiPicker]);
+
 
   return (
     <div className="w-full h-full flex flex-col bg-dark-surface/50 backdrop-blur-sm overflow-hidden rounded-lg shadow-lg">
@@ -172,8 +230,8 @@ const NotesWidget: React.FC<NotesWidgetProps> = ({
             <button onClick={() => applyFormat('italic')} title="Italic" className={toolbarButtonClass}><ItalicIcon/></button>
             <button onClick={() => applyFormat('underline')} title="Underline" className={toolbarButtonClass}><UnderlineIcon/></button>
             <button onClick={() => applyFormat('strikeThrough')} title="Strikethrough" className={toolbarButtonClass}><StrikethroughIcon/></button>
-            <div className="relative">
-                <button onClick={() => setShowEmojiPicker(prev => !prev)} title="Insert Emoji/Symbol" className={toolbarButtonClass}><EmojiIcon/></button>
+            <div className="relative emoji-picker-container"> {/* Added class for click outside logic */}
+                <button onClick={() => setShowEmojiPicker(prev => !prev)} title="Insert Emoji/Symbol" className={`${toolbarButtonClass} emoji-toggle-button`}><EmojiIcon/></button> {/* Added class */}
                 {showEmojiPicker && (
                     <div className="absolute top-full left-0 mt-1.5 z-30 bg-slate-800 p-2 rounded-lg shadow-2xl grid grid-cols-6 gap-1 w-52 max-h-56 overflow-y-auto border border-slate-700 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-700/50">
                         {EMOJI_LIST.map(emoji => ( <button key={emoji} onClick={() => insertEmoji(emoji)} className="p-1.5 text-xl rounded-md hover:bg-slate-700 transition-colors duration-100">{emoji}</button> ))}
@@ -183,19 +241,20 @@ const NotesWidget: React.FC<NotesWidgetProps> = ({
         </div>
         <div className="flex items-center space-x-2">
             <span className="text-xs text-slate-400 mr-1" aria-live="polite">Notes: {notes.length}</span>
-            <button 
-              onClick={handleNewNote} 
+            <button
+              onClick={handleNewNote}
               className="px-3 py-1.5 text-xs font-medium bg-green-600/80 text-white rounded-md hover:bg-green-500/80 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-75 transition-all duration-150 shadow-sm hover:shadow-md"
             >
               New
             </button>
-            {activeNoteId && notes.length > 1 && ( 
-              <button 
-                onClick={handleDeleteNote} 
+            {/* Delete button enabled only if there's an active note AND more than one note exists */}
+            {activeNoteId && notes.length > 1 && (
+              <button
+                onClick={handleDeleteNote}
                 className="px-3 py-1.5 text-xs font-medium bg-red-600/80 text-white rounded-md hover:bg-red-500/80 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-75 transition-all duration-150 shadow-sm hover:shadow-md"
               >
                 Delete
-              </button> 
+              </button>
             )}
         </div>
       </div>
@@ -203,13 +262,13 @@ const NotesWidget: React.FC<NotesWidgetProps> = ({
       {/* Note Selection and Title Input: Enhanced styling */}
       <div className="flex items-center p-2 border-b border-slate-700/70 shrink-0 bg-slate-800/10">
         <select
-            value={activeNoteId || ""} 
+            value={activeNoteId || ""}
             onChange={(e) => onActiveNoteIdChange(e.target.value || null)}
             className="text-xs py-2 pl-3 pr-8 bg-slate-700/60 border border-slate-600/80 rounded-l-md focus:ring-2 focus:ring-accent-primary focus:border-accent-primary focus:outline-none text-slate-100 flex-shrink min-w-[120px] max-w-[180px] appearance-none transition-colors duration-150 hover:bg-slate-700"
             aria-label="Select Note"
             style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.5rem center', backgroundSize: '1.5em 1.5em' }}
         >
-          {notes.map(note => ( <option key={note.id} value={note.id} className="bg-slate-700 text-slate-100">{(note.title || "Untitled").substring(0,25) + (note.title.length > 25 ? "..." : "")}</option> ))}
+          {notes.map(note => ( <option key={note.id} value={note.id} className="bg-slate-700 text-slate-100">{(note.title || "Untitled").substring(0,25) + ((note.title || "").length > 25 ? "..." : "")}</option> ))}
         </select>
         <input
           ref={titleInputRef}
@@ -218,30 +277,30 @@ const NotesWidget: React.FC<NotesWidgetProps> = ({
           placeholder="Note Title..."
           className="flex-grow text-sm py-2 px-3 bg-slate-700/30 border-t border-b border-r border-slate-600/80 rounded-r-md focus:ring-2 focus:ring-inset focus:ring-accent-primary focus:border-accent-primary focus:outline-none text-slate-50 placeholder-slate-400/70 transition-colors duration-150"
           aria-label="Note Title"
-          key={`title-${instanceId}-${activeNoteId}`} 
+          key={`title-${instanceId}-${activeNoteId}`} // Re-key to force re-render on activeNoteId change
           defaultValue={activeNoteForDisplay?.title || ""}
         />
       </div>
-      
+
       {/* Content Editor Area: Subtle inset shadow for depth */}
       <div
         ref={editorRef}
         contentEditable="true"
-        onInput={handleContentChange}
-        className={`w-full h-full p-3.5 ${textSizeClass} text-slate-100 placeholder-slate-500 
-                    overflow-y-auto focus:outline-none 
-                    bg-slate-800/20 
+        onInput={debouncedContentChange} // Use debounced handler
+        className={`w-full h-full p-3.5 ${textSizeClass} text-slate-100 placeholder-slate-500
+                    overflow-y-auto focus:outline-none
+                    bg-slate-800/20
                     scrollbar-thin scrollbar-thumb-slate-600/70 scrollbar-track-slate-800/30 scrollbar-thumb-rounded-full
-                    prose prose-sm sm:prose-base dark:prose-invert max-w-none 
-                    prose-headings:text-slate-200 prose-p:text-slate-300 prose-strong:text-slate-100 prose-em:text-slate-200 
+                    prose prose-sm sm:prose-base dark:prose-invert max-w-none
+                    prose-headings:text-slate-200 prose-p:text-slate-300 prose-strong:text-slate-100 prose-em:text-slate-200
                     prose-a:text-accent-primary hover:prose-a:text-accent-primary-hover prose-blockquote:border-accent-primary/50 prose-code:text-slate-300 prose-code:bg-slate-700/50 prose-code:p-1 prose-code:rounded-sm
                     focus:shadow-[inset_0_2px_4px_0_rgba(0,0,0,0.2)] transition-shadow duration-150`}
         role="textbox" aria-multiline="true" aria-label="Note content area"
         suppressContentEditableWarning={true} style={{minHeight: '150px'}}
-        key={`editor-${instanceId}-${activeNoteId}`} 
+        key={`editor-${instanceId}-${activeNoteId}`} // Re-key to force re-render on activeNoteId change
       >
       </div>
-      
+
       {/* Footer with Last Modified Timestamp: Subtle and clean */}
       {activeNoteForDisplay && (
         <div className="p-2 border-t border-slate-700/70 text-xs text-slate-500 text-right shrink-0 bg-slate-800/30" aria-live="polite">
@@ -251,6 +310,25 @@ const NotesWidget: React.FC<NotesWidgetProps> = ({
     </div>
   );
 };
+
+// Debounce utility function
+// Changed F extends (...args: any[]) => any  TO  F extends (...args: unknown[]) => unknown
+function debounce<F extends (...args: unknown[]) => unknown>(func: F, waitFor: number) {
+  let timeout: NodeJS.Timeout | null = null;
+
+  // Parameters<F> will correctly infer unknown[] now
+  // ReturnType<F> will correctly infer unknown now
+  const debounced = (...args: Parameters<F>) => {
+    if (timeout !== null) {
+      clearTimeout(timeout);
+      timeout = null;
+    }
+    timeout = setTimeout(() => func(...args), waitFor);
+  };
+
+  return debounced as (...args: Parameters<F>) => ReturnType<F>;
+}
+
 
 export default NotesWidget;
 

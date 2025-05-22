@@ -12,7 +12,7 @@ export interface ClockWidgetSettings {
 
 interface ClockWidgetProps {
   settings?: ClockWidgetSettings;
-  id: string; // Widget ID for unique form elements
+  id: string; // Widget ID for unique form elements in settings, but might be unused in ClockWidget display itself
 }
 
 // --- Clock Settings Panel ---
@@ -104,7 +104,8 @@ export const ClockSettingsPanel: React.FC<ClockSettingsPanelProps> = ({ widgetId
 
 
 // --- Main ClockWidget Component ---
-const ClockWidget: React.FC<ClockWidgetProps> = ({ settings, id }) => {
+// Removed 'id' from props destructuring as it's not used within this component
+const ClockWidget: React.FC<ClockWidgetProps> = ({ settings }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   // Apply settings or defaults

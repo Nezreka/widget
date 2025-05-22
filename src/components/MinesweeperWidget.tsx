@@ -21,7 +21,7 @@ export interface MinesweeperWidgetSettings {
 
 interface MinesweeperWidgetProps {
   settings?: MinesweeperWidgetSettings;
-  id: string;
+  id: string; // This ID is used by the settings panel, but not directly by the game display logic.
 }
 
 // --- Game Constants ---
@@ -97,10 +97,12 @@ export const MinesweeperSettingsPanel: React.FC<{
   currentSettings: MinesweeperWidgetSettings | undefined;
   onSave: (newSettings: MinesweeperWidgetSettings) => void;
 }> = ({ widgetId, currentSettings, onSave }) => {
-  const [difficulty, setDifficulty] = useState(currentSettings?.difficulty || 'easy');
+  // Initialize state with a guaranteed 'easy', 'medium', or 'hard'
+  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>(currentSettings?.difficulty || 'easy');
 
   const handleSave = () => {
-    onSave({ difficulty: difficulty as 'easy' | 'medium' | 'hard' });
+    // No need to cast 'difficulty' here as its state type is already correct
+    onSave({ difficulty: difficulty });
   };
 
   return (
@@ -112,7 +114,8 @@ export const MinesweeperSettingsPanel: React.FC<{
         <select
           id={`ms-difficulty-${widgetId}`}
           value={difficulty}
-          onChange={(e) => setDifficulty(e.target.value as MinesweeperWidgetSettings['difficulty'])}
+          // Correctly cast e.target.value to the specific union type expected by setDifficulty
+          onChange={(e) => setDifficulty(e.target.value as 'easy' | 'medium' | 'hard')}
           className="mt-1 block w-full px-3 py-2 bg-widget border border-border-interactive rounded-md shadow-sm focus:outline-none focus:ring-accent-primary focus:border-accent-primary sm:text-sm text-primary"
         >
           <option value="easy">Easy ({DIFFICULTIES.easy.rows}x{DIFFICULTIES.easy.cols}, {DIFFICULTIES.easy.mines} mines)</option>
@@ -131,7 +134,8 @@ export const MinesweeperSettingsPanel: React.FC<{
 };
 
 // --- Main MinesweeperWidget Component ---
-const MinesweeperWidget: React.FC<MinesweeperWidgetProps> = ({ settings, id }) => {
+// Removed 'id' from props destructuring as it's not used within this component's display logic.
+const MinesweeperWidget: React.FC<MinesweeperWidgetProps> = ({ settings }) => {
   const currentDifficultyParams = DIFFICULTIES[settings?.difficulty || 'easy'];
   const { rows, cols, mines: totalMines } = currentDifficultyParams;
 
@@ -291,12 +295,12 @@ const MinesweeperWidget: React.FC<MinesweeperWidgetProps> = ({ settings, id }) =
     if (gameOver && !gameWon) return <DeadFaceIcon />;
     return <SmileyFaceIcon />;
   };
-  
+
   // Dynamic cell size calculation
   const maxCellSize = 32; // Max size in pixels for a cell
   const minCellSize = 16; // Min size
-  const widgetPadding = 16 * 2; // approx p-4 on each side
-  
+  // const widgetPadding = 16 * 2; // approx p-4 on each side. Not directly used in calculation here, but good to keep in mind.
+
   // Calculate available width and height for the board within the widget
   // This needs to be done in a way that respects the widget's current rendered size.
   // For simplicity, we'll use a ref to the board container.
@@ -308,23 +312,23 @@ const MinesweeperWidget: React.FC<MinesweeperWidgetProps> = ({ settings, id }) =
       if (boardContainerRef.current) {
         const containerWidth = boardContainerRef.current.offsetWidth;
         const containerHeight = boardContainerRef.current.offsetHeight;
-        
+
         const cellWidth = Math.floor((containerWidth - (cols -1) * 1) / cols); // 1px border between cells
         const cellHeight = Math.floor((containerHeight - (rows -1) * 1) / rows);
-        
+
         setCellSize(Math.max(minCellSize, Math.min(maxCellSize, cellWidth, cellHeight)));
       }
     };
-    
+
     calculateCellSize(); // Initial calculation
     const resizeObserver = new ResizeObserver(calculateCellSize);
     if (boardContainerRef.current) {
         resizeObserver.observe(boardContainerRef.current);
     }
-    
+
     return () => resizeObserver.disconnect();
 
-  }, [rows, cols, boardContainerRef.current]); // Recalculate if rows/cols change (difficulty) or container is available
+  }, [rows, cols]); // boardContainerRef.current is not a reactive dependency, so removed. useEffect runs once on mount and when rows/cols change.
 
 
   return (
@@ -387,7 +391,7 @@ const MinesweeperWidget: React.FC<MinesweeperWidgetProps> = ({ settings, id }) =
                 <p className="mb-4 text-slate-300">
                     {gameWon ? `Cleared all ${totalMines} mines in ${time} seconds!` : "Better luck next time!"}
                 </p>
-                <button 
+                <button
                     onClick={resetGame}
                     className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-md font-semibold transition-colors"
                 >

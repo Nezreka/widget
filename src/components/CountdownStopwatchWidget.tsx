@@ -17,8 +17,7 @@ interface CountdownStopwatchWidgetProps {
 // --- Icons ---
 const PlayIcon = () => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5"><path fillRule="evenodd" d="M2 10a8 8 0 1116 0 8 8 0 01-16 0zm6.39-2.908a.75.75 0 01.766.027l3.5 2.5a.75.75 0 010 1.262l-3.5 2.5A.75.75 0 018 12.5v-5a.75.75 0 01.39-.658z" clipRule="evenodd" /></svg>;
 const PauseIcon = () => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5"><path fillRule="evenodd" d="M2 10a8 8 0 1116 0 8 8 0 01-16 0zM9.25 6.75a.75.75 0 00-1.5 0v6.5a.75.75 0 001.5 0v-6.5zm3 0a.75.75 0 00-1.5 0v6.5a.75.75 0 001.5 0v-6.5z" clipRule="evenodd" /></svg>;
-const StopIcon = () => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5"><path fillRule="evenodd" d="M2 10a8 8 0 1116 0 8 8 0 01-16 0zm5-2.25A.75.75 0 017.75 7h4.5a.75.75 0 01.75.75v4.5a.75.75 0 01-.75.75h-4.5A.75.75 0 017 12.25v-4.5z" clipRule="evenodd" /></svg>;
-const ResetIcon = () => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5"><path fillRule="evenodd" d="M15.312 5.312a.75.75 0 010 1.06L11.823 10l3.489 3.628a.75.75 0 11-1.092 1.032l-3.53-3.666a.75.75 0 010-1.032l3.53-3.666a.75.75 0 011.092 0zM6.75 5.25a.75.75 0 01.75.75v8.5a.75.75 0 01-1.5 0V6a.75.75 0 01.75-.75z" clipRule="evenodd" /></svg>; // Using a different reset icon (arrow path reverse)
+const ResetIcon = () => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5"><path fillRule="evenodd" d="M15.312 5.312a.75.75 0 010 1.06L11.823 10l3.489 3.628a.75.75 0 11-1.092 1.032l-3.53-3.666a.75.75 0 010-1.032l3.53-3.666a.75.75 0 011.092 0zM6.75 5.25a.75.75 0 01.75.75v8.5a.75.75 0 01-1.5 0V6a.75.75 0 01.75-.75z" clipRule="evenodd" /></svg>;
 const TimerIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
 const StopwatchIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m-4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 3.75v1.5M16.5 6.375l-1.06 1.06M7.5 6.375L8.56 7.436" /></svg>;
 
@@ -65,7 +64,7 @@ export const CountdownStopwatchSettingsPanel: React.FC<{
           />
           Play Sound on Countdown Finish
         </label>
-        <p className="text-xs text-secondary mt-1">Note: Sound functionality requires Tone.js integration in the main page.</p>
+        <p className="text-xs text-secondary mt-1">Note: Sound functionality uses Web Audio API.</p>
       </div>
       <button
         onClick={handleSave}
@@ -100,10 +99,17 @@ const CountdownStopwatchWidget: React.FC<CountdownStopwatchWidgetProps> = ({ set
   const playNotificationSound = useCallback(() => {
     if (!settings?.playSoundOnFinish) return;
 
-    // Simple beep using Web Audio API as Tone.js is not directly available here
     if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      // More type-safe way to access webkitAudioContext
+      const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (AudioContextClass) {
+        audioContextRef.current = new AudioContextClass();
+      } else {
+        console.warn("Web Audio API is not supported in this browser.");
+        return;
+      }
     }
+
     if (audioContextRef.current) {
         if (oscillatorRef.current) {
             oscillatorRef.current.stop();
@@ -112,9 +118,9 @@ const CountdownStopwatchWidget: React.FC<CountdownStopwatchWidgetProps> = ({ set
         const oscillator = audioContextRef.current.createOscillator();
         const gainNode = audioContextRef.current.createGain();
 
-        oscillator.type = 'sine'; // sine, square, sawtooth, triangle
-        oscillator.frequency.setValueAtTime(440, audioContextRef.current.currentTime); // A4 note
-        gainNode.gain.setValueAtTime(0.3, audioContextRef.current.currentTime); // Volume
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(440, audioContextRef.current.currentTime);
+        gainNode.gain.setValueAtTime(0.3, audioContextRef.current.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContextRef.current.currentTime + 0.5);
 
 
@@ -122,7 +128,7 @@ const CountdownStopwatchWidget: React.FC<CountdownStopwatchWidgetProps> = ({ set
         gainNode.connect(audioContextRef.current.destination);
 
         oscillator.start();
-        oscillator.stop(audioContextRef.current.currentTime + 0.5); // Beep for 0.5 seconds
+        oscillator.stop(audioContextRef.current.currentTime + 0.5);
         oscillatorRef.current = oscillator;
     }
   }, [settings?.playSoundOnFinish]);
@@ -149,7 +155,7 @@ const CountdownStopwatchWidget: React.FC<CountdownStopwatchWidgetProps> = ({ set
     }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
-      if (oscillatorRef.current) { // Clean up oscillator on unmount or effect re-run
+      if (oscillatorRef.current) {
           oscillatorRef.current.stop();
           oscillatorRef.current.disconnect();
           oscillatorRef.current = null;
@@ -166,8 +172,8 @@ const CountdownStopwatchWidget: React.FC<CountdownStopwatchWidgetProps> = ({ set
     if (totalSeconds > 0) {
         setCountdownSeconds(totalSeconds);
         setInitialCountdownSet(totalSeconds);
-        setIsRunning(false); // Stop if running
-    } else { // If input is 0 or invalid, reset to default or last set time
+        setIsRunning(false);
+    } else {
         const defaultTotalSeconds = (settings?.defaultCountdownMinutes || 5) * 60;
         setCountdownSeconds(defaultTotalSeconds);
         setInitialCountdownSet(defaultTotalSeconds);
@@ -193,12 +199,12 @@ const CountdownStopwatchWidget: React.FC<CountdownStopwatchWidgetProps> = ({ set
   };
 
   const formatStopwatchTime = (ms: number): string => {
-    const totalSeconds = Math.floor(ms / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    const milliseconds = Math.floor((ms % 1000) / 10); // Display hundredths of a second
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(2, '0')}`;
+    const totalSecondsVal = Math.floor(ms / 1000);
+    const hoursVal = Math.floor(totalSecondsVal / 3600);
+    const minutesVal = Math.floor((totalSecondsVal % 3600) / 60);
+    const secondsVal = totalSecondsVal % 60;
+    const millisecondsVal = Math.floor((ms % 1000) / 10);
+    return `${String(hoursVal).padStart(2, '0')}:${String(minutesVal).padStart(2, '0')}:${String(secondsVal).padStart(2, '0')}.${String(millisecondsVal).padStart(2, '0')}`;
   };
 
   const commonInputClass = "w-full px-2 py-1.5 bg-slate-700/60 border border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-accent-primary focus:border-accent-primary text-sm text-primary placeholder-slate-400/70 transition-colors text-center";

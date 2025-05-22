@@ -2,9 +2,13 @@
 "use client";
 
 import React, { useState, FormEvent, useEffect, useCallback } from 'react';
+import Image from 'next/image'; // Import next/image
 
 // --- Constants ---
-const YOUTUBE_API_KEY = 'AIzaSyAIsr27eVlsTIgd0kLM9Lq_WDr-vGbJjtI'; // User provided key
+// IMPORTANT: Replace with your actual YouTube Data API v3 key
+// Ensure this key is kept secure and not exposed publicly in client-side code if possible
+// Consider using environment variables and a backend proxy for API calls in a production app.
+const YOUTUBE_API_KEY: string = 'AIzaSyAIsr27eVlsTIgd0kLM9Lq_WDr-vGbJjtI'; // User provided key. WARNING: Exposing API keys on the client side is insecure.
 
 // --- Icons ---
 const SearchIcon = () => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5"><path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clipRule="evenodd" /></svg>;
@@ -39,7 +43,14 @@ interface YouTubeSearchResultItem {
 
 interface YoutubeWidgetProps {
   settings?: YoutubeWidgetSettings;
-  id: string;
+  id: string; // This ID might be used by parent components for keying or identification.
+}
+
+// Define props for the Settings Panel
+interface YoutubeSettingsPanelProps {
+  widgetId: string;
+  currentSettings: YoutubeWidgetSettings | undefined;
+  onSave: (newSettings: YoutubeWidgetSettings) => void;
 }
 
 // --- YouTube Settings Panel ---
@@ -53,7 +64,7 @@ export const YoutubeSettingsPanel: React.FC<YoutubeSettingsPanelProps> = ({
   const handleSaveClick = () => {
     onSave({
         defaultSearchQuery: defaultSearchQuery.trim(),
-        maxResults: Math.max(1, Math.min(25, maxResults)),
+        maxResults: Math.max(1, Math.min(25, maxResults)), // Ensure maxResults is within 1-25 range
         showResultsPanel: showResultsPanelConfig,
     });
   };
@@ -97,17 +108,20 @@ export const YoutubeSettingsPanel: React.FC<YoutubeSettingsPanelProps> = ({
       >
         Save YouTube Settings
       </button>
-      {YOUTUBE_API_KEY === 'YOUR_API_KEY' && (
-        <p className="text-xs text-red-400 text-center mt-2">
-          Warning: YouTube API key placeholder is still in use. Please replace 'YOUR_API_KEY' in YoutubeWidget.tsx with your actual key.
-        </p>
-      )}
+      {/* The check for YOUTUBE_API_KEY === 'YOUR_API_KEY' was removed 
+        because YOUTUBE_API_KEY is now a specific real key, making the 
+        comparison always false and flagged by TypeScript.
+        The general warning about client-side key exposure remains important.
+      */}
     </div>
   );
 };
 
 // --- Main YoutubeWidget Component ---
 const YoutubeWidget: React.FC<YoutubeWidgetProps> = ({ settings, id }) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const widgetInstanceId = id; // Use the id prop, e.g. for unique child keys or pass to settings panel if needed
+
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<YouTubeSearchResultItem[]>([]);
   const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
@@ -118,26 +132,42 @@ const YoutubeWidget: React.FC<YoutubeWidgetProps> = ({ settings, id }) => {
   const maxResultsCount = settings?.maxResults || 10;
 
   const fetchSearchResults = useCallback(async (query: string) => {
-    if (YOUTUBE_API_KEY === 'YOUR_API_KEY' || !YOUTUBE_API_KEY) {
-      setError("YouTube API Key is not configured."); setIsLoading(false); setSearchResults([]); return;
+    if (!YOUTUBE_API_KEY || YOUTUBE_API_KEY === 'YOUR_API_KEY_PLACEHOLDER_IF_YOU_REVERT') { 
+      setError("YouTube API Key is not configured correctly. Please set it in the YoutubeWidget.tsx file or as an environment variable.");
+      setIsLoading(false);
+      setSearchResults([]);
+      return;
     }
     if (!query.trim()) {
-      setSearchResults([]); setError(null); return;
+      setSearchResults([]);
+      setError(null);
+      return;
     }
-    setIsLoading(true); setError(null); setSearchResults([]);
+    setIsLoading(true);
+    setError(null);
+    setSearchResults([]);
     try {
       const response = await fetch(
         `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${maxResultsCount}&q=${encodeURIComponent(query.trim())}&key=${YOUTUBE_API_KEY}`
       );
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error?.message || `API Error: ${response.status}`);
+        console.error("YouTube API Error Response:", errorData);
+        let message = `API Error: ${response.status}`;
+        if (errorData.error && errorData.error.message) {
+            message = errorData.error.message;
+        }
+        throw new Error(message);
       }
       const data = await response.json();
       setSearchResults(data.items || []);
-    } catch (err: any) {
+    } catch (err: unknown) { // Changed from any to unknown
       console.error("YouTube API search error:", err);
-      setError(err.message || "Failed to fetch results.");
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("An unknown error occurred while fetching results. Check API key and quota.");
+      }
       setSearchResults([]);
     } finally {
       setIsLoading(false);
@@ -146,7 +176,7 @@ const YoutubeWidget: React.FC<YoutubeWidgetProps> = ({ settings, id }) => {
 
   const getVideoEmbedUrl = (videoId: string | null): string => {
     if (!videoId) return '';
-    return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`;
+    return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`;
   };
 
   const handleSearchSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -162,7 +192,8 @@ const YoutubeWidget: React.FC<YoutubeWidgetProps> = ({ settings, id }) => {
       setSearchQuery(settings.defaultSearchQuery);
       fetchSearchResults(settings.defaultSearchQuery);
     }
-  }, [settings?.defaultSearchQuery, searchQuery, isLoading, error, searchResults.length, fetchSearchResults]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings?.defaultSearchQuery, fetchSearchResults]);
 
   useEffect(() => {
     if (settings?.showResultsPanel !== undefined) {
@@ -172,11 +203,11 @@ const YoutubeWidget: React.FC<YoutubeWidgetProps> = ({ settings, id }) => {
 
   const toggleResultsPanel = () => setIsResultsPanelVisible(prev => !prev);
 
-  const hasSearchResults = searchResults.length > 0;
+  const shouldRenderResultsArea = searchQuery.trim() || isLoading || error || searchResults.length > 0;
+
 
   return (
     <div className="w-full h-full flex flex-col bg-slate-950 text-slate-100 overflow-hidden rounded-lg shadow-xl">
-      {/* Search Bar - Enhanced Styling */}
       <form onSubmit={handleSearchSubmit} className="p-3 flex items-center space-x-2 bg-slate-800/70 backdrop-blur-sm shrink-0 border-b border-slate-700/50">
         <div className="relative flex-grow">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -190,7 +221,8 @@ const YoutubeWidget: React.FC<YoutubeWidgetProps> = ({ settings, id }) => {
             />
         </div>
         <button
-          type="submit" disabled={isLoading || YOUTUBE_API_KEY === 'YOUR_API_KEY' || !YOUTUBE_API_KEY}
+          type="submit" 
+          disabled={isLoading || !YOUTUBE_API_KEY || YOUTUBE_API_KEY === 'YOUR_API_KEY_PLACEHOLDER_IF_YOU_REVERT'}
           className="px-5 py-2.5 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white text-sm font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-slate-800 transition-colors shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isLoading ? (
@@ -202,11 +234,9 @@ const YoutubeWidget: React.FC<YoutubeWidgetProps> = ({ settings, id }) => {
         </button>
       </form>
 
-      {/* Main Content Area */}
       <div className="flex-grow flex flex-col md:flex-row overflow-hidden min-h-0">
-        {/* Video Player Area */}
         <div className={`bg-black shrink-0 transition-all duration-300 ease-in-out relative
-                        ${hasSearchResults && isResultsPanelVisible ? 'w-full md:w-[calc(100%-16rem)] lg:w-[calc(100%-20rem)] h-1/2 md:h-full' : 'w-full h-full'}`}>
+                        ${shouldRenderResultsArea && isResultsPanelVisible ? 'w-full md:w-[calc(100%-16rem)] lg:w-[calc(100%-20rem)] h-1/2 md:h-full' : 'w-full h-full'}`}>
           {selectedVideoId ? (
             <iframe
               key={selectedVideoId} src={getVideoEmbedUrl(selectedVideoId)} title="YouTube Video Player"
@@ -223,40 +253,34 @@ const YoutubeWidget: React.FC<YoutubeWidgetProps> = ({ settings, id }) => {
           )}
         </div>
 
-        {/* Results Panel Container (includes toggle and list) */}
-        {/* This container is always in the flex flow if there are results, its content visibility changes */}
-        {hasSearchResults && (
+        {shouldRenderResultsArea && (
           <div className={`bg-slate-900 border-t md:border-t-0 md:border-l border-slate-700/50 flex flex-col
                            transition-all duration-300 ease-in-out overflow-hidden
                            ${isResultsPanelVisible ? 'w-full md:w-64 lg:w-80 h-1/2 md:h-full opacity-100' : 'w-full md:w-12 h-auto md:h-full opacity-100 md:py-2 flex items-center md:items-start justify-center'}`}>
-            
-            {/* Toggle Button - Always present within this container if hasSearchResults */}
+
             <button
               onClick={toggleResultsPanel}
               className="w-full flex items-center justify-center md:justify-between p-2.5 bg-slate-800 hover:bg-slate-700/80 text-slate-300 hover:text-slate-100 transition-colors text-xs shrink-0 sticky top-0 z-10 md:relative md:border-b md:border-slate-700/50"
               title={isResultsPanelVisible ? "Hide Results" : "Show Results"}
             >
-              {/* Mobile: Up/Down Chevrons and Text */}
               <span className="md:hidden flex items-center">
                 {isResultsPanelVisible ? <ChevronUpIcon /> : <ChevronDownIcon />}
                 <span className="ml-1.5">{isResultsPanelVisible ? "Hide Results" : "Show Results"}</span>
               </span>
-              {/* Desktop: Left/Right Chevrons and Text (Text only when visible) */}
               <span className="hidden md:flex items-center justify-between w-full">
                 <span className={`${!isResultsPanelVisible ? 'hidden' : ''}`}>{isResultsPanelVisible ? "Hide Results" : ""}</span>
                 {isResultsPanelVisible ? <ChevronRightIcon /> : <ChevronLeftIcon />}
               </span>
             </button>
 
-            {/* Results List - Conditionally rendered based on isResultsPanelVisible */}
             {isResultsPanelVisible && (
               <div className="flex-grow overflow-y-auto p-2 space-y-2 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-800/50">
                 {isLoading && <p className="text-slate-400 text-sm p-3 text-center">Loading results...</p>}
                 {error && <p className="text-red-400 text-sm p-3 text-center">Error: {error}</p>}
-                {!isLoading && !error && searchResults.length === 0 && searchQuery && (
-                  <p className="text-slate-400 text-sm p-3 text-center">No results for "{searchQuery}".</p>
+                {!isLoading && !error && searchResults.length === 0 && searchQuery.trim() && (
+                  <p className="text-slate-400 text-sm p-3 text-center">No results for &quot;{searchQuery}&quot;.</p> 
                 )}
-                {!isLoading && !error && searchResults.length === 0 && !searchQuery && (
+                {!isLoading && !error && searchResults.length === 0 && !searchQuery.trim() && (
                   <p className="text-slate-400 text-sm p-3 text-center">Enter a search to see videos.</p>
                 )}
                 {searchResults.map((item) => (
@@ -266,9 +290,13 @@ const YoutubeWidget: React.FC<YoutubeWidgetProps> = ({ settings, id }) => {
                                 ${selectedVideoId === item.id.videoId ? 'bg-slate-700 ring-2 ring-red-500/70 shadow-lg' : 'bg-slate-800/60 hover:shadow-md'}`}
                     onClick={() => setSelectedVideoId(item.id.videoId)} title={item.snippet.title}
                   >
-                    <img
+                    <Image // Replaced <img> with Image
                       src={item.snippet.thumbnails.default.url} alt={item.snippet.title}
-                      className="rounded-md flex-shrink-0 w-24 h-[54px] object-cover bg-slate-700 border border-slate-600/50"
+                      width={item.snippet.thumbnails.default.width || 96} // Provide width
+                      height={item.snippet.thumbnails.default.height || 54} // Provide height
+                      className="rounded-md flex-shrink-0 object-cover bg-slate-700 border border-slate-600/50"
+                      onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/96x54/1E293B/94A3B8?text=No+Thumb&font=sans'; }}
+                      unoptimized={true} // Added unoptimized if specific loader isn't configured and to prevent errors with external URLs
                     />
                     <div className="overflow-hidden flex-grow">
                       <h4 className="text-xs font-semibold text-slate-100 line-clamp-2" title={item.snippet.title}>

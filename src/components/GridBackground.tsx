@@ -15,9 +15,9 @@ interface Particle {
   baseColorA: number; // Alpha
   highlightColorL: number; // Lightness for highlight
   highlightColorA: number; // Alpha for highlight
-  
+
   highlightIntensity: number; // 0 to 1 for smooth transition
-  
+
   // For pulsation
   pulseAngle: number;
   pulseSpeed: number;
@@ -33,7 +33,7 @@ const parseHsla = (hslaString: string): [number, number, number, number] => {
   if (match) {
     return [parseInt(match[1]), parseFloat(match[2]), parseFloat(match[3]), parseFloat(match[4])];
   }
-  return [190, 100, 70, 0.5]; 
+  return [190, 100, 70, 0.5];
 };
 
 // Linear interpolation function
@@ -46,9 +46,9 @@ const GridBackground: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const particlesArray = useRef<Particle[]>([]);
   const mousePosition = useRef<{ x: number | null; y: number | null }>({ x: null, y: null });
-  
+
   const getCssVar = (name: string, fallback: string) => {
-    if (typeof window === 'undefined') return fallback; 
+    if (typeof window === 'undefined') return fallback;
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
   };
 
@@ -64,7 +64,7 @@ const GridBackground: React.FC = () => {
   const PARTICLE_BASE_SPEED = 0.18; // Slightly slower for more particles
   const MIN_RADIUS = 0.6;
   const MAX_RADIUS = 1.8;
-  const HIGHLIGHT_FADE_SPEED = 0.08; 
+  const HIGHLIGHT_FADE_SPEED = 0.08;
   const CONNECTION_RADIUS_BONUS = 0.08; // How much radius increases per connection
   const MAX_CONNECTION_BONUS_RADIUS = 1.2; // Max additional radius from connections
   // --- End Configuration ---
@@ -82,13 +82,13 @@ const GridBackground: React.FC = () => {
       const y = Math.random() * (canvas.height - radius * 2) + radius;
       const vx = (Math.random() - 0.5) * PARTICLE_BASE_SPEED * 2;
       const vy = (Math.random() - 0.5) * PARTICLE_BASE_SPEED * 2;
-      
+
       const pulseAngle = Math.random() * Math.PI * 2;
       const pulseSpeed = (Math.random() * 0.02) + 0.01;
       const pulseAmplitude = radius * 0.5;
 
-      particlesArray.current.push({ 
-        x, y, radius, vx, vy, 
+      particlesArray.current.push({
+        x, y, radius, vx, vy,
         baseColorH: baseH,
         baseColorS: baseS,
         baseColorL: baseL,
@@ -115,7 +115,8 @@ const GridBackground: React.FC = () => {
     // --- Calculate Connections and Update Counts ---
     // This loop is primarily for line drawing but we'll also count connections here
     const [lineBaseH, lineBaseS, lineBaseL, lineBaseA] = parseHsla(LINE_BASE_COLOR_STR.current);
-    const [, lineHighlightS, lineHighlightL, lineHighlightA] = parseHsla(LINE_HIGHLIGHT_COLOR_STR.current);
+    // Removed unused lineHighlightS from destructuring
+    const [, , lineHighlightL, lineHighlightA] = parseHsla(LINE_HIGHLIGHT_COLOR_STR.current);
 
     for (let i = 0; i < particlesArray.current.length; i++) {
       for (let j = i + 1; j < particlesArray.current.length; j++) {
@@ -143,6 +144,7 @@ const GridBackground: React.FC = () => {
           ctx.beginPath();
           ctx.moveTo(p1.x, p1.y);
           ctx.lineTo(p2.x, p2.y);
+          // Use lineBaseS as lineHighlightS was removed (assuming it was meant to be the same or similar)
           ctx.strokeStyle = `hsla(${lineBaseH}, ${lineBaseS}%, ${L}%, ${A.toFixed(3)})`;
           ctx.lineWidth = lerp(0.6, 1.2, lineMaxHighlightIntensity);
           ctx.stroke();
@@ -161,7 +163,7 @@ const GridBackground: React.FC = () => {
       // Add connection-based radius bonus
       const connectionBonus = Math.min(particle.connectionCount * CONNECTION_RADIUS_BONUS, MAX_CONNECTION_BONUS_RADIUS);
       dynamicRadius += connectionBonus;
-      
+
       // Smooth Mouse Interaction & Highlight Intensity
       let targetHighlightIntensity = 0;
       if (mousePosition.current.x !== null && mousePosition.current.y !== null) {
@@ -169,7 +171,7 @@ const GridBackground: React.FC = () => {
         const dyMouse = particle.y - mousePosition.current.y;
         const distanceMouse = Math.sqrt(dxMouse * dxMouse + dyMouse * dyMouse);
         if (distanceMouse < MOUSE_INTERACTION_RADIUS.current) {
-          targetHighlightIntensity = 1; 
+          targetHighlightIntensity = 1;
         }
       }
       particle.highlightIntensity = lerp(particle.highlightIntensity, targetHighlightIntensity, HIGHLIGHT_FADE_SPEED);
@@ -189,7 +191,7 @@ const GridBackground: React.FC = () => {
       // Interpolate color based on highlightIntensity
       const L = lerp(particle.baseColorL, particle.highlightColorL, particle.highlightIntensity);
       let A = lerp(particle.baseColorA, particle.highlightColorA, particle.highlightIntensity);
-      A = A * (0.6 + currentPulseFactor * 0.4); 
+      A = A * (0.6 + currentPulseFactor * 0.4);
       A = Math.max(0, Math.min(1, A));
 
       ctx.beginPath();
@@ -207,18 +209,20 @@ const GridBackground: React.FC = () => {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    
+
     PARTICLE_BASE_COLOR_STR.current = getCssVar('--particle-color', 'hsla(190, 100%, 70%, 0.5)');
     PARTICLE_HIGHLIGHT_COLOR_STR.current = getCssVar('--particle-highlight-color', 'hsla(190, 100%, 90%, 1)');
     LINE_BASE_COLOR_STR.current = getCssVar('--line-color', 'hsla(210, 80%, 50%, 0.15)');
     LINE_HIGHLIGHT_COLOR_STR.current = getCssVar('--line-highlight-color', 'hsla(190, 80%, 60%, 0.7)');
     MOUSE_INTERACTION_RADIUS.current = parseFloat(getCssVar('--mouse-interaction-radius', '180'));
 
-    let animationFrameId: number;
+    // Changed 'let' to 'const' as animationFrameId is assigned only once.
+    const animationFrameId: number = requestAnimationFrame(() => animate(canvas, ctx));
+
     const resizeCanvas = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
-      initParticles(canvas); 
+      initParticles(canvas);
     };
     const handleMouseMove = (event: MouseEvent) => {
       mousePosition.current = { x: event.clientX, y: event.clientY };
@@ -230,17 +234,17 @@ const GridBackground: React.FC = () => {
     window.addEventListener('resize', resizeCanvas);
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseleave', handleMouseLeave);
-    
-    resizeCanvas(); 
-    animationFrameId = requestAnimationFrame(() => animate(canvas, ctx));
+
+    resizeCanvas();
+    // animationFrameId is already assigned above when declared with const
 
     return () => {
       window.removeEventListener('resize', resizeCanvas);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseleave', handleMouseLeave);
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-      }
+      // No need to check if animationFrameId exists before cancelling,
+      // as it's guaranteed to be a number from requestAnimationFrame.
+      cancelAnimationFrame(animationFrameId);
     };
   }, [initParticles, animate]);
 

@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import Image from 'next/image'; // Import next/image
 
 // --- Interfaces & Types ---
 export interface HistoricImage {
@@ -38,7 +39,7 @@ const ChevronLeftIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none
 const RemoveImageIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
 
 const MAX_HISTORY_ITEMS = 20;
-const DEFAULT_OBJECT_FIT = 'cover'; // Default remains 'cover'
+const DEFAULT_OBJECT_FIT = 'cover';
 
 // Helper function for managing image history (operates on the shared history)
 const addImageToHistoryHelper = (
@@ -78,23 +79,31 @@ export const PhotoSettingsPanel: React.FC<{
   onClearGlobalHistory: () => void;
   globalHistoryLength: number;
 }> = ({ widgetId, currentSettings, onSaveInstanceSettings, onClearGlobalHistory, globalHistoryLength }) => {
-  const safeInstanceSettings: PhotoWidgetSettings = {
-    imageUrl: currentSettings?.imageUrl || null,
-    imageName: currentSettings?.imageName || null,
-    objectFit: currentSettings?.objectFit || DEFAULT_OBJECT_FIT,
-    isSidebarOpen: typeof currentSettings?.isSidebarOpen === 'boolean' ? currentSettings.isSidebarOpen : false,
-  };
-  const [objectFit, setObjectFit] = useState<'contain' | 'cover' | 'fill' | 'scale-down' | 'none'>(safeInstanceSettings.objectFit);
+
+  const [objectFit, setObjectFit] = useState<'contain' | 'cover' | 'fill' | 'scale-down' | 'none'>(
+    currentSettings?.objectFit || DEFAULT_OBJECT_FIT
+  );
 
   useEffect(() => {
-    setObjectFit(safeInstanceSettings.objectFit);
-  }, [safeInstanceSettings.objectFit]);
+    setObjectFit(currentSettings?.objectFit || DEFAULT_OBJECT_FIT);
+  }, [currentSettings?.objectFit]);
 
   const handleSaveDisplayType = () => {
-    onSaveInstanceSettings({ ...safeInstanceSettings, objectFit: objectFit });
+    onSaveInstanceSettings({
+        imageUrl: currentSettings?.imageUrl || null,
+        imageName: currentSettings?.imageName || null,
+        isSidebarOpen: typeof currentSettings?.isSidebarOpen === 'boolean' ? currentSettings.isSidebarOpen : false,
+        objectFit: objectFit
+    });
   };
+
   const handleClearCurrentImage = () => {
-     onSaveInstanceSettings({ ...safeInstanceSettings, imageUrl: null, imageName: null });
+     onSaveInstanceSettings({
+        imageUrl: null,
+        imageName: null,
+        objectFit: currentSettings?.objectFit || DEFAULT_OBJECT_FIT,
+        isSidebarOpen: typeof currentSettings?.isSidebarOpen === 'boolean' ? currentSettings.isSidebarOpen : false,
+    });
   };
 
   return (
@@ -106,7 +115,7 @@ export const PhotoSettingsPanel: React.FC<{
         <select
           id={`photo-objectfit-${widgetId}`}
           value={objectFit}
-          onChange={(e) => setObjectFit(e.target.value as PhotoWidgetSettings['objectFit'])}
+          onChange={(e) => setObjectFit(e.target.value as 'contain' | 'cover' | 'fill' | 'scale-down' | 'none')}
           className="mt-1 block w-full px-3 py-2.5 bg-widget border border-border-interactive rounded-md shadow-sm focus:outline-none focus:ring-accent-primary focus:border-accent-primary sm:text-sm text-primary"
         >
           <option value="cover">Cover (fill space, may crop)</option>
@@ -205,7 +214,7 @@ const PhotoWidget: React.FC<PhotoWidgetProps> = ({
       };
       reader.onerror = () => { setImageError(true); };
       reader.readAsDataURL(file);
-      if (event.target) event.target.value = ""; // Clear the input
+      if (event.target) event.target.value = "";
     }
   };
 
@@ -228,8 +237,8 @@ const PhotoWidget: React.FC<PhotoWidgetProps> = ({
 
   const commonButtonClass = `absolute z-30 p-1.5 rounded-md backdrop-blur-sm
                            opacity-0 group-hover:opacity-100 focus-within:opacity-100
-                           transition-all duration-300 ease-in-out 
-                           transform scale-95 group-hover:scale-100 
+                           transition-all duration-300 ease-in-out
+                           transform scale-95 group-hover:scale-100
                            pointer-events-none group-hover:pointer-events-auto
                            focus:opacity-100 focus:scale-105 hover:scale-105`;
 
@@ -255,15 +264,19 @@ const PhotoWidget: React.FC<PhotoWidgetProps> = ({
               <button
                 key={histItem.id}
                 onClick={() => { handleSetImage(histItem.url, histItem.name); }}
-                className="w-full flex items-center p-2 rounded-md hover:bg-slate-700/70 focus:bg-slate-700 focus:outline-none focus:ring-1 focus:ring-accent-primary/50 transition-colors text-left group"
+                className="w-full flex items-center p-2 rounded-md hover:bg-slate-700/70 focus:bg-slate-700 focus:outline-none focus:ring-1 focus:ring-accent-primary/50 transition-colors text-left group relative" // Added position: relative
                 title={`Load: ${histItem.name || 'Unnamed'}\nAdded: ${new Date(histItem.timestamp).toLocaleDateString()}`}
               >
-                <img
-                  src={histItem.url}
-                  alt={histItem.name || 'thumbnail'}
-                  className="w-10 h-10 object-cover rounded-sm mr-2.5 flex-shrink-0 bg-slate-700 border border-slate-600"
-                  onError={(e) => { (e.target as HTMLImageElement).src = "https://placehold.co/40x40/4A5568/A0AEC0?text=Err&font=sans-serif";}}
-                />
+                <div className="w-10 h-10 mr-2.5 flex-shrink-0 bg-slate-700 border border-slate-600 rounded-sm relative overflow-hidden">
+                  <Image
+                    src={histItem.url}
+                    alt={histItem.name || 'thumbnail'}
+                    layout="fill"
+                    objectFit="cover"
+                    // onError is not a direct prop for next/image. Fallback handled by CSS or if src is invalid, next/image shows default.
+                    // For a custom placeholder on error, a more complex stateful solution would be needed.
+                  />
+                </div>
                 <span className="text-xs text-slate-300 group-hover:text-slate-100 transition-colors truncate flex-grow">
                   {histItem.name || 'Unnamed Image'}
                 </span>
@@ -296,16 +309,16 @@ const PhotoWidget: React.FC<PhotoWidgetProps> = ({
         )}
 
         {currentImageUrl && !imageError ? (
-          <img
-            src={currentImageUrl}
-            alt={currentImageName || 'User image'}
-            // Apply w-full and h-full to make the image element itself fill its container.
-            // object-fit will then determine how the image content behaves within that box.
-            className="w-full h-full rounded-md shadow-lg" 
-            style={{ objectFit: objectFit }} 
-            onError={handleImageError}
-            loading="lazy"
-          />
+          <div className="w-full h-full rounded-md shadow-lg relative overflow-hidden">
+            <Image
+              src={currentImageUrl}
+              alt={currentImageName || 'User image'}
+              layout="fill"
+              objectFit={objectFit} // Use the objectFit prop from settings
+              onError={handleImageError} // This will trigger the imageError state
+              priority={true} // Consider adding priority if this is an LCP element
+            />
+          </div>
         ) : currentImageUrl && imageError ? (
           <div className="text-center text-red-400 p-4 flex flex-col items-center justify-center">
             <BaseImageIcon className="text-red-500/70 mb-2" />

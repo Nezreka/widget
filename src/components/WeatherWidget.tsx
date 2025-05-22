@@ -12,10 +12,21 @@ export interface WeatherWidgetSettings {
 
 interface WeatherWidgetProps {
   settings?: WeatherWidgetSettings;
-  id: string;
+  id: string; // Re-added id to match what page.tsx passes
 }
 
-// Structure for an individual hourly forecast item
+// Structure for an individual hourly forecast item from API
+interface ApiHourlyForecastValue {
+  temperature?: number;
+  weatherCode?: number;
+}
+interface ApiHourlyForecastEntry {
+  time: string; // ISO string
+  values: ApiHourlyForecastValue;
+}
+
+
+// Structure for an individual hourly forecast item (processed)
 interface HourlyForecastItem {
   time: string; // Formatted time, e.g., "3 PM"
   dt: number; // Original timestamp for keys
@@ -26,7 +37,7 @@ interface HourlyForecastItem {
 // Expanded data structure to include hourly forecast
 interface TomorrowWeatherData {
   current: {
-    time?: string; // Added for consistency if needed
+    time?: string;
     temperature?: number;
     temperatureApparent?: number;
     weatherCode?: number;
@@ -34,8 +45,8 @@ interface TomorrowWeatherData {
     windSpeed?: number;
     windDirection?: number;
   };
-  hourly: HourlyForecastItem[]; // Array of hourly forecasts
-  locationDisplay: { // For displaying location name consistently
+  hourly: HourlyForecastItem[];
+  locationDisplay: {
     name?: string;
   };
 }
@@ -119,7 +130,8 @@ export const WeatherSettingsPanel: React.FC<WeatherSettingsPanelProps> = ({ widg
 
 
 // --- Main WeatherWidget Component ---
-const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings, id }) => {
+// The 'id' prop is accepted here due to WeatherWidgetProps, but not destructured or used directly in this component's body.
+const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
   const [weatherData, setWeatherData] = useState<TomorrowWeatherData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -130,7 +142,6 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings, id }) => {
 
   const mapTomorrowWeatherCodeToEmoji = (weatherCode?: number): string => {
     if (weatherCode === undefined) return '❓';
-    // Emoji mapping remains the same
     switch (weatherCode) {
       case 1000: return '☀️'; case 1100: return '☀️'; case 1101: return '🌤️';
       case 1102: return '🌥️'; case 1001: return '☁️'; case 2000: return '🌫️';
@@ -146,7 +157,7 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings, id }) => {
 
   const formatHour = (isoTime: string): string => {
     const date = new Date(isoTime);
-    return date.toLocaleTimeString(undefined, { hour: 'numeric', hour12: true }).replace(' ', ''); // e.g., "3PM"
+    return date.toLocaleTimeString(undefined, { hour: 'numeric', hour12: true }).replace(' ', '');
   };
 
   const fetchWeatherData = useCallback(async () => {
@@ -202,7 +213,7 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings, id }) => {
       const realtimeData = await realtimeResponse.json();
       const hourlyData = await hourlyResponse.json();
 
-      const processedHourly: HourlyForecastItem[] = hourlyData.timelines?.hourly?.slice(0, 24).map((item: any) => ({
+      const processedHourly: HourlyForecastItem[] = hourlyData.timelines?.hourly?.slice(0, 24).map((item: ApiHourlyForecastEntry) => ({
         time: formatHour(item.time),
         dt: new Date(item.time).getTime(),
         temperature: item.values.temperature,
@@ -215,9 +226,13 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings, id }) => {
         locationDisplay: { name: realtimeData.location?.name || trimmedLocation }
       });
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Tomorrow.io fetch error:", err);
-      setError(err.message || "Failed to fetch weather data.");
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("An unknown error occurred while fetching weather data.");
+      }
       setWeatherData(null);
     } finally {
       setLoading(false);
@@ -257,13 +272,16 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings, id }) => {
       if(!error) setError("Location needed."); setLoading(false); return;
     }
     fetchWeatherData();
+  // The ESLint warning for missing 'error' and 'isRequestingGeo' in the dependency array
+  // is intentional here. Adding them can cause re-fetch loops under certain error/geo-requesting conditions.
+  // The logic is structured to prevent fetches while geo is pending or if an error already exists that needs user action.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings?.location, settings?.units, settings?.useCurrentLocation, geoCoordinates, fetchWeatherData]);
 
 
   const unitSymbol = settings?.units === 'metric' ? '°C' : '°F';
   const speedUnit = settings?.units === 'metric' ? 'kph' : 'mph';
 
-  // --- Render Logic ---
   const commonMessageStyles = "p-4 h-full flex flex-col items-center justify-center text-center text-secondary";
   const neumorphicMessageCardStyles = "bg-slate-800/50 backdrop-blur-sm p-6 rounded-xl shadow-[5px_5px_10px_rgba(0,0,0,0.2),-5px_-5px_10px_rgba(255,255,255,0.05)]";
 
@@ -298,16 +316,10 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings, id }) => {
   return (
     <div
       className="p-4 bg-slate-800/70 dark:bg-slate-800/70 backdrop-blur-md text-primary rounded-xl h-full flex flex-col justify-between overflow-hidden shadow-[8px_8px_16px_rgba(0,0,0,0.3),-8px_-8px_16px_rgba(255,255,255,0.08)]"
-      style={{
-        // Example of a more pronounced neumorphic shadow, adjust as needed
-        // boxShadow: "inset 5px 5px 10px #1f2937, inset -5px -5px 10px #4b5563" // For dark theme
-        // boxShadow: "inset 5px 5px 10px rgba(0,0,0,0.2), inset -5px -5px 10px rgba(255,255,255,0.05)" // Softer
-      }}
     >
-      {/* Current Weather Section - flex-grow will make this section take available space */}
       <div className="mb-3 flex-grow flex flex-col">
         <div className="flex justify-between items-start mb-1.5">
-          <div className="flex-1 min-w-0"> {/* Added flex-1 and min-w-0 for better wrapping */}
+          <div className="flex-1 min-w-0">
             <h3
               className="text-lg font-bold leading-tight text-slate-100 whitespace-normal break-words"
               title={locationName}
@@ -325,16 +337,14 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings, id }) => {
           {current.temperatureApparent !== undefined && `Feels like ${Math.round(current.temperatureApparent)}${unitSymbol}`}
         </div>
 
-        {/* Details Grid - using more padding for a spacious look */}
         <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-slate-300 mt-auto">
           <p>Humidity: <span className="font-medium text-slate-100">{current.humidity !== undefined ? `${Math.round(current.humidity)}%` : 'N/A'}</span></p>
           <p>Wind: <span className="font-medium text-slate-100">{current.windSpeed !== undefined ? `${Math.round(current.windSpeed)} ${speedUnit}` : 'N/A'}</span></p>
         </div>
       </div>
 
-      {/* Hourly Forecast Section */}
       {hourly && hourly.length > 0 && (
-        <div className="mt-auto pt-3 border-t border-slate-700/50"> {/* Slightly transparent border */}
+        <div className="mt-auto pt-3 border-t border-slate-700/50">
           <p className="text-xs font-semibold mb-2 px-1 text-slate-300">Hourly Forecast</p>
           <div className="flex overflow-x-auto space-x-2.5 pb-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-700/50">
             {hourly.map((hour) => (
@@ -349,7 +359,6 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings, id }) => {
                 </div>
               </div>
             ))}
-            {/* Spacer for scroll end */}
             <div className="flex-shrink-0 w-0.5"></div>
           </div>
         </div>

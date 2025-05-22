@@ -12,19 +12,22 @@ export interface TodoItem {
   isEditing?: boolean;
 }
 
+export type SortByType = 'createdAt_asc' | 'createdAt_desc' | 'alphabetical_asc' | 'alphabetical_desc';
+export type FilterByType = 'all' | 'active' | 'completed';
+
 export interface TodoWidgetSettings {
   showCompleted?: boolean;
-  sortBy?: 'createdAt_asc' | 'createdAt_desc' | 'alphabetical_asc' | 'alphabetical_desc';
-  defaultFilter?: 'all' | 'active' | 'completed';
+  sortBy?: SortByType;
+  defaultFilter?: FilterByType;
 }
 
 interface TodoWidgetProps {
-  instanceId: string; // Still useful for unique keys, ARIA attributes, etc.
+  instanceId: string; // This prop is passed but not used in the TodoWidget display logic.
   settings?: TodoWidgetSettings;
   // Now receives the single, global list of todos
-  todos: TodoItem[]; 
+  todos: TodoItem[];
   // Callback to update the single, global list of todos
-  onTodosChange: (newTodos: TodoItem[]) => void; 
+  onTodosChange: (newTodos: TodoItem[]) => void;
 }
 
 // --- Helper Functions ---
@@ -38,14 +41,16 @@ const CheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 
 
 // --- Settings Panel ---
 export const TodoSettingsPanel: React.FC<{
-  widgetId: string; 
+  widgetId: string;
   currentSettings: TodoWidgetSettings | undefined;
-  onSave: (newSettings: TodoWidgetSettings) => void; 
+  onSave: (newSettings: TodoWidgetSettings) => void;
   onClearAllTasks: () => void; // This will clear the *global* list of todos
 }> = ({ widgetId, currentSettings, onSave, onClearAllTasks }) => {
   const [showCompleted, setShowCompleted] = useState(currentSettings?.showCompleted === undefined ? true : currentSettings.showCompleted);
-  const [sortBy, setSortBy] = useState(currentSettings?.sortBy || 'createdAt_desc');
-  const [defaultFilter, setDefaultFilter] = useState(currentSettings?.defaultFilter || 'all');
+  // Explicitly type the sortBy state
+  const [sortBy, setSortBy] = useState<SortByType>(currentSettings?.sortBy || 'createdAt_desc');
+  // Explicitly type the defaultFilter state
+  const [defaultFilter, setDefaultFilter] = useState<FilterByType>(currentSettings?.defaultFilter || 'all');
 
   const handleSaveSettings = () => {
     onSave({ showCompleted, sortBy, defaultFilter });
@@ -70,7 +75,8 @@ export const TodoSettingsPanel: React.FC<{
         <select
           id={`todo-sort-by-${widgetId}`}
           value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as TodoWidgetSettings['sortBy'])}
+          // Cast e.target.value to the specific SortByType union
+          onChange={(e) => setSortBy(e.target.value as SortByType)}
           className="mt-1 block w-full px-3 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary sm:text-sm text-primary transition-colors duration-150"
         >
           <option value="createdAt_desc">Newest First</option>
@@ -84,7 +90,8 @@ export const TodoSettingsPanel: React.FC<{
         <select
           id={`todo-default-filter-${widgetId}`}
           value={defaultFilter}
-          onChange={(e) => setDefaultFilter(e.target.value as TodoWidgetSettings['defaultFilter'])}
+          // Cast e.target.value to the specific FilterByType union
+          onChange={(e) => setDefaultFilter(e.target.value as FilterByType)}
           className="mt-1 block w-full px-3 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary sm:text-sm text-primary transition-colors duration-150"
         >
           <option value="all">All Tasks</option>
@@ -94,6 +101,7 @@ export const TodoSettingsPanel: React.FC<{
       </div>
       <button
         onClick={() => {
+            // Consider using a custom modal for confirmation
             if (window.confirm("Are you sure you want to delete ALL tasks in the global list? This action cannot be undone and will affect all To-Do widgets.")) {
                 onClearAllTasks(); // This now clears the global list
             }
@@ -113,24 +121,21 @@ export const TodoSettingsPanel: React.FC<{
 };
 
 // --- Main TodoWidget Component ---
-const TodoWidget: React.FC<TodoWidgetProps> = ({ instanceId, settings, todos, onTodosChange }) => {
+// Removed unused 'instanceId' from props destructuring
+const TodoWidget: React.FC<TodoWidgetProps> = ({ settings, todos, onTodosChange }) => {
   // Internal UI state for this instance (like input fields, editing state)
   const [newTodoText, setNewTodoText] = useState('');
-  const [filter, setFilter] = useState<'all' | 'active' | 'completed'>(settings?.defaultFilter || 'all');
+  const [filter, setFilter] = useState<FilterByType>(settings?.defaultFilter || 'all');
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
 
   const newTodoInputRef = useRef<HTMLInputElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Update filter based on settings when they change for this instance
   useEffect(() => {
     setFilter(settings?.defaultFilter || 'all');
   }, [settings?.defaultFilter]);
-
-  // No need for internal 'currentTodos' state derived from props,
-  // as 'todos' prop is the single source of truth from page.tsx.
-  // Operations will directly call onTodosChange with the new global list.
 
   const handleAddTodo = (e?: React.FormEvent<HTMLFormElement>) => {
     e?.preventDefault();
@@ -177,7 +182,7 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ instanceId, settings, todos, on
     setEditingTodoId(null);
     setEditingText('');
   };
-  
+
   const handleCancelEdit = () => {
     setEditingTodoId(null);
     setEditingText('');
@@ -195,10 +200,10 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ instanceId, settings, todos, on
     const updatedGlobalTodos = todos.filter(todo => !todo.completed);
     onTodosChange(updatedGlobalTodos);
   };
-  
+
   const filteredAndSortedTodos = useCallback(() => {
     // Start with the global todos list passed as a prop
-    let result = [...todos]; 
+    let result = [...todos];
 
     // Apply instance-specific filter
     if (filter === 'active') {
@@ -206,30 +211,30 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ instanceId, settings, todos, on
     } else if (filter === 'completed') {
       result = result.filter(todo => todo.completed);
     }
-    
+
     // Apply instance-specific setting for showing/hiding completed tasks
     if (filter !== 'active' && settings?.showCompleted === false) {
         result = result.filter(todo => !todo.completed);
     }
 
     // Apply instance-specific sorting
-    const sortBy = settings?.sortBy || 'createdAt_desc';
-    switch (sortBy) {
+    const currentSortBy = settings?.sortBy || 'createdAt_desc';
+    switch (currentSortBy) {
       case 'createdAt_asc': result.sort((a, b) => a.createdAt - b.createdAt); break;
       case 'createdAt_desc': result.sort((a, b) => b.createdAt - a.createdAt); break;
       case 'alphabetical_asc': result.sort((a, b) => a.text.localeCompare(b.text)); break;
       case 'alphabetical_desc': result.sort((a, b) => b.text.localeCompare(a.text)); break;
     }
     return result;
-  }, [todos, filter, settings?.showCompleted, settings?.sortBy]); // Depend on the global 'todos' prop
+  }, [todos, filter, settings?.showCompleted, settings?.sortBy]);
 
   const displayTodos = filteredAndSortedTodos();
   // Count active todos from the global list
-  const activeTodosCount = todos.filter(todo => !todo.completed).length; 
+  const activeTodosCount = todos.filter(todo => !todo.completed).length;
 
   const commonInputClass = "w-full px-3 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary sm:text-sm text-primary placeholder-slate-400/70 transition-colors duration-150";
   const buttonClass = "px-3 py-1.5 text-xs font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-opacity-75 transition-all duration-150 shadow-sm hover:shadow-md";
-  const filterButtonClass = (isActive: boolean) => 
+  const filterButtonClass = (isActive: boolean) =>
     `${buttonClass} ${isActive ? 'bg-accent-primary text-on-accent focus:ring-accent-primary' : 'bg-slate-600/70 hover:bg-slate-500/70 text-slate-200 focus:ring-slate-500'}`;
 
   return (
@@ -312,7 +317,7 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ instanceId, settings, todos, on
                 {todo.text}
               </span>
             )}
-            
+
             <div className="flex items-center space-x-1.5 ml-auto shrink-0">
               {editingTodoId === todo.id ? (
                  <button

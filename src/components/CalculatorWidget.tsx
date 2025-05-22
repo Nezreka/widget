@@ -14,7 +14,14 @@ interface CalculatorWidgetProps {
 }
 
 // No specific settings panel for now, but we can define it for completeness
-export const CalculatorSettingsPanel: React.FC<{ widgetId: string, currentSettings: CalculatorWidgetSettings | undefined, onSave: (newSettings: CalculatorWidgetSettings) => void }> = ({ widgetId, currentSettings, onSave }) => {
+export const CalculatorSettingsPanel: React.FC<{ widgetId: string, currentSettings: CalculatorWidgetSettings | undefined, onSave: (newSettings: CalculatorWidgetSettings) => void }> = ({ 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  widgetId, 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  currentSettings, 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  onSave 
+}) => {
   return (
     <div className="text-primary">
       <p className="text-sm text-secondary">No specific settings available for the calculator widget at this time.</p>
@@ -31,7 +38,12 @@ export const CalculatorSettingsPanel: React.FC<{ widgetId: string, currentSettin
 };
 
 
-const CalculatorWidget: React.FC<CalculatorWidgetProps> = ({ settings, id }) => {
+const CalculatorWidget: React.FC<CalculatorWidgetProps> = ({ 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  settings, 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  id 
+}) => {
   const [displayValue, setDisplayValue] = useState<string>("0");
   const [operand1, setOperand1] = useState<number | null>(null);
   const [operator, setOperator] = useState<string | null>(null);
@@ -80,7 +92,8 @@ const CalculatorWidget: React.FC<CalculatorWidgetProps> = ({ settings, id }) => 
         const result = calculate(operand1, currentValue, operator);
         setDisplayValue(String(result).slice(0, MAX_DISPLAY_LENGTH));
         setOperand1(result);
-      } catch (e) {
+      } catch (e: unknown) { // Catch block with typed error
+        console.error("Calculation error in handleOperatorClick:", e);
         setDisplayValue("Error");
         setIsError(true);
         setOperand1(null);
@@ -130,22 +143,20 @@ const CalculatorWidget: React.FC<CalculatorWidgetProps> = ({ settings, id }) => 
   // Handles equals button click
   const handleEqualsClick = () => {
     if (isError || operand1 === null || operator === null || waitingForOperand2) {
-      // If waitingForOperand2 is true, it means an operator was the last thing pressed,
-      // so equals shouldn't do anything or should repeat last operation (not implemented here for simplicity)
       return;
     }
     const currentValue = parseFloat(displayValue);
     try {
       const result = calculate(operand1, currentValue, operator);
       setDisplayValue(String(result).slice(0, MAX_DISPLAY_LENGTH));
-    } catch (e) {
+    } catch (e: unknown) { // Catch block with typed error
+      console.error("Calculation error in handleEqualsClick:", e);
       setDisplayValue("Error");
       setIsError(true);
     } finally {
-      // Reset for next calculation, but keep result in display
-      setOperand1(null); // Or setOperand1(result) if you want to chain operations with the result
+      setOperand1(null); 
       setOperator(null);
-      setWaitingForOperand2(false); // Ready for new input or new operation on the result
+      setWaitingForOperand2(false); 
     }
   };
 
@@ -174,7 +185,7 @@ const CalculatorWidget: React.FC<CalculatorWidgetProps> = ({ settings, id }) => 
   ];
 
   const baseButtonClass = "text-xl md:text-2xl font-medium rounded-lg p-3 active:opacity-80 transition-all duration-100 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-dark-surface focus:ring-accent-primary";
-  const numberButtonClass = "bg-slate-600/70 hover:bg-slate-500/70 dark:bg-slate-700/70 dark:hover:bg-slate-600/70 text-on-accent"; // Adjusted for dark theme
+  const numberButtonClass = "bg-slate-600/70 hover:bg-slate-500/70 dark:bg-slate-700/70 dark:hover:bg-slate-600/70 text-on-accent";
 
   return (
     <div className="w-full h-full flex flex-col p-3 bg-transparent text-primary overflow-hidden">
@@ -182,7 +193,7 @@ const CalculatorWidget: React.FC<CalculatorWidgetProps> = ({ settings, id }) => 
       <div className="bg-slate-800/50 dark:bg-black/50 text-right p-4 rounded-t-lg mb-3 shadow-inner">
         <span
           className={`block text-3xl md:text-4xl font-mono break-all ${isError ? 'text-red-400' : 'text-slate-50'}`}
-          style={{ minHeight: '2.5em', lineHeight: '1.25em' }} // Ensure display height is consistent
+          style={{ minHeight: '2.5em', lineHeight: '1.25em' }} 
         >
           {displayValue}
         </span>

@@ -61,7 +61,7 @@ const PhotoIcon = () => (
         <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.158 0a.75.75 0 10-1.5 0 .75.75 0 001.5 0z" />
     </svg>
 );
-const PortfolioIcon = () => ( 
+const PortfolioIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2 text-cyan-400">
         <path strokeLinecap="round" strokeLinejoin="round" d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z" />
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21V16.5m16.5 4.5V16.5m-16.5 0a2.25 2.25 0 012.25-2.25h12a2.25 2.25 0 012.25 2.25m-16.5 0h16.5" />
@@ -73,7 +73,7 @@ const PortfolioIcon = () => (
 const CELL_SIZE = 30;
 const MAX_HISTORY_LENGTH = 50;
 const MINIMIZED_WIDGET_ROW_SPAN = 2;
-const DASHBOARD_LAYOUT_STORAGE_KEY = 'dashboardLayoutV3.15'; 
+const DASHBOARD_LAYOUT_STORAGE_KEY = 'dashboardLayoutV3.15';
 const GLOBAL_NOTES_STORAGE_KEY = 'dashboardGlobalNotesCollection_v1';
 const GLOBAL_TODOS_STORAGE_KEY = 'dashboardGlobalSingleTodoList_v1';
 const GLOBAL_PHOTO_HISTORY_STORAGE_KEY = 'dashboardGlobalPhotoHistory_v1';
@@ -83,12 +83,14 @@ const WIDGET_DESELECT_TIMEOUT_MS = 3000;
 // Default Widget Container Settings (Appearance)
 const DEFAULT_WIDGET_CONTAINER_SETTINGS: WidgetContainerSettings = {
     alwaysShowTitleBar: false,
-    innerPadding: 'px-3.5 py-3', 
+    innerPadding: 'px-3.5 py-3',
 };
 
-
 // --- Interfaces ---
-export type AllWidgetSettings = 
+// Using Record<string, unknown> instead of Record<string, any> for better type safety.
+// This means that if a widget has settings not explicitly defined in the union,
+// their values will be of type `unknown` and require type checking or casting.
+export type AllWidgetSettings =
     WeatherWidgetSettings |
     TodoWidgetSettings |
     ClockWidgetSettings |
@@ -99,8 +101,8 @@ export type AllWidgetSettings =
     UnitConverterWidgetSettings |
     CountdownStopwatchWidgetSettings |
     PhotoWidgetSettings |
-    PortfolioWidgetSettings | 
-    Record<string, any>;
+    PortfolioWidgetSettings |
+    Record<string, unknown>; // Changed from any to unknown
 
 export type WidgetType =
     'weather' | 'todo' | 'clock' | 'calculator' | 'notes' | 'youtube' |
@@ -114,8 +116,8 @@ export interface PageWidgetConfig {
   rowStart: number;
   colSpan: number;
   rowSpan: number;
-  settings?: AllWidgetSettings; 
-  containerSettings?: WidgetContainerSettings; 
+  settings?: AllWidgetSettings;
+  containerSettings?: WidgetContainerSettings;
   isMinimized?: boolean;
   originalRowSpan?: number;
 }
@@ -135,15 +137,15 @@ interface WidgetBlueprint {
   defaultRowSpan: number;
   minColSpan?: number;
   minRowSpan?: number;
-  defaultSettings: AllWidgetSettings | undefined; 
+  defaultSettings: AllWidgetSettings | undefined;
 }
 
 const PHOTO_WIDGET_DEFAULT_INSTANCE_SETTINGS: PhotoWidgetSettings = {
   imageUrl: null, imageName: null, objectFit: 'cover', isSidebarOpen: false
 };
 
-const PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS: PortfolioWidgetSettings = { 
-    accentColor: '#0ea5e9', 
+const PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS: PortfolioWidgetSettings = {
+    accentColor: '#0ea5e9',
     showAnimatedBackground: true,
 };
 
@@ -159,46 +161,46 @@ const AVAILABLE_WIDGET_DEFINITIONS: WidgetBlueprint[] = [
   { type: 'unitConverter', defaultTitle: 'Unit Converter', displayName: 'Unit Converter', description: "Convert various units.", icon: UnitConverterIcon, defaultColSpan: 15, defaultRowSpan: 13, minColSpan: 6, minRowSpan: 8, defaultSettings: { defaultCategory: 'Length', precision: 4 } as UnitConverterWidgetSettings },
   { type: 'countdownStopwatch', defaultTitle: 'Timer / Stopwatch', displayName: 'Timer/Stopwatch', description: "Countdown timer and stopwatch.", icon: CountdownStopwatchIcon, defaultColSpan: 14, defaultRowSpan: 14, minColSpan: 6, minRowSpan: 6, defaultSettings: { defaultCountdownMinutes: 5, playSoundOnFinish: true } as CountdownStopwatchWidgetSettings },
   { type: 'photo', defaultTitle: 'Photo Viewer', displayName: 'Photo Viewer', description: "Display an image from URL or upload.", icon: PhotoIcon, defaultColSpan: 12, defaultRowSpan: 12, minColSpan: 6, minRowSpan: 6, defaultSettings: PHOTO_WIDGET_DEFAULT_INSTANCE_SETTINGS },
-  { type: 'portfolio', defaultTitle: "Broque's Portfolio", displayName: 'My Portfolio', description: "A showcase of my work and experience.", icon: PortfolioIcon, defaultColSpan: 40, defaultRowSpan: 40, minColSpan: 20, minRowSpan: 18, defaultSettings: PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS }, 
+  { type: 'portfolio', defaultTitle: "Broque's Portfolio", displayName: 'My Portfolio', description: "A showcase of my work and experience.", icon: PortfolioIcon, defaultColSpan: 40, defaultRowSpan: 40, minColSpan: 20, minRowSpan: 18, defaultSettings: PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS },
 ];
 
 // Initial layout: colStart values are placeholders, will be dynamically centered.
 const initialWidgetsLayout: PageWidgetConfig[] = [
-  { 
-    "id": "clock-widget-main", 
-    "title": "Digital Clock", 
-    "type": "clock", 
-    "colStart": 1, // Placeholder, will be dynamically centered
-    "rowStart": 3, 
-    "colSpan": 8, 
-    "rowSpan": 8, 
-    "settings": { displayType: 'digital', showSeconds: true, hourFormat: '12' }, 
-    "isMinimized": false, 
-    containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS } 
-  },
-  { 
-    "id": "portfolio-main", 
-    "title": "Broque Thomas - Portfolio", 
-    "type": "portfolio", 
+  {
+    "id": "clock-widget-main",
+    "title": "Digital Clock",
+    "type": "clock",
     "colStart": 1, // Placeholder, will be dynamically centered
     "rowStart": 3,
-    "colSpan": 40,   
-    "rowSpan": 40,   
-    "settings": PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS, 
-    "isMinimized": false, 
-    containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS, innerPadding: 'p-0' } 
+    "colSpan": 8,
+    "rowSpan": 8,
+    "settings": { displayType: 'digital', showSeconds: true, hourFormat: '12' },
+    "isMinimized": false,
+    containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS }
   },
-  { 
-    "id": "weather-widget-main", 
-    "title": "Medford Weather", 
-    "type": "weather", 
+  {
+    "id": "portfolio-main",
+    "title": "Broque Thomas - Portfolio",
+    "type": "portfolio",
     "colStart": 1, // Placeholder, will be dynamically centered
-    "rowStart": 3, 
-    "colSpan": 12, 
-    "rowSpan": 14, 
-    "settings": { "location": "97504 US", "units": "imperial", "useCurrentLocation": false }, 
-    "isMinimized": false, 
-    containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS } 
+    "rowStart": 3,
+    "colSpan": 40,
+    "rowSpan": 40,
+    "settings": PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS,
+    "isMinimized": false,
+    containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS, innerPadding: 'p-0' }
+  },
+  {
+    "id": "weather-widget-main",
+    "title": "Medford Weather",
+    "type": "weather",
+    "colStart": 1, // Placeholder, will be dynamically centered
+    "rowStart": 3,
+    "colSpan": 12,
+    "rowSpan": 14,
+    "settings": { "location": "97504 US", "units": "imperial", "useCurrentLocation": false },
+    "isMinimized": false,
+    containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS }
   },
 ];
 
@@ -222,27 +224,30 @@ const ensurePortfolioWidgetInstanceSettings = (settings: AllWidgetSettings | und
     const currentPortfolioSettings = settings as PortfolioWidgetSettings | undefined;
     return {
         accentColor: currentPortfolioSettings?.accentColor || portfolioInstanceDefaults.accentColor,
-        showAnimatedBackground: typeof currentPortfolioSettings?.showAnimatedBackground === 'boolean' 
-            ? currentPortfolioSettings.showAnimatedBackground 
+        showAnimatedBackground: typeof currentPortfolioSettings?.showAnimatedBackground === 'boolean'
+            ? currentPortfolioSettings.showAnimatedBackground
             : portfolioInstanceDefaults.showAnimatedBackground,
     };
 };
 
 
 // Helper to process and ensure defaults for any widget config (content and container settings)
-const processWidgetConfig = (widgetData: any): PageWidgetConfig => {
+// Changed widgetData type from 'any' to 'Partial<PageWidgetConfig>' for better type safety.
+// This assumes widgetData will generally conform to the PageWidgetConfig structure,
+// even if some fields are missing (which the function then defaults).
+const processWidgetConfig = (widgetData: Partial<PageWidgetConfig>): PageWidgetConfig => {
     const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(def => def.type === widgetData.type);
-    
+
     let finalContentSettings = { ...(blueprint?.defaultSettings || {}), ...(widgetData.settings || {}) };
     if (widgetData.type === 'photo') {
         finalContentSettings = ensurePhotoWidgetInstanceSettings(finalContentSettings as PhotoWidgetSettings);
-    } else if (widgetData.type === 'portfolio') { 
+    } else if (widgetData.type === 'portfolio') {
         finalContentSettings = ensurePortfolioWidgetInstanceSettings(finalContentSettings as PortfolioWidgetSettings);
     }
 
     const finalContainerSettings: WidgetContainerSettings = {
-        ...DEFAULT_WIDGET_CONTAINER_SETTINGS, 
-        ...(widgetData.containerSettings || {}) 
+        ...DEFAULT_WIDGET_CONTAINER_SETTINGS,
+        ...(widgetData.containerSettings || {})
     };
     if (widgetData.type === 'portfolio' && widgetData.containerSettings?.innerPadding === undefined) {
         finalContainerSettings.innerPadding = 'p-0';
@@ -252,17 +257,18 @@ const processWidgetConfig = (widgetData: any): PageWidgetConfig => {
     }
 
     return {
-        ...widgetData, 
-        id: widgetData.id || `generic-${Date.now()}`, 
+        id: widgetData.id || `generic-${Date.now()}`,
         title: widgetData.title || blueprint?.defaultTitle || "Untitled Widget",
-        type: widgetData.type || 'generic', 
-        colStart: widgetData.colStart || 1, // Default to 1 if not specified
-        rowStart: widgetData.rowStart || 1, // Default to 1 if not specified
+        type: widgetData.type || 'generic', // Fallback type
+        colStart: widgetData.colStart || 1,
+        rowStart: widgetData.rowStart || 1,
         colSpan: widgetData.colSpan || blueprint?.defaultColSpan || 6,
         rowSpan: widgetData.rowSpan || blueprint?.defaultRowSpan || 6,
         isMinimized: widgetData.isMinimized || false,
-        settings: finalContentSettings, 
-        containerSettings: finalContainerSettings, 
+        settings: finalContentSettings,
+        containerSettings: finalContainerSettings,
+        // Ensure all PageWidgetConfig fields are present in the return
+        originalRowSpan: widgetData.originalRowSpan,
     };
 };
 
@@ -281,18 +287,22 @@ export default function Home() {
             const savedLayoutJSON = window.localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY);
             if (savedLayoutJSON) {
                 const savedData = JSON.parse(savedLayoutJSON);
-                if (savedData && typeof savedData === 'object' && savedData.dashboardVersion && Array.isArray(savedData.widgets)) {
-                    const loadedVersion = savedData.dashboardVersion.replace('v','V'); 
-                    const currentVersion = DASHBOARD_LAYOUT_STORAGE_KEY.replace('dashboardLayoutV','V'); 
+                // Check if savedData is an object and has the expected structure
+                if (savedData && typeof savedData === 'object' && !Array.isArray(savedData) && savedData.dashboardVersion && Array.isArray(savedData.widgets)) {
+                    const loadedVersion = String(savedData.dashboardVersion).replace('v','V');
+                    const currentVersion = DASHBOARD_LAYOUT_STORAGE_KEY.replace('dashboardLayoutV','V');
 
                     if (loadedVersion === currentVersion) {
                         initialLayoutIsDefaultRef.current = false; // Loaded from storage
-                        return savedData.widgets.map(processWidgetConfig);
+                        // Assuming savedData.widgets are Partial<PageWidgetConfig> or conformant
+                        return (savedData.widgets as Partial<PageWidgetConfig>[]).map(processWidgetConfig);
                     } else {
                         console.log(`[page.tsx] Storage key version mismatch (Saved: ${loadedVersion}, Current: ${currentVersion}). Using new initial layout.`);
                     }
-                } else if (Array.isArray(savedData)) { 
+                } else if (Array.isArray(savedData)) { // Handle legacy array-only format
                      console.log(`[page.tsx] Legacy layout format detected. Using new initial layout for ${DASHBOARD_LAYOUT_STORAGE_KEY}.`);
+                     // Potentially attempt to process legacy data if a structure is known, or discard.
+                     // For now, discarding and using new initial layout.
                 } else {
                     console.log(`[page.tsx] Invalid saved layout structure. Using new initial layout.`);
                 }
@@ -314,16 +324,16 @@ export default function Home() {
   const todosSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const photoHistorySaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const deselectTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const history = useRef<PageWidgetConfig[][]>([]); 
-  const historyPointer = useRef<number>(-1);       
+  const history = useRef<PageWidgetConfig[][]>([]);
+  const historyPointer = useRef<number>(-1);
   const isPerformingUndoRedo = useRef(false);
   const headerRef = useRef<HTMLElement>(null);
   const initialLoadAttempted = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [selectedWidgetForSettings, setSelectedWidgetForSettings] = useState<PageWidgetConfig | null>(null);
-  
+
   const [isContainerSettingsModalOpen, setIsContainerSettingsModalOpen] = useState(false);
   const [selectedWidgetForContainerSettings, setSelectedWidgetForContainerSettings] = useState<PageWidgetConfig | null>(null);
 
@@ -331,7 +341,7 @@ export default function Home() {
   const [maximizedWidgetOriginalState, setMaximizedWidgetOriginalState] = useState<PageWidgetConfig | null>(null);
   const [isAddWidgetMenuOpen, setIsAddWidgetMenuOpen] = useState(false);
   const addWidgetMenuRef = useRef<HTMLDivElement>(null);
-  const [historyDisplay, setHistoryDisplay] = useState({ pointer: 0, length: 0 }); 
+  const [historyDisplay, setHistoryDisplay] = useState({ pointer: 0, length: 0 });
 
   // Moved updateWidgetsAndPushToHistory definition before its use in useEffect
   const updateWidgetsAndPushToHistory = useCallback((newWidgetsState: PageWidgetConfig[], actionType?: string) => {
@@ -340,7 +350,7 @@ export default function Home() {
     const currentHistoryTop = historyPointer.current >= 0 && historyPointer.current < history.current.length ? history.current[historyPointer.current] : null;
     if (currentHistoryTop && JSON.stringify(currentHistoryTop) === JSON.stringify(newWidgetsState)) return;
 
-    const newHistoryEntry = JSON.parse(JSON.stringify(newWidgetsState)); 
+    const newHistoryEntry = JSON.parse(JSON.stringify(newWidgetsState));
     const newHistoryBase = history.current.slice(0, historyPointer.current + 1);
     let finalHistory = [...newHistoryBase, newHistoryEntry];
     if (finalHistory.length > MAX_HISTORY_LENGTH) {
@@ -348,26 +358,26 @@ export default function Home() {
     }
     history.current = finalHistory;
     historyPointer.current = finalHistory.length - 1;
-    setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length }); 
-  }, []); 
+    setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length });
+  }, []);
 
 
    useEffect(() => {
-    if (!initialLoadAttempted.current) { 
-        history.current = [JSON.parse(JSON.stringify(widgets))]; 
+    if (!initialLoadAttempted.current) {
+        history.current = [JSON.parse(JSON.stringify(widgets))];
         historyPointer.current = 0;
         setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length });
         initialLoadAttempted.current = true;
     }
-  }, [widgets]); 
+  }, [widgets]);
 
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && initialLoadAttempted.current) { 
+    if (typeof window !== 'undefined' && initialLoadAttempted.current) {
       try {
         const dataToSave = {
-            dashboardVersion: DASHBOARD_LAYOUT_STORAGE_KEY.replace('dashboardLayoutV','v'), 
-            widgets: widgets 
+            dashboardVersion: DASHBOARD_LAYOUT_STORAGE_KEY.replace('dashboardLayoutV','v'),
+            widgets: widgets
         };
         window.localStorage.setItem(DASHBOARD_LAYOUT_STORAGE_KEY, JSON.stringify(dataToSave));
       } catch (error) { console.error("Error saving dashboard layout to localStorage:", error); }
@@ -388,7 +398,7 @@ export default function Home() {
             const gap = 2; // Define the gap between widgets
 
             const totalBlockSpan = clockSpan + gap + portfolioSpan + gap + weatherSpan;
-            
+
             let leftOffset = Math.floor((widgetContainerCols - totalBlockSpan) / 2);
             if (leftOffset < 1) leftOffset = 0; // Ensure it's not negative, start at 0 for colStart 1
 
@@ -409,11 +419,11 @@ export default function Home() {
                     return updated;
                 });
                 initialCenteringDoneRef.current = true;
-                initialLayoutIsDefaultRef.current = false; 
+                initialLayoutIsDefaultRef.current = false;
             } else {
                 console.warn("[page.tsx] Calculated dynamic centered layout would overflow. Widgets will start at column 1.");
-                initialCenteringDoneRef.current = true; 
-                initialLayoutIsDefaultRef.current = false; 
+                initialCenteringDoneRef.current = true;
+                initialLayoutIsDefaultRef.current = false;
             }
         }
     }
@@ -444,7 +454,7 @@ export default function Home() {
   useEffect(() => {
     const determineWidgetContainerGridSize = () => {
       const screenWidth = window.innerWidth; const screenHeight = window.innerHeight;
-      const headerHeight = headerRef.current?.offsetHeight || 60; 
+      const headerHeight = headerRef.current?.offsetHeight || 60;
       const mainContentHeight = screenHeight - headerHeight;
       setWidgetContainerCols(Math.floor(screenWidth / CELL_SIZE));
       setWidgetContainerRows(Math.floor(mainContentHeight / CELL_SIZE));
@@ -462,31 +472,62 @@ export default function Home() {
     } catch (error) { console.error("Error exporting layout:", error); alert("Error exporting layout."); }
   };
 
+  // Define a more specific type for the imported data structure
+  interface ImportedLayoutData {
+    dashboardVersion?: string;
+    widgets?: Partial<PageWidgetConfig>[]; // Assuming widgets might be partially formed
+    notesCollection?: NotesCollectionStorage;
+    sharedGlobalTodos?: TodoItem[];
+    sharedGlobalPhotoHistory?: HistoricImage[];
+  }
+
+
   const handleImportLayout = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (typeof window === 'undefined') return; const file = event.target.files?.[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
         const text = e.target?.result; if (typeof text !== 'string') throw new Error("Failed to read file content.");
-        const importedData = JSON.parse(text);
-        let widgetsToImportRaw: any[] = []; 
+        // Parse the JSON, assuming it could be an object or an array (for legacy)
+        const parsedJson = JSON.parse(text);
+        let importedData: ImportedLayoutData | Partial<PageWidgetConfig>[];
+
+        // Type guard or check to determine structure
+        if (typeof parsedJson === 'object' && !Array.isArray(parsedJson) && (parsedJson.dashboardVersion || parsedJson.widgets)) {
+            importedData = parsedJson as ImportedLayoutData;
+        } else if (Array.isArray(parsedJson)) {
+            importedData = parsedJson as Partial<PageWidgetConfig>[];
+        } else {
+            throw new Error("Invalid file format. Could not recognize dashboard structure.");
+        }
+
+
+        let widgetsToImportRaw: Partial<PageWidgetConfig>[] = [];
         let notesToImport: Note[] = sharedNotes; let activeNoteIdToImport: string | null = activeSharedNoteId;
         let globalTodosToImport: TodoItem[] = sharedTodos; let globalPhotoHistoryToImport: HistoricImage[] = sharedPhotoHistory;
 
-        if (importedData.dashboardVersion && importedData.widgets) { 
-            widgetsToImportRaw = importedData.widgets;
+        if ('dashboardVersion' in importedData && 'widgets' in importedData && Array.isArray(importedData.widgets)) { // Modern format
+            widgetsToImportRaw = importedData.widgets || [];
             if (importedData.notesCollection) { notesToImport = importedData.notesCollection.notes || []; activeNoteIdToImport = importedData.notesCollection.activeNoteId || null; }
             if (importedData.sharedGlobalTodos && Array.isArray(importedData.sharedGlobalTodos)) { globalTodosToImport = importedData.sharedGlobalTodos; }
             if (importedData.sharedGlobalPhotoHistory && Array.isArray(importedData.sharedGlobalPhotoHistory)) { globalPhotoHistoryToImport = importedData.sharedGlobalPhotoHistory; }
             alert(`Dashboard layout and global data (version ${importedData.dashboardVersion}) imported successfully!`);
-        } else if (Array.isArray(importedData)) { 
+        } else if (Array.isArray(importedData)) { // Legacy format (array of widgets)
             widgetsToImportRaw = importedData;
             alert("Dashboard layout (legacy format) imported. Global data (notes, todos, photo history) will use defaults or existing data.");
-        } else { throw new Error("Invalid file format. Could not recognize dashboard structure."); }
+        } else {
+             throw new Error("Invalid file format. Could not recognize dashboard structure.");
+        }
 
-        if (widgetsToImportRaw.length > 0 && typeof widgetsToImportRaw[0].id !== 'string') throw new Error("Imported widget data seems invalid.");
-        
-        const processedWidgetsToImport = widgetsToImportRaw.map(processWidgetConfig); 
+
+        if (widgetsToImportRaw.length > 0 && typeof widgetsToImportRaw[0]?.id !== 'string') {
+             // Add a more robust check if needed, e.g., check for other essential properties
+             console.warn("Imported widget data might be invalid or incomplete.", widgetsToImportRaw[0]);
+             // Depending on strictness, you might throw an error or attempt to process anyway
+        }
+
+
+        const processedWidgetsToImport = widgetsToImportRaw.map(processWidgetConfig);
 
         setWidgets(processedWidgetsToImport); setSharedNotes(notesToImport); setActiveSharedNoteId(activeNoteIdToImport);
         setSharedTodos(globalTodosToImport); setSharedPhotoHistory(globalPhotoHistoryToImport);
@@ -496,7 +537,14 @@ export default function Home() {
         initialLayoutIsDefaultRef.current = false; // Data loaded from import, not default
         initialCenteringDoneRef.current = true; // Assume imported layout is as intended
 
-      } catch (err: any) { console.error("Error importing layout:", err); alert(`Error importing layout: ${err.message || 'Invalid file content.'}`); }
+      } catch (err: unknown) { // Changed from any to unknown
+          let message = 'Invalid file content.';
+          if (err instanceof Error) {
+            message = err.message;
+          }
+          console.error("Error importing layout:", err);
+          alert(`Error importing layout: ${message}`);
+      }
       finally { if (fileInputRef.current) fileInputRef.current.value = ""; }
     };
     reader.onerror = () => { alert("Error reading file."); if (fileInputRef.current) fileInputRef.current.value = ""; };
@@ -518,26 +566,32 @@ export default function Home() {
     if (!position) { alert("No available space to add this widget. Try making some room or resizing existing widgets."); setIsAddWidgetMenuOpen(false); return; }
 
     let newWidgetInstanceSettings = JSON.parse(JSON.stringify(blueprint.defaultSettings || {}));
-    if (blueprint.type === 'photo') { 
-        newWidgetInstanceSettings = ensurePhotoWidgetInstanceSettings(newWidgetInstanceSettings as PhotoWidgetSettings); 
-    } else if (blueprint.type === 'portfolio') { 
+    if (blueprint.type === 'photo') {
+        newWidgetInstanceSettings = ensurePhotoWidgetInstanceSettings(newWidgetInstanceSettings as PhotoWidgetSettings);
+    } else if (blueprint.type === 'portfolio') {
         newWidgetInstanceSettings = ensurePortfolioWidgetInstanceSettings(newWidgetInstanceSettings as PortfolioWidgetSettings);
     }
 
+    // Initialize containerSettings with potential overrides
+    const newWidgetContainerSettings = { ...DEFAULT_WIDGET_CONTAINER_SETTINGS };
+    if (blueprint.type === 'portfolio' || blueprint.type === 'notes') {
+        newWidgetContainerSettings.innerPadding = 'p-0';
+    }
+
     const newWidget: PageWidgetConfig = {
-      id: `${blueprint.type}-${Date.now()}`, title: blueprint.defaultTitle, type: blueprint.type,
-      colStart: position.colStart, rowStart: position.rowStart, colSpan: defaultColSpan, rowSpan: defaultRowSpan,
-      settings: newWidgetInstanceSettings, 
-      containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS }, 
+      id: `${blueprint.type}-${Date.now()}`,
+      title: blueprint.defaultTitle,
+      type: blueprint.type,
+      colStart: position.colStart,
+      rowStart: position.rowStart,
+      colSpan: defaultColSpan,
+      rowSpan: defaultRowSpan,
+      settings: newWidgetInstanceSettings,
+      containerSettings: newWidgetContainerSettings,
       isMinimized: false,
     };
-    if (newWidget.type === 'portfolio') {
-        newWidget.containerSettings.innerPadding = 'p-0';
-    }
-    if (newWidget.type === 'notes') {
-        newWidget.containerSettings.innerPadding = 'p-0';
-    }
-    
+
+
     setWidgets(prev => { const updatedWidgets = [...prev, newWidget]; updateWidgetsAndPushToHistory(updatedWidgets, `add_widget_${widgetType}`); return updatedWidgets; });
     setActiveWidgetId(newWidget.id); setIsAddWidgetMenuOpen(false);
   };
@@ -556,7 +610,7 @@ export default function Home() {
     if (maximizedWidgetId && maximizedWidgetId !== widgetId) return;
     const widgetToEdit = widgets.find(w => w.id === widgetId);
     if (widgetToEdit) {
-      setActiveWidgetId(widgetId); 
+      setActiveWidgetId(widgetId);
       setSelectedWidgetForContainerSettings(widgetToEdit);
       setIsContainerSettingsModalOpen(true);
     }
@@ -577,7 +631,7 @@ export default function Home() {
         updateWidgetsAndPushToHistory(updatedWidgets, `save_container_settings_${widgetId}`);
         return updatedWidgets;
     });
-    setActiveWidgetId(widgetId); 
+    setActiveWidgetId(widgetId);
   }, [updateWidgetsAndPushToHistory]);
 
 
@@ -594,7 +648,7 @@ export default function Home() {
   const handleSharedPhotoHistoryChange = (newGlobalPhotoHistory: HistoricImage[]) => { setSharedPhotoHistory(newGlobalPhotoHistory); };
 
   const renderWidgetContent = (widgetConfig: PageWidgetConfig) => {
-    const currentWidgetSettings = widgetConfig.settings || {}; 
+    const currentWidgetSettings = widgetConfig.settings || {};
     switch (widgetConfig.type) {
       case 'weather': return <WeatherWidget id={widgetConfig.id} settings={currentWidgetSettings as WeatherWidgetSettings | undefined} />;
       case 'clock': return <ClockWidget id={widgetConfig.id} settings={currentWidgetSettings as ClockWidgetSettings | undefined} />;
@@ -606,12 +660,12 @@ export default function Home() {
       case 'photo': return <PhotoWidget id={widgetConfig.id} settings={currentWidgetSettings as PhotoWidgetSettings | undefined} onSettingsChange={handleSaveWidgetInstanceSettings} sharedHistory={sharedPhotoHistory} onSharedHistoryChange={handleSharedPhotoHistoryChange} />;
       case 'todo': return <TodoWidget instanceId={widgetConfig.id} settings={currentWidgetSettings as TodoWidgetSettings | undefined} todos={sharedTodos} onTodosChange={handleSharedTodosChange} />;
       case 'notes': return <NotesWidget instanceId={widgetConfig.id} settings={currentWidgetSettings as PageInstanceNotesSettings | undefined} notes={sharedNotes} activeNoteId={activeSharedNoteId} onNotesChange={setSharedNotes} onActiveNoteIdChange={setActiveSharedNoteId} />;
-      case 'portfolio': return <PortfolioWidget id={widgetConfig.id} settings={currentWidgetSettings as PortfolioWidgetSettings | undefined} />; 
+      case 'portfolio': return <PortfolioWidget /*id={widgetConfig.id}*/ settings={currentWidgetSettings as PortfolioWidgetSettings | undefined} />; // ID was removed from PortfolioWidget props
       default: return <p className="text-xs text-secondary italic">Generic widget content.</p>;
     }
   };
 
-  const getSettingsPanelForWidget = (widgetConfig: PageWidgetConfig | null) => { 
+  const getSettingsPanelForWidget = (widgetConfig: PageWidgetConfig | null) => {
     if (!widgetConfig) return null; const currentContentSettings = widgetConfig.settings || {};
     const boundSaveInstanceContentSettings = (newInstanceContentSettings: AllWidgetSettings) => { handleSaveWidgetInstanceSettings(widgetConfig.id, newInstanceContentSettings); handleCloseSettingsModal(); };
     const boundSavePhotoInstanceContentSettings = (newInstancePhotoSettings: PhotoWidgetSettings) => { handleSaveWidgetInstanceSettings(widgetConfig.id, newInstancePhotoSettings); handleCloseSettingsModal(); };
@@ -626,11 +680,11 @@ export default function Home() {
       case 'photo': return <PhotoSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as PhotoWidgetSettings | undefined} onSaveInstanceSettings={boundSavePhotoInstanceContentSettings} onClearGlobalHistory={() => { handleSharedPhotoHistoryChange([]); alert('Global photo history has been cleared.'); }} globalHistoryLength={sharedPhotoHistory.length} />;
       case 'notes': return <NotesSettingsPanel widgetInstanceId={widgetConfig.id} currentSettings={currentContentSettings as PageInstanceNotesSettings | undefined} onSaveLocalSettings={boundSaveInstanceContentSettings} onClearAllNotesGlobal={() => { setSharedNotes([]); setActiveSharedNoteId(null); alert("All notes have been cleared from the dashboard."); }} />;
       case 'todo': return <TodoSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as TodoWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} onClearAllTasks={() => { handleSharedTodosChange([]); alert(`The global to-do list has been cleared.`); }} />;
-      case 'portfolio': return <PortfolioSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as PortfolioWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} />; 
+      case 'portfolio': return <PortfolioSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as PortfolioWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} />;
       default: return <p className="text-sm text-secondary">No specific content settings available for this widget type.</p>;
     }
   };
-  
+
   if (!initialLoadAttempted.current || widgetContainerCols === 0 || widgetContainerRows === 0) {
     return <div className="w-full h-screen bg-page-background flex items-center justify-center text-page-foreground">Loading Dashboard...</div>;
   }
@@ -664,16 +718,16 @@ export default function Home() {
             const currentWidgetState = maximizedWidgetId === widgetConfig.id && maximizedWidgetOriginalState ? { ...maximizedWidgetOriginalState, colStart: 1, rowStart: 1, colSpan: widgetContainerCols > 2 ? widgetContainerCols - 2 : widgetContainerCols, rowSpan: widgetContainerRows > 2 ? widgetContainerRows - 2 : widgetContainerRows, isMinimized: false } : widgetConfig;
             const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(def => def.type === widgetConfig.type); let minCol = blueprint?.minColSpan || 3; let minRow = blueprint?.minRowSpan || 3;
             if (widgetConfig.isMinimized && maximizedWidgetId !== widgetConfig.id) { minCol = widgetConfig.colSpan; minRow = MINIMIZED_WIDGET_ROW_SPAN; }
-            
+
             return (
               <Widget
                 key={widgetConfig.id} id={widgetConfig.id} title={widgetConfig.title}
                 colStart={currentWidgetState.colStart} rowStart={currentWidgetState.rowStart} colSpan={currentWidgetState.colSpan} rowSpan={currentWidgetState.rowSpan}
                 onResize={handleWidgetResizeLive} onResizeEnd={handleWidgetResizeEnd} onMove={handleWidgetMove}
                 onDelete={handleWidgetDelete} onFocus={handleWidgetFocus}
-                onOpenSettings={handleOpenWidgetSettings} 
-                onOpenContainerSettings={handleOpenContainerSettingsModal} 
-                containerSettings={widgetConfig.containerSettings} 
+                onOpenSettings={handleOpenWidgetSettings}
+                onOpenContainerSettings={handleOpenContainerSettingsModal}
+                containerSettings={widgetConfig.containerSettings}
                 isActive={widgetConfig.id === activeWidgetId && !maximizedWidgetId} CELL_SIZE={CELL_SIZE}
                 minColSpan={minCol} minRowSpan={minRow} totalGridCols={widgetContainerCols} totalGridRows={widgetContainerRows}
                 isMinimized={widgetConfig.isMinimized && maximizedWidgetId !== widgetConfig.id} onMinimizeToggle={() => handleWidgetMinimizeToggle(widgetConfig.id)}
@@ -685,13 +739,13 @@ export default function Home() {
           })}
         </div>
       </div>
-      
+
       {isSettingsModalOpen && selectedWidgetForSettings && (
-        <SettingsModal 
-          isOpen={isSettingsModalOpen} 
-          onClose={handleCloseSettingsModal} 
-          title={selectedWidgetForSettings.title} 
-          settingsContent={getSettingsPanelForWidget(selectedWidgetForSettings)} 
+        <SettingsModal
+          isOpen={isSettingsModalOpen}
+          onClose={handleCloseSettingsModal}
+          title={selectedWidgetForSettings.title}
+          settingsContent={getSettingsPanelForWidget(selectedWidgetForSettings)}
         />
       )}
 
@@ -701,8 +755,8 @@ export default function Home() {
           onClose={handleCloseContainerSettingsModal}
           widgetId={selectedWidgetForContainerSettings.id}
           widgetTitle={selectedWidgetForContainerSettings.title}
-          currentSettings={selectedWidgetForContainerSettings.containerSettings} 
-          onSave={handleSaveWidgetContainerSettings} 
+          currentSettings={selectedWidgetForContainerSettings.containerSettings}
+          onSave={handleSaveWidgetContainerSettings}
         />
       )}
     </main>
