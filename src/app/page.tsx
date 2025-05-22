@@ -73,7 +73,7 @@ const PortfolioIcon = () => (
 const CELL_SIZE = 30;
 const MAX_HISTORY_LENGTH = 50;
 const MINIMIZED_WIDGET_ROW_SPAN = 2;
-const DASHBOARD_LAYOUT_STORAGE_KEY = 'dashboardLayoutV3.15'; // Incremented for dynamic centering logic
+const DASHBOARD_LAYOUT_STORAGE_KEY = 'dashboardLayoutV3.15'; 
 const GLOBAL_NOTES_STORAGE_KEY = 'dashboardGlobalNotesCollection_v1';
 const GLOBAL_TODOS_STORAGE_KEY = 'dashboardGlobalSingleTodoList_v1';
 const GLOBAL_PHOTO_HISTORY_STORAGE_KEY = 'dashboardGlobalPhotoHistory_v1';
@@ -587,14 +587,8 @@ export default function Home() {
   const handleUndo = () => { if (historyPointer.current > 0) { isPerformingUndoRedo.current = true; const newPointer = historyPointer.current - 1; historyPointer.current = newPointer; const historicWidgets = JSON.parse(JSON.stringify(history.current[newPointer])); setWidgets(historicWidgets); setActiveWidgetId(null); setMaximizedWidgetId(null); setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length }); requestAnimationFrame(() => { isPerformingUndoRedo.current = false; }); } };
   const handleRedo = () => { if (historyPointer.current < history.current.length - 1) { isPerformingUndoRedo.current = true; const newPointer = historyPointer.current + 1; historyPointer.current = newPointer; const historicWidgets = JSON.parse(JSON.stringify(history.current[newPointer])); setWidgets(historicWidgets); setActiveWidgetId(null); setMaximizedWidgetId(null); setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length }); requestAnimationFrame(() => { isPerformingUndoRedo.current = false; }); } };
 
-  useEffect(() => {
-    if (initialLoadAttempted.current && !isPerformingUndoRedo.current) {
-        const currentHistoryTop = historyPointer.current >= 0 && historyPointer.current < history.current.length ? history.current[historyPointer.current] : null;
-        if (!currentHistoryTop || JSON.stringify(currentHistoryTop) !== JSON.stringify(widgets)) {
-            updateWidgetsAndPushToHistory(widgets, 'direct_widgets_change_sync');
-        }
-    }
-  }, [widgets, updateWidgetsAndPushToHistory]); 
+  // Removed the general useEffect that was causing issues with resize undo.
+  // History is now managed more explicitly by individual action handlers.
 
   const handleSharedTodosChange = (newGlobalTodos: TodoItem[]) => { setSharedTodos(newGlobalTodos); };
   const handleSharedPhotoHistoryChange = (newGlobalPhotoHistory: HistoricImage[]) => { setSharedPhotoHistory(newGlobalPhotoHistory); };
