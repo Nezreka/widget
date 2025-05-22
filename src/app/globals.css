@@ -39,6 +39,23 @@
   --mouse-y: 50%; /* Will be updated by JS */
   --mouse-interaction-radius: 150px; /* Radius for mouse interaction with particles */
 }
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.05); }
+}
+@keyframes pulse-slower {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.03); }
+}
+@keyframes pulse-medium {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.04); }
+}
+.animate-pulse-slow { animation: pulse-slow 8s infinite ease-in-out; }
+.animate-pulse-slower { animation: pulse-slower 10s infinite ease-in-out; }
+.animate-pulse-medium { animation: pulse-medium 9s infinite ease-in-out; }
+.animation-delay-2000 { animation-delay: 2s; }
+.animation-delay-4000 { animation-delay: 4s; }
 
 /* Keyframes for the main background gradient animation - kept for depth */
 @keyframes animateCosmicBackground {
