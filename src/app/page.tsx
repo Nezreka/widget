@@ -85,13 +85,13 @@ const initialDesktopWidgetsLayout: Omit<PageWidgetConfig, 'colSpan' | 'rowSpan' 
     id: "portfolio-main", title: "Broque Thomas - Portfolio", type: "portfolio",
     colStart: 1, rowStart: 1, // Will be centered or adjusted
     settings: PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS, isMinimized: false,
-    containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS, innerPadding: 'p-0' }
+    containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS, innerPadding: 'px-3.5 py-3' }
   },
   {
     id: "gemini-chat-main", title: "Gemini AI Assistant", type: "geminiChat",
     colStart: 1, rowStart: 1, // Will be centered or adjusted
     settings: GEMINI_CHAT_WIDGET_DEFAULT_INSTANCE_SETTINGS, isMinimized: false,
-    containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS, innerPadding: 'p-0' }
+    containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS, innerPadding: 'px-3.5 py-3' }
   },
   {
     id: "clock-widget-main", title: "Digital Clock", type: "clock",
@@ -106,7 +106,7 @@ const initialMobileWidgetLayout: Omit<PageWidgetConfig, 'colSpan' | 'rowSpan' | 
     id: "portfolio-main", title: "Broque Thomas - Portfolio", type: "portfolio",
     colStart: 1, rowStart: 1, // Will span full width/height
     settings: PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS, isMinimized: false,
-    containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS, innerPadding: 'p-0' }
+    containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS, innerPadding: 'px-3.5 py-3' }
   },
 ];
 
