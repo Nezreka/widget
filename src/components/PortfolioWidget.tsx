@@ -260,8 +260,8 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ settings, isMobileFul
           {(layoutMode === 'default' || layoutMode === 'detailed') && (
             <ul className={`list-disc list-inside space-y-1.5 text-slate-300 text-sm`}>
                 <li>Curriculum: Software engineering, algorithms, web tech.</li>
-                <li>Capstone: Full-stack web application development.</li>
-                <li>Awarded Dean&apos;s List for academic excellence.</li>
+                <li>Capstone: Full-stack web & iOS App application development </li>
+                <li>Completed advanced coursework with distinction in distributed systems and cloud infrastructure.</li>
             </ul>
           )}
           </div>
