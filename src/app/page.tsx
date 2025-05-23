@@ -86,18 +86,6 @@ const initialDesktopWidgetsLayout: Omit<PageWidgetConfig, 'colSpan' | 'rowSpan' 
     settings: PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS, isMinimized: false,
     containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS, innerPadding: 'px-3.5 py-3' }
   },
-  {
-    id: "gemini-chat-main", title: "Gemini AI Assistant", type: "geminiChat",
-    colStart: 1, rowStart: 1,
-    settings: GEMINI_CHAT_WIDGET_DEFAULT_INSTANCE_SETTINGS, isMinimized: false,
-    containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS, innerPadding: 'px-3.5 py-3' }
-  },
-  {
-    id: "clock-widget-main", title: "Digital Clock", type: "clock",
-    colStart: 1, rowStart: 1,
-    settings: { displayType: 'digital', showSeconds: true, hourFormat: '12' } as ClockWidgetSettings, isMinimized: false,
-    containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS }
-  },
 ];
 
 const initialMobileWidgetLayout: Omit<PageWidgetConfig, 'colSpan' | 'rowSpan' | 'minColSpan' | 'minRowSpan'>[] = [
