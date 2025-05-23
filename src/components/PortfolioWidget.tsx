@@ -11,6 +11,9 @@ export interface PortfolioWidgetSettings {
 
 interface PortfolioWidgetProps {
   settings?: PortfolioWidgetSettings;
+  // Add a prop to inform the widget if it's in a mobile-first, full-span context
+  // This helps decide initial project visibility if needed, though the button handles most of it.
+  isMobileFullScreen?: boolean;
 }
 
 // --- Icons (Refined for a sleeker look) ---
@@ -43,6 +46,12 @@ const CodeBracketIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
 const ChevronDownIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={className}>
         <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+    </svg>
+);
+
+const ChevronUpIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={className}>
+        <path fillRule="evenodd" d="M14.78 11.78a.75.75 0 0 1-1.06 0L10 8.06l-3.72 3.72a.75.75 0 1 1-1.06-1.06l4.25-4.25a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06Z" clipRule="evenodd" />
     </svg>
 );
 
@@ -97,10 +106,12 @@ export const PortfolioSettingsPanel: React.FC<{
 };
 
 // --- Main PortfolioWidget Component ---
-const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ settings }) => {
+const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ settings, isMobileFullScreen }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [widgetSize, setWidgetSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
   const widgetRef = useRef<HTMLDivElement>(null);
+  // State to manage showing all projects, especially for compact/mobile view
+  const [showAllProjects, setShowAllProjects] = useState(false);
 
   const accentColor = settings?.accentColor || '#0ea5e9'; // Default to sky-500
   const showAnimatedBackground = settings?.showAnimatedBackground === undefined ? true : settings.showAnimatedBackground;
@@ -135,11 +146,18 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ settings }) => {
   };
 
   let layoutMode: 'compact' | 'default' | 'detailed' = 'detailed';
+  // If isMobileFullScreen is true, we might want to force 'detailed' or a specific mobile-optimized 'detailed' view
+  // For now, existing logic will apply, but button will override project list
   if (widgetSize.width < BREAKPOINTS.COMPACT_WIDTH || widgetSize.height < BREAKPOINTS.COMPACT_HEIGHT) {
     layoutMode = 'compact';
   } else if (widgetSize.width < BREAKPOINTS.DEFAULT_WIDTH || widgetSize.height < BREAKPOINTS.DEFAULT_HEIGHT) {
     layoutMode = 'default';
   }
+  
+  // If it's mobile full screen and compact mode, allow showing all projects via button
+  // This ensures that even in compact mode (due to widgetSize), the button can reveal all projects
+  const canToggleAllProjects = layoutMode === 'compact' || isMobileFullScreen;
+
 
   useEffect(() => {
     const element = widgetRef.current;
@@ -148,7 +166,7 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ settings }) => {
     setWidgetSize({ width: element.offsetWidth, height: element.offsetHeight });
 
     const resizeObserver = new ResizeObserver(entries => {
-      for (const entry of entries) { // Changed let to const here
+      for (const entry of entries) {
         setWidgetSize({ width: entry.contentRect.width, height: entry.contentRect.height });
       }
     });
@@ -222,7 +240,6 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ settings }) => {
           <p className={`text-slate-400 mb-0.5 ${layoutMode === 'compact' ? 'text-xs' : 'text-sm'}`}>{previousCompany}</p>
           <p className={`text-slate-400 mb-2 ${layoutMode === 'compact' ? 'text-xs' : 'text-sm'}`}>{experienceDuration}</p>
           {(layoutMode === 'default' || layoutMode === 'detailed') && (
-            // UPDATED: Simplified className for ul based on outer condition
             <ul className={`list-disc list-inside space-y-1.5 text-slate-300 text-sm`}>
                 <li>Engineered critical features for enterprise web applications.</li>
                 <li>Specialized in React, Next.js, and Node.js solutions.</li>
@@ -241,7 +258,6 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ settings }) => {
           <p className={`text-slate-400 mb-0.5 ${layoutMode === 'compact' ? 'text-xs' : 'text-sm'}`}>{university}</p>
           <p className={`text-slate-400 mb-2 ${layoutMode === 'compact' ? 'text-xs' : 'text-sm'}`}>Graduated: {graduationYear}</p>
           {(layoutMode === 'default' || layoutMode === 'detailed') && (
-             // UPDATED: Simplified className for ul based on outer condition
             <ul className={`list-disc list-inside space-y-1.5 text-slate-300 text-sm`}>
                 <li>Curriculum: Software engineering, algorithms, web tech.</li>
                 <li>Capstone: Full-stack web application development.</li>
@@ -279,45 +295,57 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ settings }) => {
     </section>
   );
 
-  const renderProjects = () => (
-    <section className={animatedEntryClass(6)}>
-      <h2 className={sectionTitleStyle(layoutMode)}>
-          <span className="w-1.5 h-6 rounded-sm mr-3" style={{backgroundColor: 'var(--portfolio-accent-color)'}}></span>
-          Featured Projects
-      </h2>
-      <div className={`grid gap-4 md:gap-6 ${layoutMode === 'detailed' ? 'lg:grid-cols-2 xl:grid-cols-3' : layoutMode === 'default' ? 'md:grid-cols-2' : 'grid-cols-1'}`}>
-          {projects.slice(0, layoutMode === 'compact' ? 1 : layoutMode === 'default' ? 2 : projects.length).map((project, index) => (
-          <div
-              key={index}
-              className={`${cardBaseClass} group flex flex-col justify-between hover:-translate-y-1.5`}
-          >
-              <div>
-                  <h3 className={`font-bold mb-1 group-hover:text-[var(--portfolio-accent-color)] transition-colors duration-300 ${layoutMode === 'compact' ? 'text-lg' : 'text-xl'}`}>{project.name}</h3>
-                  <p className={`${textContentClass} mb-3 flex-grow ${layoutMode === 'compact' ? 'text-xs' : 'text-sm'}`}>
-                    {layoutMode === 'compact' && project.description.length > 100 ? project.description.substring(0,100) + "..." : project.description}
-                  </p>
-                  {(layoutMode === 'default' || layoutMode === 'detailed') && (
-                    <div className="flex flex-wrap gap-1.5 mb-3">
-                        {project.tech.slice(0, layoutMode === 'default' ? 3: project.tech.length).map(t => <span key={t} className="text-[10px] px-2 py-0.5 bg-slate-700 rounded-full text-slate-300 font-medium">{t}</span>)}
-                        {layoutMode === 'default' && project.tech.length > 3 && <span className="text-[10px] px-2 py-0.5 bg-slate-700 rounded-full text-slate-300 font-medium">...</span>}
-                    </div>
-                  )}
-              </div>
-              {project.link !== "#" && (
-                  <a
-                      href={project.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`inline-flex items-center font-semibold text-[var(--portfolio-accent-color)] hover:underline group mt-auto self-start transition-transform duration-200 hover:translate-x-0.5 ${layoutMode === 'compact' ? 'text-xs' : 'text-sm'}`}
-                  >
-                      Explore Project <LinkIcon className={layoutMode === 'compact' ? 'w-3 h-3' : 'w-4 h-4'} />
-                  </a>
-              )}
-          </div>
-          ))}
-      </div>
-    </section>
-  );
+  const renderProjects = () => {
+    // Determine how many projects to show based on layoutMode and showAllProjects state
+    let projectsToShow = projects;
+    if (canToggleAllProjects && !showAllProjects) {
+        projectsToShow = projects.slice(0, 1); // Show 1 project if compact and not "showAll"
+    } else if (layoutMode === 'default' && !showAllProjects) { // Keep default behavior if not compact
+        projectsToShow = projects.slice(0, 2);
+    }
+    // If showAllProjects is true, or if it's detailed mode, show all projects.
+
+    return (
+        <section className={animatedEntryClass(6)}>
+        <h2 className={sectionTitleStyle(layoutMode)}>
+            <span className="w-1.5 h-6 rounded-sm mr-3" style={{backgroundColor: 'var(--portfolio-accent-color)'}}></span>
+            Featured Projects
+        </h2>
+        <div className={`grid gap-4 md:gap-6 ${layoutMode === 'detailed' || showAllProjects ? 'lg:grid-cols-2 xl:grid-cols-3' : layoutMode === 'default' ? 'md:grid-cols-2' : 'grid-cols-1'}`}>
+            {projectsToShow.map((project, index) => (
+            <div
+                key={index}
+                className={`${cardBaseClass} group flex flex-col justify-between hover:-translate-y-1.5`}
+            >
+                <div>
+                    <h3 className={`font-bold mb-1 group-hover:text-[var(--portfolio-accent-color)] transition-colors duration-300 ${layoutMode === 'compact' && !showAllProjects ? 'text-lg' : 'text-xl'}`}>{project.name}</h3>
+                    <p className={`${textContentClass} mb-3 flex-grow ${layoutMode === 'compact' && !showAllProjects ? 'text-xs' : 'text-sm'}`}>
+                        {layoutMode === 'compact' && !showAllProjects && project.description.length > 100 ? project.description.substring(0,100) + "..." : project.description}
+                    </p>
+                    {(layoutMode === 'default' || layoutMode === 'detailed' || showAllProjects) && (
+                        <div className="flex flex-wrap gap-1.5 mb-3">
+                            {project.tech.slice(0, (layoutMode === 'default' && !showAllProjects) ? 3: project.tech.length).map(t => <span key={t} className="text-[10px] px-2 py-0.5 bg-slate-700 rounded-full text-slate-300 font-medium">{t}</span>)}
+                            {(layoutMode === 'default' && !showAllProjects) && project.tech.length > 3 && <span className="text-[10px] px-2 py-0.5 bg-slate-700 rounded-full text-slate-300 font-medium">...</span>}
+                        </div>
+                    )}
+                </div>
+                {project.link !== "#" && (
+                    <a
+                        href={project.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`inline-flex items-center font-semibold text-[var(--portfolio-accent-color)] hover:underline group mt-auto self-start transition-transform duration-200 hover:translate-x-0.5 ${layoutMode === 'compact' && !showAllProjects ? 'text-xs' : 'text-sm'}`}
+                    >
+                        Explore Project <LinkIcon className={layoutMode === 'compact' && !showAllProjects ? 'w-3 h-3' : 'w-4 h-4'} />
+                    </a>
+                )}
+            </div>
+            ))}
+        </div>
+        </section>
+    );
+  };
+
 
   const renderFooter = () => (
     <footer className={`pt-8 md:pt-12 mt-auto text-center ${animatedEntryClass(7)}`}>
@@ -370,23 +398,28 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ settings }) => {
                       ${layoutMode === 'compact' ? 'p-4' : 'p-6 md:p-8'}`}>
         <div className="max-w-6xl mx-auto">
             {renderAboutMe()}
-            {(layoutMode === 'default' || layoutMode === 'detailed') && (
+            {/* Conditionally render Experience/Education and Skills based on layoutMode OR if showAllProjects is true for mobile */}
+            {(layoutMode === 'default' || layoutMode === 'detailed' || (canToggleAllProjects && showAllProjects) ) && (
                 <>
-                    <div className={`mt-8 md:mt-12 ${layoutMode === 'detailed' ? '' : 'space-y-8'}`}>
+                    <div className={`mt-8 md:mt-12 ${layoutMode === 'detailed' || (canToggleAllProjects && showAllProjects) ? '' : 'space-y-8'}`}>
                         {renderExperienceAndEducation()}
                     </div>
                     <div className="mt-8 md:mt-12">{renderSkills()}</div>
                 </>
             )}
-             {layoutMode === 'compact' && (
+            
+            <div className="mt-8 md:mt-12">{renderProjects()}</div>
+
+            {/* "View/Hide Full Portfolio" button for compact mode or mobile full screen */}
+            {canToggleAllProjects && (
                 <button
-                    onClick={() => alert("Detailed view would show more info here. Implement navigation or state change for full portfolio view.")}
+                    onClick={() => setShowAllProjects(prev => !prev)}
                     className="mt-6 w-full text-sm py-2.5 rounded-lg bg-[var(--portfolio-accent-color)]/80 hover:bg-[var(--portfolio-accent-color)] text-white font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center"
                 >
-                    View Full Portfolio <ChevronDownIcon className="ml-2 w-4 h-4" />
+                    {showAllProjects ? 'Show Less' : 'View Full Portfolio'}
+                    {showAllProjects ? <ChevronUpIcon className="ml-2 w-4 h-4" /> : <ChevronDownIcon className="ml-2 w-4 h-4" />}
                 </button>
             )}
-            <div className="mt-8 md:mt-12">{renderProjects()}</div>
             {renderFooter()}
         </div>
       </div>

@@ -75,6 +75,8 @@ interface WidgetProps {
   totalGridCols?: number;
   totalGridRows?: number;
   isMinimized?: boolean;
+  isDraggable?: boolean;
+  isResizable?: boolean;
   onMinimizeToggle?: (id: string) => void;
   isMaximized?: boolean;
   onMaximizeToggle?: (id: string) => void;

@@ -2,13 +2,9 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-// Import Widget, { WidgetResizeDataType, WidgetMoveDataType, WidgetContainerSettings } from "@/components/Widget";
-// The above line was likely a copy-paste error in the original provided file, as Widget is defined below.
-// Assuming the intended import was for the types and WidgetContainerSettings.
 import Widget, { type WidgetResizeDataType, type WidgetMoveDataType, type WidgetContainerSettings } from "@/components/Widget";
 import GridBackground from "@/components/GridBackground";
 import SettingsModal from '@/components/SettingsModal';
-// Removed InnerPaddingType as it's unused in this file
 import WidgetContainerSettingsModal from '@/components/WidgetContainerSettingsModal';
 
 // Import Widget-specific components and types
@@ -18,8 +14,6 @@ import CalculatorWidget, { CalculatorSettingsPanel, type CalculatorWidgetSetting
 import YoutubeWidget, { YoutubeSettingsPanel, type YoutubeWidgetSettings } from "@/components/YoutubeWidget";
 import NotesWidget, {
     NotesSettingsPanel,
-    // Removed PageInstanceNotesSettingsImport as it's unused
-    // type NotesWidgetSettings as PageInstanceNotesSettingsImport,
     type Note
 } from "@/components/NotesWidget";
 import TodoWidget, { TodoSettingsPanel, type TodoWidgetSettings, type TodoItem } from "@/components/TodoWidget";
@@ -31,7 +25,6 @@ import PortfolioWidget, { PortfolioSettingsPanel, type PortfolioWidgetSettings }
 import GeminiChatWidget, { GeminiChatSettingsPanel, type GeminiChatWidgetSettings } from "@/components/GeminiChatWidget";
 import AddWidgetContextMenu, { mapBlueprintToContextMenuItem, type WidgetBlueprintContextMenuItem } from '@/components/AddWidgetContextMenu';
 
-// Import Icons from the dedicated Icons.tsx file
 import {
   UndoIcon,
   RedoIcon,
@@ -42,7 +35,6 @@ import {
   DensityIcon
 } from '@/components/Icons';
 
-// Import ALL shared widget configurations, types, and constants from widgetConfig.ts
 import {
   DEFAULT_CELL_SIZE,
   WIDGET_SIZE_PRESETS,
@@ -69,12 +61,13 @@ const CELL_SIZE_OPTIONS = [
 
 const MAX_HISTORY_LENGTH = 50;
 const MINIMIZED_WIDGET_ROW_SPAN = 2;
-const DASHBOARD_LAYOUT_STORAGE_KEY = 'dashboardLayoutV3.20';
+const DASHBOARD_LAYOUT_STORAGE_KEY = 'dashboardLayoutV3.21'; // Incremented version for new mobile logic
 const GLOBAL_NOTES_STORAGE_KEY = 'dashboardGlobalNotesCollection_v1';
 const GLOBAL_TODOS_STORAGE_KEY = 'dashboardGlobalSingleTodoList_v1';
 const GLOBAL_PHOTO_HISTORY_STORAGE_KEY = 'dashboardGlobalPhotoHistory_v1';
 const DATA_SAVE_DEBOUNCE_MS = 700;
 const WIDGET_DESELECT_TIMEOUT_MS = 3000;
+const MOBILE_BREAKPOINT_PX = 768; // Common breakpoint for mobile devices
 
 const DEFAULT_WIDGET_CONTAINER_SETTINGS: WidgetContainerSettings = {
     alwaysShowTitleBar: false,
@@ -86,26 +79,37 @@ interface NotesCollectionStorage {
     activeNoteId: string | null;
 }
 
-const initialWidgetsLayout: Omit<PageWidgetConfig, 'colSpan' | 'rowSpan' | 'minColSpan' | 'minRowSpan'>[] = [
+// Define the initial layout structure without spans, as they are determined dynamically
+const initialDesktopWidgetsLayout: Omit<PageWidgetConfig, 'colSpan' | 'rowSpan' | 'minColSpan' | 'minRowSpan'>[] = [
   {
     id: "portfolio-main", title: "Broque Thomas - Portfolio", type: "portfolio",
-    colStart: 1, rowStart: 3,
+    colStart: 1, rowStart: 1, // Will be centered or adjusted
     settings: PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS, isMinimized: false,
     containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS, innerPadding: 'p-0' }
   },
   {
     id: "gemini-chat-main", title: "Gemini AI Assistant", type: "geminiChat",
-    colStart: 1, rowStart: 3,
+    colStart: 1, rowStart: 1, // Will be centered or adjusted
     settings: GEMINI_CHAT_WIDGET_DEFAULT_INSTANCE_SETTINGS, isMinimized: false,
     containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS, innerPadding: 'p-0' }
   },
   {
     id: "clock-widget-main", title: "Digital Clock", type: "clock",
-    colStart: 1, rowStart: 3,
+    colStart: 1, rowStart: 1, // Will be centered or adjusted
     settings: { displayType: 'digital', showSeconds: true, hourFormat: '12' } as ClockWidgetSettings, isMinimized: false,
     containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS }
   },
 ];
+
+const initialMobileWidgetLayout: Omit<PageWidgetConfig, 'colSpan' | 'rowSpan' | 'minColSpan' | 'minRowSpan'>[] = [
+  {
+    id: "portfolio-main", title: "Broque Thomas - Portfolio", type: "portfolio",
+    colStart: 1, rowStart: 1, // Will span full width/height
+    settings: PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS, isMinimized: false,
+    containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS, innerPadding: 'p-0' }
+  },
+];
+
 
 const ensurePhotoWidgetInstanceSettings = (settings: AllWidgetSettings | undefined): PhotoWidgetSettings => {
     const photoInstanceDefaults = PHOTO_WIDGET_DEFAULT_INSTANCE_SETTINGS;
@@ -139,7 +143,10 @@ const ensureGeminiChatWidgetInstanceSettings = (settings: AllWidgetSettings | un
 
 const processWidgetConfig = (
     widgetData: Partial<PageWidgetConfig>,
-    currentCellSize: number
+    currentCellSize: number,
+    isMobileTarget?: boolean, // Hint for mobile-specific sizing
+    containerColsForMobile?: number, // Pass container cols for mobile full span
+    containerRowsForMobile?: number  // Pass container rows for mobile full span
 ): PageWidgetConfig => {
     const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(def => def.type === widgetData.type);
 
@@ -162,13 +169,17 @@ const processWidgetConfig = (
         };
     }
 
-    const presetSizeTargets = WIDGET_SIZE_PRESETS[blueprint.defaultSizePreset];
     let colSpan, rowSpan;
 
-    if (widgetData.colSpan !== undefined && widgetData.rowSpan !== undefined) {
+    if (isMobileTarget && widgetData.type === 'portfolio' && containerColsForMobile && containerRowsForMobile) {
+        // Mobile full-screen portfolio
+        colSpan = Math.max(blueprint.minColSpan, containerColsForMobile);
+        rowSpan = Math.max(blueprint.minRowSpan, containerRowsForMobile > 1 ? containerRowsForMobile -1 : 1); // Leave a bit of room or ensure min 1
+    } else if (widgetData.colSpan !== undefined && widgetData.rowSpan !== undefined) {
         colSpan = widgetData.colSpan;
         rowSpan = widgetData.rowSpan;
     } else {
+        const presetSizeTargets = WIDGET_SIZE_PRESETS[blueprint.defaultSizePreset];
         colSpan = Math.max(blueprint.minColSpan, Math.max(1, Math.round(presetSizeTargets.targetWidthPx / currentCellSize)));
         rowSpan = Math.max(blueprint.minRowSpan, Math.max(1, Math.round(presetSizeTargets.targetHeightPx / currentCellSize)));
     }
@@ -182,6 +193,10 @@ const processWidgetConfig = (
         ...DEFAULT_WIDGET_CONTAINER_SETTINGS,
         ...(widgetData.containerSettings || {})
     };
+     if (isMobileTarget && widgetData.type === 'portfolio') {
+        finalContainerSettings.innerPadding = 'p-0'; // Ensure no padding for full screen mobile portfolio
+    }
+
 
     return {
         id: widgetData.id || `${blueprint.type}-${Date.now()}`,
@@ -202,15 +217,17 @@ const processWidgetConfig = (
 
 interface StoredDashboardLayout {
     dashboardVersion: string;
-    widgets: PageWidgetConfig[]; // This expects fully defined widgets
+    widgets: PageWidgetConfig[];
     cellSize?: number;
     notesCollection?: NotesCollectionStorage;
     sharedGlobalTodos?: TodoItem[];
     sharedGlobalPhotoHistory?: HistoricImage[];
+    isMobileLayout?: boolean; // To remember if it was saved in mobile state
 }
 
 
 export default function Home() {
+  const [isMobileView, setIsMobileView] = useState(false);
   const [cellSize, setCellSize] = useState<number>(DEFAULT_CELL_SIZE);
   const [widgetContainerCols, setWidgetContainerCols] = useState(0);
   const [widgetContainerRows, setWidgetContainerRows] = useState(0);
@@ -221,55 +238,84 @@ export default function Home() {
   const [widgets, setWidgets] = useState<PageWidgetConfig[]>([]);
 
 
+  // Effect for determining mobile view
   useEffect(() => {
+    const checkMobile = () => {
+      setIsMobileView(window.innerWidth < MOBILE_BREAKPOINT_PX);
+    };
+    checkMobile(); // Initial check
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Effect for initializing widgets based on mobile view or localStorage
+ useEffect(() => {
     let loadedCellSize = DEFAULT_CELL_SIZE;
+    let loadedWidgets: PageWidgetConfig[] | null = null;
+    let wasMobileLayoutSaved = false;
+
     if (typeof window !== 'undefined') {
         const savedLayoutJSON = window.localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY);
         if (savedLayoutJSON) {
             try {
                 const savedData = JSON.parse(savedLayoutJSON) as StoredDashboardLayout;
-                if (savedData && typeof savedData.cellSize === 'number') {
-                    const validOption = CELL_SIZE_OPTIONS.find(opt => opt.value === savedData.cellSize);
-                    if (validOption) {
-                        loadedCellSize = savedData.cellSize;
+                if (savedData && typeof savedData === 'object' && !Array.isArray(savedData) && savedData.dashboardVersion) {
+                    const loadedVersion = String(savedData.dashboardVersion).replace('v','V');
+                    const currentVersion = DASHBOARD_LAYOUT_STORAGE_KEY.replace('dashboardLayoutV','V');
+
+                    if (loadedVersion === currentVersion) {
+                        if (typeof savedData.cellSize === 'number') {
+                            const validOption = CELL_SIZE_OPTIONS.find(opt => opt.value === savedData.cellSize);
+                            if (validOption) loadedCellSize = validOption.value;
+                        }
+                        wasMobileLayoutSaved = savedData.isMobileLayout || false;
+
+                        // If current view is mobile and saved layout wasn't mobile, or vice-versa, force default for that view.
+                        // Or if it's the same view type, load the widgets.
+                        if (isMobileView === wasMobileLayoutSaved && Array.isArray(savedData.widgets)) {
+                            loadedWidgets = savedData.widgets.map(w => processWidgetConfig(
+                                w as Partial<PageWidgetConfig>,
+                                loadedCellSize,
+                                isMobileView, // Pass mobile hint
+                                isMobileView ? Math.floor(window.innerWidth / loadedCellSize) : undefined,
+                                isMobileView ? Math.floor((window.innerHeight - (headerRef.current?.offsetHeight || 60)) / loadedCellSize) : undefined
+                            ));
+                            initialLayoutIsDefaultRef.current = false;
+                        } else {
+                             console.log(`[page.tsx] View mode mismatch (current: ${isMobileView ? 'mobile' : 'desktop'}, saved: ${wasMobileLayoutSaved ? 'mobile' : 'desktop'}). Using default layout for current view.`);
+                        }
+                    } else {
+                        console.log(`[page.tsx] Storage key version mismatch. Using new initial layout.`);
                     }
+                } else {
+                    console.log(`[page.tsx] Invalid or legacy layout structure.`);
                 }
             } catch (error) {
-                console.error("[page.tsx] Error parsing cellSize from localStorage, using default:", error);
+                console.error("[page.tsx] Error loading/parsing dashboard layout from localStorage:", error);
             }
         }
     }
     setCellSize(loadedCellSize);
 
-    if (typeof window !== 'undefined') {
-        try {
-            const savedLayoutJSON = window.localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY);
-            if (savedLayoutJSON) {
-                const savedData = JSON.parse(savedLayoutJSON) as StoredDashboardLayout; // Assume StoredDashboardLayout implies PageWidgetConfig[] for widgets
-                if (savedData && typeof savedData === 'object' && !Array.isArray(savedData) && savedData.dashboardVersion && Array.isArray(savedData.widgets)) {
-                    const loadedVersion = String(savedData.dashboardVersion).replace('v','V');
-                    const currentVersion = DASHBOARD_LAYOUT_STORAGE_KEY.replace('dashboardLayoutV','V');
+    if (loadedWidgets) {
+        setWidgets(loadedWidgets);
+    } else {
+        // Determine initial layout based on current mobile state
+        const baseLayout = isMobileView ? initialMobileWidgetLayout : initialDesktopWidgetsLayout;
+        const tempCols = Math.floor(window.innerWidth / loadedCellSize);
+        const tempRows = Math.floor((window.innerHeight - (headerRef.current?.offsetHeight || 60)) / loadedCellSize);
 
-                    if (loadedVersion === currentVersion) {
-                        initialLayoutIsDefaultRef.current = false;
-                        // Assuming savedData.widgets are already PageWidgetConfig[] or processWidgetConfig handles it
-                        // To be safe, process them, as saved data might be from an older Partial structure internally
-                        setWidgets((savedData.widgets).map(w => processWidgetConfig(w as Partial<PageWidgetConfig>, loadedCellSize)));
-                        return;
-                    } else {
-                         console.log(`[page.tsx] Storage key version mismatch. Using new initial layout with cellSize: ${loadedCellSize}`);
-                    }
-                } else {
-                    console.log(`[page.tsx] Invalid or legacy layout structure. Using new initial layout with cellSize: ${loadedCellSize}`);
-                }
-            }
-        } catch (error) {
-            console.error("[page.tsx] Error loading/parsing dashboard layout from localStorage, using initial layout:", error);
-        }
+        setWidgets(baseLayout.map(w => processWidgetConfig(
+            w as Partial<PageWidgetConfig>,
+            loadedCellSize,
+            isMobileView,
+            isMobileView ? tempCols : undefined,
+            isMobileView ? tempRows : undefined
+        )));
+        initialLayoutIsDefaultRef.current = true; // Mark as default only if not loaded from storage for current view type
+        initialCenteringDoneRef.current = isMobileView; // No centering needed for mobile full view
     }
-    initialLayoutIsDefaultRef.current = true;
-    setWidgets(initialWidgetsLayout.map(w => processWidgetConfig(w as Partial<PageWidgetConfig>, loadedCellSize)));
-  }, []);
+  }, [isMobileView]); // Rerun if isMobileView changes
 
 
   const [sharedNotes, setSharedNotes] = useState<Note[]>([]);
@@ -285,7 +331,7 @@ export default function Home() {
   const historyPointer = useRef<number>(-1);
   const isPerformingUndoRedo = useRef(false);
   const headerRef = useRef<HTMLElement>(null);
-  const initialLoadAttempted = useRef(false);
+  const initialLoadAttempted = useRef(false); // This might need re-evaluation with mobile logic
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dashboardAreaRef = useRef<HTMLDivElement>(null);
   const densityMenuRef = useRef<HTMLDivElement>(null);
@@ -325,32 +371,38 @@ export default function Home() {
 
 
    useEffect(() => {
-    if (!initialLoadAttempted.current) {
-        if (widgets && widgets.length >= 0) {
-            history.current = [JSON.parse(JSON.stringify(widgets))];
-            historyPointer.current = 0;
-            setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length });
-            initialLoadAttempted.current = true;
-        }
+    // Initialize history only once widgets are set, and initialLoadAttempted is true
+    if (initialLoadAttempted.current && widgets && widgets.length >= 0 && history.current.length === 0) {
+        history.current = [JSON.parse(JSON.stringify(widgets))];
+        historyPointer.current = 0;
+        setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length });
     }
+  }, [widgets, initialLoadAttempted]);
+
+  // This effect now marks initialLoadAttempted true after the first render with widgets
+  useEffect(() => {
+      if (widgets.length > 0 && !initialLoadAttempted.current) {
+          initialLoadAttempted.current = true;
+      }
   }, [widgets]);
 
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && initialLoadAttempted.current) {
+    if (typeof window !== 'undefined' && initialLoadAttempted.current) { // Save only if initial load is done
       try {
         const dataToSave: StoredDashboardLayout = {
             dashboardVersion: DASHBOARD_LAYOUT_STORAGE_KEY.replace('dashboardLayoutV','v'),
-            widgets: widgets, // widgets is PageWidgetConfig[] here
-            cellSize: cellSize
+            widgets: widgets,
+            cellSize: cellSize,
+            isMobileLayout: isMobileView // Save current view mode
         };
         window.localStorage.setItem(DASHBOARD_LAYOUT_STORAGE_KEY, JSON.stringify(dataToSave));
       } catch (error) { console.error("Error saving dashboard layout to localStorage:", error); }
     }
-  }, [widgets, cellSize]);
+  }, [widgets, cellSize, isMobileView]); // Add isMobileView to dependencies
 
   useEffect(() => {
-    if (widgetContainerCols > 0 && initialLayoutIsDefaultRef.current && !initialCenteringDoneRef.current && widgets.length > 0) {
+    if (widgetContainerCols > 0 && initialLayoutIsDefaultRef.current && !initialCenteringDoneRef.current && widgets.length > 0 && !isMobileView) { // Only center on desktop for default layout
         const portfolioBlueprint = AVAILABLE_WIDGET_DEFINITIONS.find(b => b.type === "portfolio");
         const geminiChatBlueprint = AVAILABLE_WIDGET_DEFINITIONS.find(b => b.type === "geminiChat");
         const clockBlueprint = AVAILABLE_WIDGET_DEFINITIONS.find(b => b.type === "clock");
@@ -388,16 +440,16 @@ export default function Home() {
                 initialLayoutIsDefaultRef.current = false;
             } else {
                 console.warn("[page.tsx] Calculated dynamic centered layout would overflow. Widgets will start at column 1.");
-                initialCenteringDoneRef.current = true;
+                initialCenteringDoneRef.current = true; // Still mark as done to prevent re-attempts
                 initialLayoutIsDefaultRef.current = false;
             }
         } else {
              console.warn("[page.tsx] Could not find all blueprints for initial centering logic.");
-             initialCenteringDoneRef.current = true;
+             initialCenteringDoneRef.current = true; // Mark as done
              initialLayoutIsDefaultRef.current = false;
         }
     }
-  }, [widgetContainerCols, updateWidgetsAndPushToHistory, widgets, cellSize]);
+  }, [widgetContainerCols, updateWidgetsAndPushToHistory, widgets, cellSize, isMobileView]);
 
 
   useEffect(() => {
@@ -424,15 +476,33 @@ export default function Home() {
   useEffect(() => {
     const determineWidgetContainerGridSize = () => {
       const screenWidth = window.innerWidth; const screenHeight = window.innerHeight;
-      const currentHeaderHeight = headerRef.current?.offsetHeight || 60;
+      const currentHeaderHeight = headerRef.current?.offsetHeight || 60; // Estimate header height if not rendered
       const mainContentHeight = screenHeight - currentHeaderHeight;
-      setWidgetContainerCols(Math.floor(screenWidth / cellSize));
-      setWidgetContainerRows(Math.floor(mainContentHeight / cellSize));
+      const newCols = Math.max(1, Math.floor(screenWidth / cellSize));
+      const newRows = Math.max(1, Math.floor(mainContentHeight / cellSize));
+      setWidgetContainerCols(newCols);
+      setWidgetContainerRows(newRows);
+
+      // If mobile and portfolio is the only widget, make it full span
+      if (isMobileView && widgets.length === 1 && widgets[0].type === 'portfolio') {
+        setWidgets(currentWidgets => currentWidgets.map(w => {
+          if (w.type === 'portfolio') {
+            return {
+              ...w,
+              colStart: 1,
+              rowStart: 1,
+              colSpan: newCols,
+              rowSpan: newRows > 1 ? newRows -1 : 1, // Small adjustment for potential scrollbar or footer space
+            };
+          }
+          return w;
+        }));
+      }
     };
-    determineWidgetContainerGridSize(); const timeoutId = setTimeout(determineWidgetContainerGridSize, 100);
+    determineWidgetContainerGridSize(); const timeoutId = setTimeout(determineWidgetContainerGridSize, 100); // Slight delay for headerRef
     window.addEventListener('resize', determineWidgetContainerGridSize);
     return () => { clearTimeout(timeoutId); window.removeEventListener('resize', determineWidgetContainerGridSize); };
-  }, [cellSize]);
+  }, [cellSize, isMobileView, widgets]); // Add widgets to dependency to re-evaluate full span on mobile if widgets change
 
   useEffect(() => {
     setContextMenuAvailableWidgets(
@@ -443,7 +513,7 @@ export default function Home() {
   const handleExportLayout = () => {
     if (typeof window === 'undefined') return;
     try {
-      const layoutToExport: StoredDashboardLayout = { dashboardVersion: DASHBOARD_LAYOUT_STORAGE_KEY.replace('dashboardLayoutV','v'), widgets: widgets, cellSize: cellSize, notesCollection: { notes: sharedNotes, activeNoteId: activeSharedNoteId }, sharedGlobalTodos: sharedTodos, sharedGlobalPhotoHistory: sharedPhotoHistory };
+      const layoutToExport: StoredDashboardLayout = { dashboardVersion: DASHBOARD_LAYOUT_STORAGE_KEY.replace('dashboardLayoutV','v'), widgets: widgets, cellSize: cellSize, notesCollection: { notes: sharedNotes, activeNoteId: activeSharedNoteId }, sharedGlobalTodos: sharedTodos, sharedGlobalPhotoHistory: sharedPhotoHistory, isMobileLayout: isMobileView };
       const jsonString = JSON.stringify(layoutToExport, null, 2); const blob = new Blob([jsonString],{type:'application/json'}); const href = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = href; link.download = `dashboard-layout-${layoutToExport.dashboardVersion}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(href);
     } catch (error) { console.error("Error exporting layout:", error); alert("Error exporting layout."); }
   };
@@ -461,40 +531,73 @@ export default function Home() {
             const parsedJson = JSON.parse(text);
 
             let finalWidgetsToSet: PageWidgetConfig[];
-            let finalCellSize = cellSize; // Default to current cellSize
+            let finalCellSize = cellSize;
             let notesToSet = sharedNotes;
             let activeNoteIdToSet = activeSharedNoteId;
             let todosToSet = sharedTodos;
             let photoHistoryToSet = sharedPhotoHistory;
             let alertMessage = "";
+            let importedIsMobileLayout = false;
+
 
             if (typeof parsedJson === 'object' && !Array.isArray(parsedJson) && parsedJson.dashboardVersion && parsedJson.widgets) {
-                // Modern format (implements StoredDashboardLayout)
                 const modernData = parsedJson as StoredDashboardLayout;
+                importedIsMobileLayout = modernData.isMobileLayout || false;
 
                 if (typeof modernData.cellSize === 'number') {
                     const validOption = CELL_SIZE_OPTIONS.find(opt => opt.value === modernData.cellSize);
                     if (validOption) finalCellSize = validOption.value;
                 }
 
-                // Process widgets, ensuring they become PageWidgetConfig[]
-                // Cast individual items to Partial<PageWidgetConfig> for processWidgetConfig if structure isn't guaranteed
-                finalWidgetsToSet = (modernData.widgets || []).map(w => processWidgetConfig(w as Partial<PageWidgetConfig>, finalCellSize));
+                const tempCols = Math.floor(window.innerWidth / finalCellSize);
+                const tempRows = Math.floor((window.innerHeight - (headerRef.current?.offsetHeight || 60)) / finalCellSize);
 
-                if (modernData.notesCollection) {
-                    notesToSet = modernData.notesCollection.notes || [];
-                    activeNoteIdToSet = modernData.notesCollection.activeNoteId || null;
+                if (isMobileView !== importedIsMobileLayout) {
+                    // View mode mismatch, import will adapt to current view using default layout for this view
+                    alertMessage = `Imported layout was for ${importedIsMobileLayout ? 'mobile' : 'desktop'} view. Adapting to current ${isMobileView ? 'mobile' : 'desktop'} view with default widgets. Global data imported.`;
+                    const baseLayout = isMobileView ? initialMobileWidgetLayout : initialDesktopWidgetsLayout;
+                    finalWidgetsToSet = baseLayout.map(w => processWidgetConfig(
+                        w as Partial<PageWidgetConfig>,
+                        finalCellSize,
+                        isMobileView,
+                        isMobileView ? tempCols : undefined,
+                        isMobileView ? tempRows : undefined
+                    ));
+                } else {
+                     finalWidgetsToSet = (modernData.widgets || []).map(w => processWidgetConfig(
+                        w as Partial<PageWidgetConfig>,
+                        finalCellSize,
+                        isMobileView, // Pass current mobile state
+                        isMobileView ? tempCols : undefined,
+                        isMobileView ? tempRows : undefined
+                    ));
+                    alertMessage = `Dashboard layout (version ${modernData.dashboardVersion}), settings, and global data imported successfully for ${isMobileView ? 'mobile' : 'desktop'} view!`;
                 }
+
+
+                if (modernData.notesCollection) { notesToSet = modernData.notesCollection.notes || []; activeNoteIdToSet = modernData.notesCollection.activeNoteId || null; }
                 if (modernData.sharedGlobalTodos) todosToSet = modernData.sharedGlobalTodos;
                 if (modernData.sharedGlobalPhotoHistory) photoHistoryToSet = modernData.sharedGlobalPhotoHistory;
 
-                alertMessage = `Dashboard layout, settings, and global data (version ${modernData.dashboardVersion}) imported successfully!`;
 
             } else if (Array.isArray(parsedJson)) {
-                // Legacy format (array of Partial<PageWidgetConfig>)
-                // CellSize remains current, notes, todos, photo history also remain current
-                finalWidgetsToSet = (parsedJson as Partial<PageWidgetConfig>[]).map(w => processWidgetConfig(w, cellSize)); // Use current cellSize
-                alertMessage = "Dashboard layout (legacy format) imported. Global data and settings will use defaults or existing data.";
+                // Legacy format - adapt to current view
+                alertMessage = "Dashboard layout (legacy format) imported. Adapting to current view. Global data and settings will use defaults or existing data.";
+                const tempCols = Math.floor(window.innerWidth / cellSize); // Use current cellSize for legacy
+                const tempRows = Math.floor((window.innerHeight - (headerRef.current?.offsetHeight || 60)) / cellSize);
+
+                if (isMobileView) { // If current is mobile, use mobile default
+                    const baseLayout = initialMobileWidgetLayout;
+                     finalWidgetsToSet = baseLayout.map(w => processWidgetConfig(
+                        w as Partial<PageWidgetConfig>,
+                        cellSize, // current cell size
+                        true, tempCols, tempRows
+                    ));
+                } else { // If current is desktop, try to process imported, then sort
+                    const processedLegacy = (parsedJson as Partial<PageWidgetConfig>[]).map(w => processWidgetConfig(w, cellSize));
+                    finalWidgetsToSet = performAutoSort(processedLegacy) || processedLegacy; // Sort if possible
+                }
+
             } else {
                 throw new Error("Invalid file format. Could not recognize dashboard structure.");
             }
@@ -514,8 +617,8 @@ export default function Home() {
             historyPointer.current = 0;
             setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length });
 
-            initialLayoutIsDefaultRef.current = false;
-            initialCenteringDoneRef.current = true;
+            initialLayoutIsDefaultRef.current = false; // Imported layout is not default
+            initialCenteringDoneRef.current = true; // Assume imported layout is as intended or will be sorted
 
         } catch (err: unknown) {
             let message = 'Invalid file content.';
@@ -547,7 +650,7 @@ export default function Home() {
     const overlapY = r1R <= r2BufferedRowEnd && r1RowEnd >= r2BufferedRowStart;
 
     return overlapX && overlapY;
-  }, [widgetContainerCols, widgetContainerRows]); // Added dependencies
+  }, [widgetContainerCols, widgetContainerRows]);
 
   const canPlaceWidget = useCallback((
     widgetToPlace: PageWidgetConfig,
@@ -571,7 +674,7 @@ export default function Home() {
       }
     }
     return true;
-  }, [widgetContainerCols, widgetContainerRows, doRectanglesOverlap]); // Added dependencies
+  }, [widgetContainerCols, widgetContainerRows, doRectanglesOverlap]);
 
 
   const performAutoSort = useCallback((widgetsToSort: PageWidgetConfig[]): PageWidgetConfig[] | null => {
@@ -610,7 +713,7 @@ export default function Home() {
   }, [widgetContainerCols, widgetContainerRows, canPlaceWidget]);
 
   const handleAutoSortButtonClick = () => {
-    if (maximizedWidgetId) return;
+    if (maximizedWidgetId || isMobileView) return; // Auto-sort primarily for desktop
     const currentLayout = widgets.map(w => ({...w}));
     const sortedLayout = performAutoSort(currentLayout);
     if (sortedLayout) {
@@ -630,9 +733,9 @@ export default function Home() {
   ): PageWidgetConfig[] | null => {
     if (widgetContainerCols === 0 || widgetContainerRows === 0) return null;
 
-    const tempWidgetsLayout = currentWidgetsImmutable.map(w => ({ ...w })); // Changed let to const
+    const tempWidgetsLayout = currentWidgetsImmutable.map(w => ({ ...w }));
 
-    const sortedWithNew = performAutoSort([...tempWidgetsLayout, { ...newWidgetConfig }]); // Changed let to const
+    const sortedWithNew = performAutoSort([...tempWidgetsLayout, { ...newWidgetConfig }]);
     if (sortedWithNew) {
         return sortedWithNew;
     }
@@ -691,7 +794,10 @@ export default function Home() {
   }, [widgetContainerCols, widgetContainerRows, canPlaceWidget]);
 
   const handleAddNewWidget = useCallback((widgetType: WidgetType) => {
-    if (maximizedWidgetId) return;
+    if (maximizedWidgetId || isMobileView) { // Don't add new widgets on mobile if portfolio is full screen
+        if(isMobileView) alert("Adding new widgets is disabled in mobile full-portfolio view.");
+        return;
+    }
     const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(def => def.type === widgetType);
     if (!blueprint) { alert(`Widget type "${widgetType}" is not available.`); setIsAddWidgetMenuOpen(false); setIsAddWidgetContextMenuOpen(false); return; }
 
@@ -736,10 +842,10 @@ export default function Home() {
     }
     setIsAddWidgetMenuOpen(false);
     setIsAddWidgetContextMenuOpen(false);
-  }, [maximizedWidgetId, widgetContainerCols, widgetContainerRows, widgets, cellSize, findNextAvailablePosition, performAutoSort, attemptPlaceWidgetWithShrinking, updateWidgetsAndPushToHistory]);
+  }, [maximizedWidgetId, widgetContainerCols, widgetContainerRows, widgets, cellSize, findNextAvailablePosition, performAutoSort, attemptPlaceWidgetWithShrinking, updateWidgetsAndPushToHistory, isMobileView]);
 
   const handleApplyWidgetSizePreset = useCallback((widgetId: string, presetKey: WidgetSizePresetKey) => {
-    if (maximizedWidgetId) return;
+    if (maximizedWidgetId || isMobileView) return; // Size presets primarily for desktop
 
     const targetWidget = widgets.find(w => w.id === widgetId);
     const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(b => b.type === targetWidget?.type);
@@ -787,7 +893,7 @@ export default function Home() {
     } else {
         alert(`Could not apply size preset "${presetKey}". There isn't enough space, even after trying to rearrange. Please try a different preset or make more room manually.`);
     }
-  }, [widgets, maximizedWidgetId, cellSize, findNextAvailablePosition, performAutoSort, updateWidgetsAndPushToHistory, canPlaceWidget]);
+  }, [widgets, maximizedWidgetId, cellSize, findNextAvailablePosition, performAutoSort, updateWidgetsAndPushToHistory, canPlaceWidget, isMobileView]);
 
   const performAutoSortWithGivenGrid = useCallback((widgetsToSort: PageWidgetConfig[], newCols: number, newRows: number): PageWidgetConfig[] | null => {
     if (newCols === 0 || newRows === 0) return null;
@@ -831,7 +937,7 @@ export default function Home() {
         }
     }
     return newLayout;
-  }, [doRectanglesOverlap]); // Added doRectanglesOverlap dependency
+  }, [doRectanglesOverlap]);
 
 
   const handleChangeCellSize = useCallback((newCellSize: number) => {
@@ -849,11 +955,21 @@ export default function Home() {
         const currentPixelX = (w.colStart - 1) * oldCellSize;
         const currentPixelY = (w.rowStart - 1) * oldCellSize;
 
-        const newColSpan = Math.max(blueprint.minColSpan, Math.max(1, Math.round(currentPixelWidth / newCellSize))); // Changed let to const
-        const newRowSpan = Math.max(blueprint.minRowSpan, Math.max(1, Math.round(currentPixelHeight / newCellSize))); // Changed let to const
+        let newColSpan = Math.max(blueprint.minColSpan, Math.max(1, Math.round(currentPixelWidth / newCellSize)));
+        let newRowSpan = Math.max(blueprint.minRowSpan, Math.max(1, Math.round(currentPixelHeight / newCellSize)));
+        let newColStart = Math.max(1, Math.round(currentPixelX / newCellSize) + 1);
+        let newRowStart = Math.max(1, Math.round(currentPixelY / newCellSize) + 1);
 
-        const newColStart = Math.max(1, Math.round(currentPixelX / newCellSize) + 1); // Changed let to const
-        const newRowStart = Math.max(1, Math.round(currentPixelY / newCellSize) + 1); // Changed let to const
+        // If mobile and it's the portfolio widget, ensure it still tries to take full width
+        if (isMobileView && w.type === 'portfolio' && widgets.length === 1) {
+            const tempNewCols = Math.floor(window.innerWidth / newCellSize);
+            const tempNewRows = Math.floor((window.innerHeight - (headerRef.current?.offsetHeight || 60)) / newCellSize);
+            newColSpan = tempNewCols;
+            newRowSpan = tempNewRows > 1 ? tempNewRows -1 : 1;
+            newColStart = 1;
+            newRowStart = 1;
+        }
+
 
         return {
             ...w,
@@ -864,7 +980,12 @@ export default function Home() {
         };
     });
 
-    setCellSize(newCellSize);
+    setCellSize(newCellSize); // Set new cell size first, so widgetContainerCols/Rows update
+
+    // Let useEffect for widgetContainerCols/Rows run, then sort/set
+    // This is a bit indirect, ideally, we'd get the new cols/rows synchronously
+    // For now, we'll use a slight delay or rely on the existing resize logic to trigger a re-sort if needed.
+    // A more robust way would be to calculate new cols/rows here and pass to performAutoSortWithGivenGrid.
 
     const tempNewCols = Math.floor(window.innerWidth / newCellSize);
     const tempNewRows = Math.floor((window.innerHeight - (headerRef.current?.offsetHeight || 60)) / newCellSize);
@@ -876,28 +997,31 @@ export default function Home() {
         updateWidgetsAndPushToHistory(sortedLayout, `grid_density_change_${newCellSize}`);
     } else {
         console.warn("[Grid Density] Auto-sort after scaling failed. Layout might need manual adjustment.");
+        // Fallback to scaled widgets if sort fails, especially for mobile single-widget view
         setWidgets(scaledWidgets);
         updateWidgetsAndPushToHistory(scaledWidgets, `grid_density_change_scaled_only_${newCellSize}`);
-        alert("Grid density changed. Some widgets may need manual readjustment or use the 'Sort Grid' button.");
+        if (!isMobileView) { // Only alert on desktop where layout is more complex
+             alert("Grid density changed. Some widgets may need manual readjustment or use the 'Sort Grid' button.");
+        }
     }
     setIsDensityMenuOpen(false);
 
-  }, [cellSize, widgets, maximizedWidgetId, updateWidgetsAndPushToHistory, performAutoSortWithGivenGrid]); // Added performAutoSortWithGivenGrid
+  }, [cellSize, widgets, maximizedWidgetId, updateWidgetsAndPushToHistory, performAutoSortWithGivenGrid, isMobileView]);
 
 
-  const handleWidgetResizeLive = (id: string, newGeometry: WidgetResizeDataType) => { if (isPerformingUndoRedo.current || maximizedWidgetId) return; setWidgets(currentWidgets => currentWidgets.map(w => w.id === id ? { ...w, ...newGeometry, isMinimized: false } : w)); };
-  const handleWidgetResizeEnd = (id: string, finalGeometry: WidgetResizeDataType) => { if (maximizedWidgetId) return; setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.map(w => w.id === id ? { ...w, ...finalGeometry, isMinimized: false, originalRowSpan: undefined } : w); updateWidgetsAndPushToHistory(updatedWidgets, `resize_end_${id}`); return updatedWidgets; }); setActiveWidgetId(id); };
-  const handleWidgetMove = (id: string, newPosition: WidgetMoveDataType) => { if (maximizedWidgetId) return; const currentWidget = widgets.find(w => w.id === id); if (!currentWidget) return; if (currentWidget.colStart !== newPosition.colStart || currentWidget.rowStart !== newPosition.rowStart) { setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.map(w => w.id === id ? { ...w, ...newPosition } : w); updateWidgetsAndPushToHistory(updatedWidgets, `move_${id}`); return updatedWidgets; }); } setActiveWidgetId(id); };
-  const handleWidgetDelete = (idToDelete: string) => { if (maximizedWidgetId === idToDelete) { setMaximizedWidgetId(null); setMaximizedWidgetOriginalState(null); } setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.filter(widget => widget.id !== idToDelete); updateWidgetsAndPushToHistory(updatedWidgets, `delete_${idToDelete}`); return updatedWidgets; }); if (activeWidgetId === idToDelete) setActiveWidgetId(null); };
+  const handleWidgetResizeLive = (id: string, newGeometry: WidgetResizeDataType) => { if (isPerformingUndoRedo.current || maximizedWidgetId || isMobileView) return; setWidgets(currentWidgets => currentWidgets.map(w => w.id === id ? { ...w, ...newGeometry, isMinimized: false } : w)); };
+  const handleWidgetResizeEnd = (id: string, finalGeometry: WidgetResizeDataType) => { if (maximizedWidgetId || isMobileView) return; setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.map(w => w.id === id ? { ...w, ...finalGeometry, isMinimized: false, originalRowSpan: undefined } : w); updateWidgetsAndPushToHistory(updatedWidgets, `resize_end_${id}`); return updatedWidgets; }); setActiveWidgetId(id); };
+  const handleWidgetMove = (id: string, newPosition: WidgetMoveDataType) => { if (maximizedWidgetId || isMobileView) return; const currentWidget = widgets.find(w => w.id === id); if (!currentWidget) return; if (currentWidget.colStart !== newPosition.colStart || currentWidget.rowStart !== newPosition.rowStart) { setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.map(w => w.id === id ? { ...w, ...newPosition } : w); updateWidgetsAndPushToHistory(updatedWidgets, `move_${id}`); return updatedWidgets; }); } setActiveWidgetId(id); };
+  const handleWidgetDelete = (idToDelete: string) => { if (isMobileView) return; if (maximizedWidgetId === idToDelete) { setMaximizedWidgetId(null); setMaximizedWidgetOriginalState(null); } setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.filter(widget => widget.id !== idToDelete); updateWidgetsAndPushToHistory(updatedWidgets, `delete_${idToDelete}`); return updatedWidgets; }); if (activeWidgetId === idToDelete) setActiveWidgetId(null); };
   const handleWidgetFocus = (id: string) => { if (maximizedWidgetId && maximizedWidgetId !== id) return; setActiveWidgetId(id); };
   const handleOpenWidgetSettings = (widgetId: string) => { if (maximizedWidgetId && maximizedWidgetId !== widgetId) return; const widgetToEdit = widgets.find(w => w.id === widgetId); if (widgetToEdit) { setActiveWidgetId(widgetId); setSelectedWidgetForSettings(widgetToEdit); setIsSettingsModalOpen(true); } };
   const handleCloseSettingsModal = () => { setIsSettingsModalOpen(false); setSelectedWidgetForSettings(null); };
   const handleSaveWidgetInstanceSettings = useCallback((widgetId: string, newInstanceSettings: AllWidgetSettings) => { setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.map(w => w.id === widgetId ? { ...w, settings: { ...(w.settings || {}), ...newInstanceSettings } } : w); updateWidgetsAndPushToHistory(updatedWidgets, `save_settings_${widgetId}`); return updatedWidgets; }); setActiveWidgetId(widgetId); }, [updateWidgetsAndPushToHistory]);
-  const handleOpenContainerSettingsModal = (widgetId: string) => { if (maximizedWidgetId && maximizedWidgetId !== widgetId) return; const widgetToEdit = widgets.find(w => w.id === widgetId); if (widgetToEdit) { setActiveWidgetId(widgetId); setSelectedWidgetForContainerSettings(widgetToEdit); setIsContainerSettingsModalOpen(true); } };
+  const handleOpenContainerSettingsModal = (widgetId: string) => { if (maximizedWidgetId && maximizedWidgetId !== widgetId || isMobileView) return; const widgetToEdit = widgets.find(w => w.id === widgetId); if (widgetToEdit) { setActiveWidgetId(widgetId); setSelectedWidgetForContainerSettings(widgetToEdit); setIsContainerSettingsModalOpen(true); } };
   const handleCloseContainerSettingsModal = () => { setIsContainerSettingsModalOpen(false); setSelectedWidgetForContainerSettings(null); };
   const handleSaveWidgetContainerSettings = useCallback((widgetId: string, newContainerSettings: WidgetContainerSettings) => { setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.map(w => { if (w.id === widgetId) { const existingContainerSettings = w.containerSettings || DEFAULT_WIDGET_CONTAINER_SETTINGS; return { ...w, containerSettings: { ...existingContainerSettings, ...newContainerSettings } }; } return w; }); updateWidgetsAndPushToHistory(updatedWidgets, `save_container_settings_${widgetId}`); return updatedWidgets; }); setActiveWidgetId(widgetId); }, [updateWidgetsAndPushToHistory]);
-  const handleWidgetMinimizeToggle = (widgetId: string) => { if (maximizedWidgetId) return; setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.map(w => { if (w.id === widgetId) { if (w.isMinimized) { return { ...w, isMinimized: false, rowSpan: w.originalRowSpan || w.rowSpan, originalRowSpan: undefined }; } else { return { ...w, isMinimized: true, originalRowSpan: w.rowSpan, rowSpan: MINIMIZED_WIDGET_ROW_SPAN }; } } return w; }); updateWidgetsAndPushToHistory(updatedWidgets, `minimize_toggle_${widgetId}`); return updatedWidgets; }); setActiveWidgetId(widgetId); };
-  const handleWidgetMaximizeToggle = (widgetId: string) => { const widgetToToggle = widgets.find(w => w.id === widgetId); if (!widgetToToggle) return; if (maximizedWidgetId === widgetId) { setMaximizedWidgetId(null); setMaximizedWidgetOriginalState(null); setActiveWidgetId(widgetId); } else { let originalStateForMaximize = JSON.parse(JSON.stringify(widgetToToggle)); if (widgetToToggle.isMinimized) { originalStateForMaximize = { ...originalStateForMaximize, isMinimized: false, rowSpan: widgetToToggle.originalRowSpan || widgetToToggle.rowSpan, originalRowSpan: undefined }; } setMaximizedWidgetOriginalState(originalStateForMaximize); setMaximizedWidgetId(widgetId); setActiveWidgetId(widgetId); } };
+  const handleWidgetMinimizeToggle = (widgetId: string) => { if (maximizedWidgetId || isMobileView) return; setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.map(w => { if (w.id === widgetId) { if (w.isMinimized) { return { ...w, isMinimized: false, rowSpan: w.originalRowSpan || w.rowSpan, originalRowSpan: undefined }; } else { return { ...w, isMinimized: true, originalRowSpan: w.rowSpan, rowSpan: MINIMIZED_WIDGET_ROW_SPAN }; } } return w; }); updateWidgetsAndPushToHistory(updatedWidgets, `minimize_toggle_${widgetId}`); return updatedWidgets; }); setActiveWidgetId(widgetId); };
+  const handleWidgetMaximizeToggle = (widgetId: string) => { if(isMobileView) return; const widgetToToggle = widgets.find(w => w.id === widgetId); if (!widgetToToggle) return; if (maximizedWidgetId === widgetId) { setMaximizedWidgetId(null); setMaximizedWidgetOriginalState(null); setActiveWidgetId(widgetId); } else { let originalStateForMaximize = JSON.parse(JSON.stringify(widgetToToggle)); if (widgetToToggle.isMinimized) { originalStateForMaximize = { ...originalStateForMaximize, isMinimized: false, rowSpan: widgetToToggle.originalRowSpan || widgetToToggle.rowSpan, originalRowSpan: undefined }; } setMaximizedWidgetOriginalState(originalStateForMaximize); setMaximizedWidgetId(widgetId); setActiveWidgetId(widgetId); } };
   const handleUndo = () => { if (historyPointer.current > 0) { isPerformingUndoRedo.current = true; const newPointer = historyPointer.current - 1; historyPointer.current = newPointer; const historicWidgets = JSON.parse(JSON.stringify(history.current[newPointer])); setWidgets(historicWidgets); setActiveWidgetId(null); setMaximizedWidgetId(null); setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length }); requestAnimationFrame(() => { isPerformingUndoRedo.current = false; }); } };
   const handleRedo = () => { if (historyPointer.current < history.current.length - 1) { isPerformingUndoRedo.current = true; const newPointer = historyPointer.current + 1; historyPointer.current = newPointer; const historicWidgets = JSON.parse(JSON.stringify(history.current[newPointer])); setWidgets(historicWidgets); setActiveWidgetId(null); setMaximizedWidgetId(null); setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length }); requestAnimationFrame(() => { isPerformingUndoRedo.current = false; }); } };
   const handleSharedTodosChange = (newGlobalTodos: TodoItem[]) => { setSharedTodos(newGlobalTodos); };
@@ -905,6 +1029,7 @@ export default function Home() {
 
 
   const handleDashboardContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (isMobileView) return; // No context menu on mobile
     const target = event.target as HTMLElement;
     let clickedOnWidgetOrInteractiveContent = false;
     for (const widget of widgets) {
@@ -949,7 +1074,7 @@ export default function Home() {
       case 'photo': return <PhotoWidget id={widgetConfig.id} settings={currentWidgetSettings as PhotoWidgetSettings | undefined} onSettingsChange={handleSaveWidgetInstanceSettings} sharedHistory={sharedPhotoHistory} onSharedHistoryChange={handleSharedPhotoHistoryChange} />;
       case 'todo': return <TodoWidget instanceId={widgetConfig.id} settings={currentWidgetSettings as TodoWidgetSettings | undefined} todos={sharedTodos} onTodosChange={handleSharedTodosChange} />;
       case 'notes': return <NotesWidget instanceId={widgetConfig.id} settings={notesSettings} notes={sharedNotes} activeNoteId={activeSharedNoteId} onNotesChange={setSharedNotes} onActiveNoteIdChange={setActiveSharedNoteId} />;
-      case 'portfolio': return <PortfolioWidget settings={currentWidgetSettings as PortfolioWidgetSettings | undefined} />;
+      case 'portfolio': return <PortfolioWidget settings={currentWidgetSettings as PortfolioWidgetSettings | undefined} isMobileFullScreen={isMobileView && widgets.length === 1 && widgets[0].type === 'portfolio'} />;
       case 'geminiChat': return <GeminiChatWidget instanceId={widgetConfig.id} settings={currentWidgetSettings as GeminiChatWidgetSettings | undefined} />;
       default: return <p className="text-xs text-secondary italic">Generic widget content.</p>;
     }
@@ -996,15 +1121,22 @@ export default function Home() {
       onContextMenu={handleDashboardContextMenu}
     >
       <header ref={headerRef} className="p-3 bg-dark-surface text-primary flex items-center justify-between shadow-lg z-40 shrink-0 border-b border-[var(--dark-border-interactive)]">
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1 sm:space-x-2">
           <button onClick={handleUndo} disabled={historyPointer.current <= 0 || !!maximizedWidgetId} className="control-button" aria-label="Undo"><UndoIcon /></button>
           <button onClick={handleRedo} disabled={historyPointer.current >= history.current.length - 1 || !!maximizedWidgetId} className="control-button" aria-label="Redo"><RedoIcon /></button>
 
-          <div className="relative" ref={addWidgetMenuRef}>
-            <button id="add-widget-button" onClick={() => {setIsAddWidgetMenuOpen(prev => !prev); setIsAddWidgetContextMenuOpen(false); setIsDensityMenuOpen(false);}} disabled={!!maximizedWidgetId} className="control-button flex items-center" aria-expanded={isAddWidgetMenuOpen} aria-haspopup="true" aria-label="Add New Widget" > <AddIcon /> <span className="ml-1.5 text-xs hidden sm:inline">Add Widget</span> </button>
-            {isAddWidgetMenuOpen && ( <div className="absolute backdrop-blur-md left-0 mt-2 w-56 origin-top-left rounded-md bg-dark-surface border border-dark-border-interactive shadow-xl py-1 z-50 focus:outline-none animate-modalFadeInScale" role="menu" aria-orientation="vertical" aria-labelledby="add-widget-button" > {AVAILABLE_WIDGET_DEFINITIONS.map(widgetDef => ( <button key={widgetDef.type} onClick={() => handleAddNewWidget(widgetDef.type)} className="group flex items-center w-full text-left px-3 py-2.5 text-sm text-dark-text-primary hover:bg-dark-accent-primary hover:text-dark-text-on-accent focus:bg-dark-accent-primary focus:text-dark-text-on-accent focus:outline-none transition-all duration-150 ease-in-out hover:pl-4" role="menuitem" disabled={!!maximizedWidgetId} > {widgetDef.icon && <widgetDef.icon />} <span className="flex-grow">{widgetDef.displayName || widgetDef.defaultTitle.replace("New ", "")}</span> </button> ))} </div> )}
-          </div>
-
+          {!isMobileView && ( // Hide Add Widget, Sort, Import/Export on mobile if only portfolio is shown
+            <>
+              <div className="relative" ref={addWidgetMenuRef}>
+                <button id="add-widget-button" onClick={() => {setIsAddWidgetMenuOpen(prev => !prev); setIsAddWidgetContextMenuOpen(false); setIsDensityMenuOpen(false);}} disabled={!!maximizedWidgetId} className="control-button flex items-center" aria-expanded={isAddWidgetMenuOpen} aria-haspopup="true" aria-label="Add New Widget" > <AddIcon /> <span className="ml-1.5 text-xs hidden sm:inline">Add Widget</span> </button>
+                {isAddWidgetMenuOpen && ( <div className="absolute backdrop-blur-md left-0 mt-2 w-56 origin-top-left rounded-md bg-dark-surface border border-dark-border-interactive shadow-xl py-1 z-50 focus:outline-none animate-modalFadeInScale" role="menu" aria-orientation="vertical" aria-labelledby="add-widget-button" > {AVAILABLE_WIDGET_DEFINITIONS.map(widgetDef => ( <button key={widgetDef.type} onClick={() => handleAddNewWidget(widgetDef.type)} className="group flex items-center w-full text-left px-3 py-2.5 text-sm text-dark-text-primary hover:bg-dark-accent-primary hover:text-dark-text-on-accent focus:bg-dark-accent-primary focus:text-dark-text-on-accent focus:outline-none transition-all duration-150 ease-in-out hover:pl-4" role="menuitem" disabled={!!maximizedWidgetId} > {widgetDef.icon && <widgetDef.icon />} <span className="flex-grow">{widgetDef.displayName || widgetDef.defaultTitle.replace("New ", "")}</span> </button> ))} </div> )}
+              </div>
+              <button onClick={handleAutoSortButtonClick} disabled={!!maximizedWidgetId || widgets.length === 0} className="control-button flex items-center" aria-label="Auto Sort Grid"> <AutoSortIcon /> <span className="ml-1.5 text-xs hidden sm:inline">Sort Grid</span> </button>
+              <button onClick={handleExportLayout} disabled={!!maximizedWidgetId} className="control-button" aria-label="Export Layout"><ExportIcon /></button>
+              <button onClick={triggerImportFileSelect} disabled={!!maximizedWidgetId} className="control-button" aria-label="Import Layout"><ImportIcon /></button>
+              <input type="file" ref={fileInputRef} onChange={handleImportLayout} accept=".json" style={{ display: 'none' }} />
+            </>
+          )}
            <div className="relative" ref={densityMenuRef}>
             <button
               onClick={() => {setIsDensityMenuOpen(prev => !prev); setIsAddWidgetMenuOpen(false);}}
@@ -1040,18 +1172,15 @@ export default function Home() {
               </div>
             )}
           </div>
-
-          <button onClick={handleAutoSortButtonClick} disabled={!!maximizedWidgetId || widgets.length === 0} className="control-button flex items-center" aria-label="Auto Sort Grid"> <AutoSortIcon /> <span className="ml-1.5 text-xs hidden sm:inline">Sort Grid</span> </button>
-          <button onClick={handleExportLayout} disabled={!!maximizedWidgetId} className="control-button" aria-label="Export Layout"><ExportIcon /></button>
-          <button onClick={triggerImportFileSelect} disabled={!!maximizedWidgetId} className="control-button" aria-label="Import Layout"><ImportIcon /></button>
-          <input type="file" ref={fileInputRef} onChange={handleImportLayout} accept=".json" style={{ display: 'none' }} />
         </div>
-        <div className="text-xs text-secondary px-3 py-1 bg-slate-700 rounded-md">History: {historyDisplay.pointer} / {historyDisplay.length}</div>
+        <div className="text-xs text-secondary px-2 sm:px-3 py-1 bg-slate-700 rounded-md">
+            {isMobileView ? "Mobile View" : `History: ${historyDisplay.pointer}/${historyDisplay.length}`}
+        </div>
       </header>
 
-      {maximizedWidgetId && ( <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[45]" onClick={() => maximizedWidgetId && handleWidgetMaximizeToggle(maximizedWidgetId)} /> )}
+      {maximizedWidgetId && !isMobileView && ( <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[45]" onClick={() => maximizedWidgetId && handleWidgetMaximizeToggle(maximizedWidgetId)} /> )}
 
-      <div ref={dashboardAreaRef} className={`flex-grow relative ${maximizedWidgetId ? 'pointer-events-none' : ''}`}>
+      <div ref={dashboardAreaRef} className={`flex-grow relative ${maximizedWidgetId && !isMobileView ? 'pointer-events-none' : ''}`}>
         <GridBackground cellSize={cellSize} />
         <div
             id="widget-grid-container"
@@ -1059,27 +1188,29 @@ export default function Home() {
             style={{
                 gridTemplateColumns: `repeat(${widgetContainerCols}, ${cellSize}px)`,
                 gridTemplateRows: `repeat(${widgetContainerRows}, ${cellSize}px)`,
-                alignContent: 'start'
+                alignContent: 'start' // Important for grid behavior
             }}
         >
           {widgets.map((widgetConfig) => {
-            if (maximizedWidgetId && maximizedWidgetId !== widgetConfig.id) return null;
-            const currentWidgetState = maximizedWidgetId === widgetConfig.id && maximizedWidgetOriginalState
-                ? {
+            if (maximizedWidgetId && maximizedWidgetId !== widgetConfig.id && !isMobileView) return null; // Hide non-maximized on desktop
+            // On mobile, if portfolio is the only widget, it's already full screen, no separate maximized state needed from here.
+
+            const currentWidgetState = maximizedWidgetId === widgetConfig.id && maximizedWidgetOriginalState && !isMobileView
+                ? { // Desktop maximized state
                     ...maximizedWidgetOriginalState,
                     colStart: 1,
                     rowStart: 1,
-                    colSpan: widgetContainerCols > 2 ? widgetContainerCols - 1 : widgetContainerCols,
-                    rowSpan: widgetContainerRows > 2 ? widgetContainerRows - 1 : widgetContainerRows,
+                    colSpan: widgetContainerCols > 2 ? widgetContainerCols - 1 : widgetContainerCols, // Adjusted for potential scrollbar
+                    rowSpan: widgetContainerRows > 2 ? widgetContainerRows - 1 : widgetContainerRows, // Adjusted
                     isMinimized: false,
                   }
-                : widgetConfig;
+                : widgetConfig; // Default state or mobile full-screen state
 
             let minCol = widgetConfig.minColSpan;
             let minRow = widgetConfig.minRowSpan;
 
-            if (widgetConfig.isMinimized && maximizedWidgetId !== widgetConfig.id) {
-                minCol = widgetConfig.colSpan;
+            if (widgetConfig.isMinimized && maximizedWidgetId !== widgetConfig.id && !isMobileView) {
+                minCol = widgetConfig.colSpan; // Keep colSpan when minimized
                 minRow = MINIMIZED_WIDGET_ROW_SPAN;
             }
 
@@ -1095,8 +1226,11 @@ export default function Home() {
                 isActive={widgetConfig.id === activeWidgetId && !maximizedWidgetId} CELL_SIZE={cellSize}
                 minColSpan={minCol} minRowSpan={minRow}
                 totalGridCols={widgetContainerCols} totalGridRows={widgetContainerRows}
-                isMinimized={widgetConfig.isMinimized && maximizedWidgetId !== widgetConfig.id} onMinimizeToggle={() => handleWidgetMinimizeToggle(widgetConfig.id)}
-                isMaximized={maximizedWidgetId === widgetConfig.id} onMaximizeToggle={() => handleWidgetMaximizeToggle(widgetConfig.id)}
+                isMinimized={widgetConfig.isMinimized && maximizedWidgetId !== widgetConfig.id && !isMobileView} onMinimizeToggle={() => handleWidgetMinimizeToggle(widgetConfig.id)}
+                isMaximized={maximizedWidgetId === widgetConfig.id && !isMobileView} onMaximizeToggle={() => handleWidgetMaximizeToggle(widgetConfig.id)}
+                // Disable drag/resize on mobile if it's the full-screen portfolio
+                isDraggable={!isMobileView || widgets.length > 1}
+                isResizable={!isMobileView || widgets.length > 1}
               >
                 {renderWidgetContent(widgetConfig)}
               </Widget>
@@ -1113,7 +1247,7 @@ export default function Home() {
             settingsContent={getSettingsPanelForWidget(selectedWidgetForSettings)}
         />
       )}
-      {isContainerSettingsModalOpen && selectedWidgetForContainerSettings && (
+      {isContainerSettingsModalOpen && selectedWidgetForContainerSettings && !isMobileView && (
         <WidgetContainerSettingsModal
             isOpen={isContainerSettingsModalOpen}
             onClose={handleCloseContainerSettingsModal}
@@ -1127,7 +1261,7 @@ export default function Home() {
         />
       )}
 
-      <AddWidgetContextMenu
+      {!isMobileView && <AddWidgetContextMenu // Only show context menu on desktop
         isOpen={isAddWidgetContextMenuOpen}
         onClose={handleCloseContextMenu}
         position={contextMenuPosition}
@@ -1137,7 +1271,7 @@ export default function Home() {
         widgetContainerRows={widgetContainerRows}
         CELL_SIZE={cellSize}
         headerHeight={headerRef.current?.offsetHeight}
-      />
+      />}
     </main>
   );
 }
