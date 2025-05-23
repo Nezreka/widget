@@ -15,16 +15,16 @@ interface Particle {
   baseColorA: number; // Alpha
   highlightColorL: number; // Lightness for highlight
   highlightColorA: number; // Alpha for highlight
-
   highlightIntensity: number; // 0 to 1 for smooth transition
-
-  // For pulsation
   pulseAngle: number;
   pulseSpeed: number;
   pulseAmplitude: number;
-
-  // For connection-based sizing
   connectionCount: number;
+}
+
+// Define Props interface for GridBackground
+interface GridBackgroundProps {
+  cellSize: number; // cellSize prop is now expected
 }
 
 // Helper to parse HSLA string into components
@@ -33,7 +33,7 @@ const parseHsla = (hslaString: string): [number, number, number, number] => {
   if (match) {
     return [parseInt(match[1]), parseFloat(match[2]), parseFloat(match[3]), parseFloat(match[4])];
   }
-  return [190, 100, 70, 0.5];
+  return [190, 100, 70, 0.5]; // Default fallback
 };
 
 // Linear interpolation function
@@ -41,8 +41,7 @@ const lerp = (start: number, end: number, amount: number): number => {
   return (1 - amount) * start + amount * end;
 };
 
-
-const GridBackground: React.FC = () => {
+const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => { // Destructure cellSize from props
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const particlesArray = useRef<Particle[]>([]);
   const mousePosition = useRef<{ x: number | null; y: number | null }>({ x: null, y: null });
@@ -53,20 +52,21 @@ const GridBackground: React.FC = () => {
   };
 
   // --- Configuration ---
+  // These could potentially be influenced by cellSize or other props in the future if needed
   const PARTICLE_BASE_COLOR_STR = useRef('hsla(190, 100%, 70%, 0.5)');
   const PARTICLE_HIGHLIGHT_COLOR_STR = useRef('hsla(190, 100%, 90%, 1)');
   const LINE_BASE_COLOR_STR = useRef('hsla(210, 80%, 50%, 0.15)');
   const LINE_HIGHLIGHT_COLOR_STR = useRef('hsla(190, 80%, 60%, 0.7)');
   const MOUSE_INTERACTION_RADIUS = useRef(180);
 
-  const MAX_PARTICLES = 500; // User requested 500 particles
-  const CONNECT_DISTANCE = 110; // Slightly reduced due to increased particle density
-  const PARTICLE_BASE_SPEED = 0.18; // Slightly slower for more particles
+  const MAX_PARTICLES = 500;
+  const CONNECT_DISTANCE = 110;
+  const PARTICLE_BASE_SPEED = 0.18;
   const MIN_RADIUS = 0.6;
   const MAX_RADIUS = 1.8;
   const HIGHLIGHT_FADE_SPEED = 0.08;
-  const CONNECTION_RADIUS_BONUS = 0.08; // How much radius increases per connection
-  const MAX_CONNECTION_BONUS_RADIUS = 1.2; // Max additional radius from connections
+  const CONNECTION_RADIUS_BONUS = 0.08;
+  const MAX_CONNECTION_BONUS_RADIUS = 1.2;
   // --- End Configuration ---
 
   const initParticles = useCallback((canvas: HTMLCanvasElement) => {
@@ -99,23 +99,19 @@ const GridBackground: React.FC = () => {
         pulseAngle,
         pulseSpeed,
         pulseAmplitude,
-        connectionCount: 0, // Initialize connection count
+        connectionCount: 0,
       });
     }
-  }, []);
+  }, []); // Removed cellSize from dependencies as it's not directly used in initParticles logic itself
 
   const animate = useCallback((canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Reset connection counts for all particles at the start of each frame
     particlesArray.current.forEach(particle => {
       particle.connectionCount = 0;
     });
 
-    // --- Calculate Connections and Update Counts ---
-    // This loop is primarily for line drawing but we'll also count connections here
     const [lineBaseH, lineBaseS, lineBaseL, lineBaseA] = parseHsla(LINE_BASE_COLOR_STR.current);
-    // Removed unused lineHighlightS from destructuring
     const [, , lineHighlightL, lineHighlightA] = parseHsla(LINE_HIGHLIGHT_COLOR_STR.current);
 
     for (let i = 0; i < particlesArray.current.length; i++) {
@@ -127,11 +123,9 @@ const GridBackground: React.FC = () => {
         const distance = Math.sqrt(dx * dx + dy * dy);
 
         if (distance < CONNECT_DISTANCE) {
-          // Increment connection count for both particles
           p1.connectionCount++;
           p2.connectionCount++;
 
-          // Line drawing logic (as before)
           const lineMaxHighlightIntensity = Math.max(p1.highlightIntensity, p2.highlightIntensity);
           const L = lerp(lineBaseL, lineHighlightL, lineMaxHighlightIntensity);
           let A = lerp(lineBaseA, lineHighlightA, lineMaxHighlightIntensity);
@@ -144,7 +138,6 @@ const GridBackground: React.FC = () => {
           ctx.beginPath();
           ctx.moveTo(p1.x, p1.y);
           ctx.lineTo(p2.x, p2.y);
-          // Use lineBaseS as lineHighlightS was removed (assuming it was meant to be the same or similar)
           ctx.strokeStyle = `hsla(${lineBaseH}, ${lineBaseS}%, ${L}%, ${A.toFixed(3)})`;
           ctx.lineWidth = lerp(0.6, 1.2, lineMaxHighlightIntensity);
           ctx.stroke();
@@ -152,19 +145,13 @@ const GridBackground: React.FC = () => {
       }
     }
 
-
-    // --- Update and Draw Particles ---
     particlesArray.current.forEach(particle => {
-      // Update pulse
       particle.pulseAngle += particle.pulseSpeed;
       const currentPulseFactor = (Math.sin(particle.pulseAngle) + 1) / 2;
       let dynamicRadius = particle.radius + currentPulseFactor * particle.pulseAmplitude;
-
-      // Add connection-based radius bonus
       const connectionBonus = Math.min(particle.connectionCount * CONNECTION_RADIUS_BONUS, MAX_CONNECTION_BONUS_RADIUS);
       dynamicRadius += connectionBonus;
 
-      // Smooth Mouse Interaction & Highlight Intensity
       let targetHighlightIntensity = 0;
       if (mousePosition.current.x !== null && mousePosition.current.y !== null) {
         const dxMouse = particle.x - mousePosition.current.x;
@@ -176,11 +163,9 @@ const GridBackground: React.FC = () => {
       }
       particle.highlightIntensity = lerp(particle.highlightIntensity, targetHighlightIntensity, HIGHLIGHT_FADE_SPEED);
 
-      // Update position
       particle.x += particle.vx;
       particle.y += particle.vy;
 
-      // Wall collision (use dynamicRadius for accuracy)
       if (particle.x + dynamicRadius > canvas.width || particle.x - dynamicRadius < 0) {
         particle.vx *= -1;
       }
@@ -188,21 +173,19 @@ const GridBackground: React.FC = () => {
         particle.vy *= -1;
       }
 
-      // Interpolate color based on highlightIntensity
       const L = lerp(particle.baseColorL, particle.highlightColorL, particle.highlightIntensity);
       let A = lerp(particle.baseColorA, particle.highlightColorA, particle.highlightIntensity);
       A = A * (0.6 + currentPulseFactor * 0.4);
       A = Math.max(0, Math.min(1, A));
 
       ctx.beginPath();
-      ctx.arc(particle.x, particle.y, dynamicRadius, 0, Math.PI * 2, false); // Use dynamicRadius
+      ctx.arc(particle.x, particle.y, dynamicRadius, 0, Math.PI * 2, false);
       ctx.fillStyle = `hsla(${particle.baseColorH}, ${particle.baseColorS}%, ${L}%, ${A.toFixed(3)})`;
       ctx.fill();
     });
 
     requestAnimationFrame(() => animate(canvas, ctx));
-  }, []);
-
+  }, []); // Removed cellSize from dependencies as it's not directly used in animate logic itself
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -216,12 +199,14 @@ const GridBackground: React.FC = () => {
     LINE_HIGHLIGHT_COLOR_STR.current = getCssVar('--line-highlight-color', 'hsla(190, 80%, 60%, 0.7)');
     MOUSE_INTERACTION_RADIUS.current = parseFloat(getCssVar('--mouse-interaction-radius', '180'));
 
-    // Changed 'let' to 'const' as animationFrameId is assigned only once.
     const animationFrameId: number = requestAnimationFrame(() => animate(canvas, ctx));
 
     const resizeCanvas = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
+      // Potentially, if particle density or other features should change with cellSize,
+      // you might re-initialize or adjust particles here, using the `cellSize` prop.
+      // For now, initParticles doesn't use cellSize directly.
       initParticles(canvas);
     };
     const handleMouseMove = (event: MouseEvent) => {
@@ -236,22 +221,29 @@ const GridBackground: React.FC = () => {
     window.addEventListener('mouseleave', handleMouseLeave);
 
     resizeCanvas();
-    // animationFrameId is already assigned above when declared with const
 
     return () => {
       window.removeEventListener('resize', resizeCanvas);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseleave', handleMouseLeave);
-      // No need to check if animationFrameId exists before cancelling,
-      // as it's guaranteed to be a number from requestAnimationFrame.
       cancelAnimationFrame(animationFrameId);
     };
-  }, [initParticles, animate]);
+  // Add cellSize to dependency array if resizeCanvas or initParticles were to use it.
+  // For now, initParticles and animate are memoized without it.
+  // If cellSize affects the grid's visual density (not just particle count),
+  // then it should be a dependency and potentially trigger re-initialization or adjustments.
+  }, [initParticles, animate, cellSize]); // Added cellSize to dependencies
+
+  // The cellSize prop is available here if needed for styling or other logic directly in the JSX
+  // For example: style={{ '--grid-cell-size': `${cellSize}px` }} if you use CSS variables
 
   return (
     <canvas
       ref={canvasRef}
       className="absolute inset-0 w-full h-full pointer-events-none"
+      // Example of using cellSize if needed for direct canvas attributes, though typically managed in JS
+      // width={window.innerWidth} // Typically set in JS for responsiveness
+      // height={window.innerHeight} // Typically set in JS for responsiveness
     ></canvas>
   );
 };

@@ -1,7 +1,7 @@
 // src/components/NotesWidget.tsx
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react'; // Removed useCallback, kept useMemo
 
 // --- Interfaces ---
 export interface Note {
@@ -107,9 +107,8 @@ const NotesWidget: React.FC<NotesWidgetProps> = ({
   }, [activeNoteId, notes]);
 
   // Debounced content change handler
-  const debouncedContentChange = useCallback(
-    // The function being debounced is defined inline here
-    debounce(() => {
+  const debouncedContentChange = useMemo( // Changed from useCallback to useMemo
+    () => debounce(() => {
       if (editorRef.current && activeNoteId) {
         const newContent = editorRef.current.innerHTML;
         const currentNote = notes.find(n => n.id === activeNoteId);
@@ -122,7 +121,7 @@ const NotesWidget: React.FC<NotesWidgetProps> = ({
         }
       }
     }, 500),
-    [activeNoteId, notes, onNotesChange] // Dependencies of the inner debounced function
+    [activeNoteId, notes, onNotesChange] // Dependencies for the inner debounced function
   );
 
   // Title change handler (can be immediate as it's less frequent)

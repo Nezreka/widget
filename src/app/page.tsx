@@ -2,240 +2,111 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import Widget, { WidgetResizeDataType, WidgetMoveDataType, WidgetContainerSettings } from "@/components/Widget";
+// Import Widget, { WidgetResizeDataType, WidgetMoveDataType, WidgetContainerSettings } from "@/components/Widget";
+// The above line was likely a copy-paste error in the original provided file, as Widget is defined below.
+// Assuming the intended import was for the types and WidgetContainerSettings.
+import Widget, { type WidgetResizeDataType, type WidgetMoveDataType, type WidgetContainerSettings } from "@/components/Widget";
 import GridBackground from "@/components/GridBackground";
-import SettingsModal from '@/components/SettingsModal'; // For widget content settings
-import WidgetContainerSettingsModal from '@/components/WidgetContainerSettingsModal'; // For widget container (appearance) settings
-import WeatherWidget, { WeatherSettingsPanel, WeatherWidgetSettings } from "@/components/WeatherWidget";
-import ClockWidget, { ClockSettingsPanel, ClockWidgetSettings } from "@/components/ClockWidget";
-import CalculatorWidget, { CalculatorSettingsPanel, CalculatorWidgetSettings } from "@/components/CalculatorWidget";
-import YoutubeWidget, { YoutubeSettingsPanel, YoutubeWidgetSettings } from "@/components/YoutubeWidget";
+import SettingsModal from '@/components/SettingsModal';
+// Removed InnerPaddingType as it's unused in this file
+import WidgetContainerSettingsModal from '@/components/WidgetContainerSettingsModal';
+
+// Import Widget-specific components and types
+import WeatherWidget, { WeatherSettingsPanel, type WeatherWidgetSettings } from "@/components/WeatherWidget";
+import ClockWidget, { ClockSettingsPanel, type ClockWidgetSettings } from "@/components/ClockWidget";
+import CalculatorWidget, { CalculatorSettingsPanel, type CalculatorWidgetSettings } from "@/components/CalculatorWidget";
+import YoutubeWidget, { YoutubeSettingsPanel, type YoutubeWidgetSettings } from "@/components/YoutubeWidget";
 import NotesWidget, {
     NotesSettingsPanel,
-    NotesWidgetSettings as PageInstanceNotesSettings,
-    Note
+    // Removed PageInstanceNotesSettingsImport as it's unused
+    // type NotesWidgetSettings as PageInstanceNotesSettingsImport,
+    type Note
 } from "@/components/NotesWidget";
-import TodoWidget, { TodoSettingsPanel, TodoWidgetSettings, TodoItem } from "@/components/TodoWidget";
-import MinesweeperWidget, { MinesweeperSettingsPanel, MinesweeperWidgetSettings } from "@/components/MinesweeperWidget";
-import UnitConverterWidget, { UnitConverterSettingsPanel, UnitConverterWidgetSettings } from "@/components/UnitConverterWidget";
-import CountdownStopwatchWidget, { CountdownStopwatchSettingsPanel, CountdownStopwatchWidgetSettings } from "@/components/CountdownStopwatchWidget";
-import PhotoWidget, { PhotoSettingsPanel, PhotoWidgetSettings, HistoricImage } from "@/components/PhotoWidget";
-import PortfolioWidget, { PortfolioSettingsPanel, PortfolioWidgetSettings } from "@/components/PortfolioWidget";
-// Import the new GeminiChatWidget and its settings panel
-import GeminiChatWidget, { GeminiChatSettingsPanel, GeminiChatWidgetSettings } from "@/components/GeminiChatWidget";
+import TodoWidget, { TodoSettingsPanel, type TodoWidgetSettings, type TodoItem } from "@/components/TodoWidget";
+import MinesweeperWidget, { MinesweeperSettingsPanel, type MinesweeperWidgetSettings } from "@/components/MinesweeperWidget";
+import UnitConverterWidget, { UnitConverterSettingsPanel, type UnitConverterWidgetSettings } from "@/components/UnitConverterWidget";
+import CountdownStopwatchWidget, { CountdownStopwatchSettingsPanel, type CountdownStopwatchWidgetSettings } from "@/components/CountdownStopwatchWidget";
+import PhotoWidget, { PhotoSettingsPanel, type PhotoWidgetSettings, type HistoricImage } from "@/components/PhotoWidget";
+import PortfolioWidget, { PortfolioSettingsPanel, type PortfolioWidgetSettings } from "@/components/PortfolioWidget";
+import GeminiChatWidget, { GeminiChatSettingsPanel, type GeminiChatWidgetSettings } from "@/components/GeminiChatWidget";
+import AddWidgetContextMenu, { mapBlueprintToContextMenuItem, type WidgetBlueprintContextMenuItem } from '@/components/AddWidgetContextMenu';
+
+// Import Icons from the dedicated Icons.tsx file
+import {
+  UndoIcon,
+  RedoIcon,
+  ExportIcon,
+  ImportIcon,
+  AddIcon,
+  AutoSortIcon,
+  DensityIcon
+} from '@/components/Icons';
+
+// Import ALL shared widget configurations, types, and constants from widgetConfig.ts
+import {
+  DEFAULT_CELL_SIZE,
+  WIDGET_SIZE_PRESETS,
+  AVAILABLE_WIDGET_DEFINITIONS,
+  PHOTO_WIDGET_DEFAULT_INSTANCE_SETTINGS,
+  PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS,
+  GEMINI_CHAT_WIDGET_DEFAULT_INSTANCE_SETTINGS,
+  type WidgetSizePresetKey,
+  type AllWidgetSettings,
+  type WidgetType,
+  type PageWidgetConfig,
+  type PageInstanceNotesSettings,
+} from '@/definitions/widgetConfig';
 
 
-// --- Icons ---
-const UndoIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" /></svg>;
-const RedoIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4"> <path strokeLinecap="round" strokeLinejoin="round" d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 000 12h3" /> </svg>;
-const ExportIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4"> <path strokeLinecap="round" strokeLinejoin="round" d="M12 9.75v6.75m0 0l-3-3m3 3l3-3m-8.25 6a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" /> </svg>;
-const ImportIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4"> <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" /> </svg>;
-const AddIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4">  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /> </svg>;
-const WeatherIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2 text-blue-400"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.158 0a.75.75 0 10-1.5 0 .75.75 0 001.5 0z" /></svg>;
-const ClockIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2 text-purple-400"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
-const CalculatorIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2 text-green-400"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 15.75V18m-7.5-6.75h.008v.008H8.25v-.008zm0 2.25h.008v.008H8.25V13.5zm0 2.25h.008v.008H8.25v-.008zm0 2.25h.008v.008H8.25V18zm2.498-6.75h.007v.008h-.007v-.008zm0 2.25h.007v.008h-.007V13.5zm0 2.25h.007v.008h-.007v-.008zm0 2.25h.007v.008h-.007V18zm2.504-6.75h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V13.5zm0 2.25h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V18zm2.498-6.75h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V13.5zM9 7.5h6m2.25 0V21H5.25V7.5M3 12h18M3 12a9 9 0 0018 0M3 12a9 9 0 0118 0m0 0V6a3 3 0 00-3-3H6a3 3 0 00-3 3v6c0 1.291.398 2.507 1.074 3.508M17.25 12V6" /></svg>;
-const TodoIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2 text-yellow-400"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
-const NotesIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2 text-indigo-400"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>;
-const YoutubeIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2 text-red-500">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15.91 11.672a.375.375 0 010 .656l-5.603 3.113A.375.375 0 019.75 15.113V8.887c0-.286.307-.466.557-.328l5.603 3.113z" />
-    </svg>
-);
-const MinesweeperIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2 text-gray-400">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.047M15.362 5.214A8.252 8.252 0 0012 3a8.25 8.25 0 00-3.362 2.214m6.724 0a3 3 0 01-3.362 0m3.362 0l1.04 1.04m-4.402 0l-1.04 1.04M12 6.75v.008h.008V6.75H12zm0 3.75v.008h.008v-.008H12zm-2.25.75h4.5m-4.5 0a.75.75 0 000 1.5h4.5a.75.75 0 000-1.5h-4.5z" />
-    </svg>
-);
-const UnitConverterIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2 text-teal-400">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h18M16.5 3L21 7.5m0 0L16.5 12M21 7.5H3" />
-    </svg>
-);
-const CountdownStopwatchIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2 text-orange-400">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12c0-4.073-3.06-7.44-7-7.932V2.25M12 21.75c-1.13 0-2.21-.2-3.2-.57M4.5 12H2.25" />
-    </svg>
-);
-const PhotoIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2 text-pink-400">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.158 0a.75.75 0 10-1.5 0 .75.75 0 001.5 0z" />
-    </svg>
-);
-const PortfolioIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2 text-cyan-400">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21V16.5m16.5 4.5V16.5m-16.5 0a2.25 2.25 0 012.25-2.25h12a2.25 2.25 0 012.25 2.25m-16.5 0h16.5" />
-    </svg>
-);
-// Gemini Chat Icon
-const GeminiChatIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2 text-emerald-400">
-        {/* A simple chat bubble with a star or sparkle - more distinct for AI */}
-        <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3.697-3.697c-.022.012-.044.023-.066.034a5.106 5.106 0 01-2.193-.325 9.75 9.75 0 01-4.252-5.688 9.75 9.75 0 011.438-9.049c1.128-1.223 2.712-2.058 4.498-2.213.01-.002.02-.003.03-.005a.75.75 0 01.729.734c.006.014.008.028.008.042v.444a5.062 5.062 0 002.474 3.578z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 12.75h.008v.008H6.75v-.008zm3.75 0h.008v.008h-.008v-.008zm3.75 0h.008v.008h-.008v-.008z" /> {/* Dots for thinking */}
-        {/* Sparkle / Star element */}
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15.375 19.5l-1.06-2.121L12 16.318l-2.315 1.06L8.625 19.5l1.06 2.121L12 22.682l2.315-1.061 1.06-2.121z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 3.75l.938-.469L12 2.25l-.938 1.031L12 3.75zm0 0v1.5m0 0V3.75m0 1.5h1.5m-1.5 0H10.5m1.5 1.5l.938.469L12 7.75l-.938-.469L12 6.75zm0 0v-1.5m0 0V6.75m0-1.5h-1.5m1.5 0H13.5" />
-    </svg>
-);
+// --- Page-Specific Constants ---
+const CELL_SIZE_OPTIONS = [
+    { label: 'Micro', value: 15 },
+    { label: 'Compact', value: 20 },
+    { label: 'Default', value: DEFAULT_CELL_SIZE },
+    { label: 'Spacious', value: 40 },
+    { label: 'Large', value: 50 },
+];
 
-
-// --- Constants ---
-const CELL_SIZE = 30;
 const MAX_HISTORY_LENGTH = 50;
 const MINIMIZED_WIDGET_ROW_SPAN = 2;
-const DASHBOARD_LAYOUT_STORAGE_KEY = 'dashboardLayoutV3.16'; // Incremented for Gemini Chat Widget
+const DASHBOARD_LAYOUT_STORAGE_KEY = 'dashboardLayoutV3.20';
 const GLOBAL_NOTES_STORAGE_KEY = 'dashboardGlobalNotesCollection_v1';
 const GLOBAL_TODOS_STORAGE_KEY = 'dashboardGlobalSingleTodoList_v1';
 const GLOBAL_PHOTO_HISTORY_STORAGE_KEY = 'dashboardGlobalPhotoHistory_v1';
 const DATA_SAVE_DEBOUNCE_MS = 700;
 const WIDGET_DESELECT_TIMEOUT_MS = 3000;
 
-// Default Widget Container Settings (Appearance)
 const DEFAULT_WIDGET_CONTAINER_SETTINGS: WidgetContainerSettings = {
     alwaysShowTitleBar: false,
     innerPadding: 'px-3.5 py-3',
 };
-
-// --- Interfaces ---
-export type AllWidgetSettings =
-    WeatherWidgetSettings |
-    TodoWidgetSettings |
-    ClockWidgetSettings |
-    CalculatorWidgetSettings |
-    PageInstanceNotesSettings |
-    YoutubeWidgetSettings |
-    MinesweeperWidgetSettings |
-    UnitConverterWidgetSettings |
-    CountdownStopwatchWidgetSettings |
-    PhotoWidgetSettings |
-    PortfolioWidgetSettings |
-    GeminiChatWidgetSettings | // Add GeminiChatWidgetSettings
-    Record<string, unknown>;
-
-export type WidgetType =
-    'weather' | 'todo' | 'clock' | 'calculator' | 'notes' | 'youtube' |
-    'minesweeper' | 'unitConverter' | 'countdownStopwatch' | 'photo' | 'portfolio' |
-    'geminiChat' | // Add geminiChat type
-    'generic';
-
-export interface PageWidgetConfig {
-  id: string;
-  title: string;
-  type: WidgetType;
-  colStart: number;
-  rowStart: number;
-  colSpan: number;
-  rowSpan: number;
-  settings?: AllWidgetSettings;
-  containerSettings?: WidgetContainerSettings;
-  isMinimized?: boolean;
-  originalRowSpan?: number;
-}
 
 interface NotesCollectionStorage {
     notes: Note[];
     activeNoteId: string | null;
 }
 
-interface WidgetBlueprint {
-  type: WidgetType;
-  defaultTitle: string;
-  displayName?: string;
-  description?: string;
-  icon?: React.FC;
-  defaultColSpan: number;
-  defaultRowSpan: number;
-  minColSpan?: number;
-  minRowSpan?: number;
-  defaultSettings: AllWidgetSettings | undefined;
-}
-
-const PHOTO_WIDGET_DEFAULT_INSTANCE_SETTINGS: PhotoWidgetSettings = {
-  imageUrl: null, imageName: null, objectFit: 'cover', isSidebarOpen: false
-};
-
-const PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS: PortfolioWidgetSettings = {
-    accentColor: '#0ea5e9',
-    showAnimatedBackground: true,
-};
-
-// Default settings for the Gemini Chat Widget
-const GEMINI_CHAT_WIDGET_DEFAULT_INSTANCE_SETTINGS: GeminiChatWidgetSettings = {
-    customSystemPrompt: '', // Default empty system prompt
-};
-
-
-const AVAILABLE_WIDGET_DEFINITIONS: WidgetBlueprint[] = [
-  { type: 'weather', defaultTitle: 'New Weather', displayName: 'Weather', description: "Live weather updates and forecasts.", icon: WeatherIcon, defaultColSpan: 12, defaultRowSpan: 14, minColSpan: 6, minRowSpan: 8, defaultSettings: { location: '97504 US', units: 'imperial', useCurrentLocation: false } },
-  { type: 'clock', defaultTitle: 'New Clock', displayName: 'Clock', description: "Analog or digital world clock.", icon: ClockIcon, defaultColSpan: 8, defaultRowSpan: 8, minColSpan: 4, minRowSpan: 4, defaultSettings: { displayType: 'digital', showSeconds: true, hourFormat: '12' } },
-  { type: 'calculator', defaultTitle: 'New Calculator', displayName: 'Calculator', description: "Perform quick calculations.", icon: CalculatorIcon, defaultColSpan: 12, defaultRowSpan: 18, minColSpan: 4, minRowSpan: 6, defaultSettings: {} },
-  { type: 'todo', defaultTitle: 'Global To-Do List', displayName: 'To-Do List', description: "Organize your tasks.", icon: TodoIcon, defaultColSpan: 15, defaultRowSpan: 12, minColSpan: 5, minRowSpan: 6, defaultSettings: { showCompleted: true, sortBy: 'createdAt_desc', defaultFilter: 'all' } },
-  { type: 'notes', defaultTitle: 'New Note Pad', displayName: 'Notes', description: "Jot down quick notes and ideas.", icon: NotesIcon, defaultColSpan: 15, defaultRowSpan: 15, minColSpan: 6, minRowSpan: 6, defaultSettings: { fontSize: 'base' } },
-  { type: 'youtube', defaultTitle: 'YouTube Player', displayName: 'YouTube', description: "Embed YouTube to watch videos.", icon: YoutubeIcon, defaultColSpan: 25, defaultRowSpan: 20, minColSpan: 10, minRowSpan: 10, defaultSettings: {} },
-  { type: 'minesweeper', defaultTitle: 'Minesweeper', displayName: 'Minesweeper', description: "Classic Minesweeper game.", icon: MinesweeperIcon, defaultColSpan: 15, defaultRowSpan: 18, minColSpan: 8, minRowSpan: 10, defaultSettings: { difficulty: 'easy' } },
-  { type: 'unitConverter', defaultTitle: 'Unit Converter', displayName: 'Unit Converter', description: "Convert various units.", icon: UnitConverterIcon, defaultColSpan: 15, defaultRowSpan: 13, minColSpan: 6, minRowSpan: 8, defaultSettings: { defaultCategory: 'Length', precision: 4 } as UnitConverterWidgetSettings },
-  { type: 'countdownStopwatch', defaultTitle: 'Timer / Stopwatch', displayName: 'Timer/Stopwatch', description: "Countdown timer and stopwatch.", icon: CountdownStopwatchIcon, defaultColSpan: 14, defaultRowSpan: 14, minColSpan: 6, minRowSpan: 6, defaultSettings: { defaultCountdownMinutes: 5, playSoundOnFinish: true } as CountdownStopwatchWidgetSettings },
-  { type: 'photo', defaultTitle: 'Photo Viewer', displayName: 'Photo Viewer', description: "Display an image from URL or upload.", icon: PhotoIcon, defaultColSpan: 12, defaultRowSpan: 12, minColSpan: 6, minRowSpan: 6, defaultSettings: PHOTO_WIDGET_DEFAULT_INSTANCE_SETTINGS },
-  { type: 'portfolio', defaultTitle: "Broque's Portfolio", displayName: 'My Portfolio', description: "A showcase of my work and experience.", icon: PortfolioIcon, defaultColSpan: 30, defaultRowSpan: 30, minColSpan: 20, minRowSpan: 18, defaultSettings: PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS },
-  // Add Gemini Chat Widget Definition
-  { 
-    type: 'geminiChat', 
-    defaultTitle: 'AI Chat', 
-    displayName: 'Gemini AI Chat', 
-    description: "Chat with a Gemini-powered AI assistant.", 
-    icon: GeminiChatIcon, 
-    defaultColSpan: 15, // Adjusted for new layout
-    defaultRowSpan: 20, // Adjusted for new layout
-    minColSpan: 8, 
-    minRowSpan: 10, 
-    defaultSettings: GEMINI_CHAT_WIDGET_DEFAULT_INSTANCE_SETTINGS 
-  },
-];
-
-// Initial layout: Adjusted for Portfolio | Gemini Chat | Clock
-const initialWidgetsLayout: PageWidgetConfig[] = [
+const initialWidgetsLayout: Omit<PageWidgetConfig, 'colSpan' | 'rowSpan' | 'minColSpan' | 'minRowSpan'>[] = [
   {
-    "id": "portfolio-main",
-    "title": "Broque Thomas - Portfolio",
-    "type": "portfolio",
-    "colStart": 1, // Placeholder, will be dynamically centered
-    "rowStart": 3,
-    "colSpan": 30, 
-    "rowSpan": 30, 
-    "settings": PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS,
-    "isMinimized": false,
+    id: "portfolio-main", title: "Broque Thomas - Portfolio", type: "portfolio",
+    colStart: 1, rowStart: 3,
+    settings: PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS, isMinimized: false,
     containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS, innerPadding: 'p-0' }
   },
   {
-    "id": "gemini-chat-main", 
-    "title": "Gemini AI Assistant",
-    "type": "geminiChat",
-    "colStart": 1, // Placeholder, will be dynamically centered
-    "rowStart": 3,
-    "colSpan": 15,
-    "rowSpan": 20,
-    "settings": GEMINI_CHAT_WIDGET_DEFAULT_INSTANCE_SETTINGS,
-    "isMinimized": false,
-    containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS, innerPadding: 'p-0' } 
+    id: "gemini-chat-main", title: "Gemini AI Assistant", type: "geminiChat",
+    colStart: 1, rowStart: 3,
+    settings: GEMINI_CHAT_WIDGET_DEFAULT_INSTANCE_SETTINGS, isMinimized: false,
+    containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS, innerPadding: 'p-0' }
   },
   {
-    "id": "clock-widget-main",
-    "title": "Digital Clock",
-    "type": "clock",
-    "colStart": 1, // Placeholder, will be dynamically centered
-    "rowStart": 3,
-    "colSpan": 8,
-    "rowSpan": 8,
-    "settings": { displayType: 'digital', showSeconds: true, hourFormat: '12' },
-    "isMinimized": false,
+    id: "clock-widget-main", title: "Digital Clock", type: "clock",
+    colStart: 1, rowStart: 3,
+    settings: { displayType: 'digital', showSeconds: true, hourFormat: '12' } as ClockWidgetSettings, isMinimized: false,
     containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS }
   },
 ];
 
-// Helper to ensure PhotoWidget instance settings are correctly formed
 const ensurePhotoWidgetInstanceSettings = (settings: AllWidgetSettings | undefined): PhotoWidgetSettings => {
     const photoInstanceDefaults = PHOTO_WIDGET_DEFAULT_INSTANCE_SETTINGS;
     const currentPhotoSettings = settings as PhotoWidgetSettings | undefined;
@@ -248,8 +119,6 @@ const ensurePhotoWidgetInstanceSettings = (settings: AllWidgetSettings | undefin
             : photoInstanceDefaults.isSidebarOpen,
     };
 };
-
-// Helper to ensure PortfolioWidget instance settings are correctly formed
 const ensurePortfolioWidgetInstanceSettings = (settings: AllWidgetSettings | undefined): PortfolioWidgetSettings => {
     const portfolioInstanceDefaults = PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS;
     const currentPortfolioSettings = settings as PortfolioWidgetSettings | undefined;
@@ -260,8 +129,6 @@ const ensurePortfolioWidgetInstanceSettings = (settings: AllWidgetSettings | und
             : portfolioInstanceDefaults.showAnimatedBackground,
     };
 };
-
-// Helper to ensure GeminiChatWidget instance settings are correctly formed
 const ensureGeminiChatWidgetInstanceSettings = (settings: AllWidgetSettings | undefined): GeminiChatWidgetSettings => {
     const geminiChatInstanceDefaults = GEMINI_CHAT_WIDGET_DEFAULT_INSTANCE_SETTINGS;
     const currentGeminiChatSettings = settings as GeminiChatWidgetSettings | undefined;
@@ -270,44 +137,62 @@ const ensureGeminiChatWidgetInstanceSettings = (settings: AllWidgetSettings | un
     };
 };
 
-
-const processWidgetConfig = (widgetData: Partial<PageWidgetConfig>): PageWidgetConfig => {
+const processWidgetConfig = (
+    widgetData: Partial<PageWidgetConfig>,
+    currentCellSize: number
+): PageWidgetConfig => {
     const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(def => def.type === widgetData.type);
 
-    let finalContentSettings = { ...(blueprint?.defaultSettings || {}), ...(widgetData.settings || {}) };
-    if (widgetData.type === 'photo') {
-        finalContentSettings = ensurePhotoWidgetInstanceSettings(finalContentSettings as PhotoWidgetSettings);
-    } else if (widgetData.type === 'portfolio') {
-        finalContentSettings = ensurePortfolioWidgetInstanceSettings(finalContentSettings as PortfolioWidgetSettings);
-    } else if (widgetData.type === 'geminiChat') { // Add processing for Gemini Chat
-        finalContentSettings = ensureGeminiChatWidgetInstanceSettings(finalContentSettings as GeminiChatWidgetSettings);
+    if (!blueprint) {
+        const defaultPresetFallback = WIDGET_SIZE_PRESETS.small_square;
+        return {
+            id: widgetData.id || `generic-${Date.now()}`,
+            title: widgetData.title || "Untitled Widget",
+            type: widgetData.type || 'generic',
+            colStart: widgetData.colStart || 1,
+            rowStart: widgetData.rowStart || 1,
+            colSpan: widgetData.colSpan || Math.max(1, Math.round(defaultPresetFallback.targetWidthPx / currentCellSize)),
+            rowSpan: widgetData.rowSpan || Math.max(1, Math.round(defaultPresetFallback.targetHeightPx / currentCellSize)),
+            minColSpan: widgetData.minColSpan || 3,
+            minRowSpan: widgetData.minRowSpan || 3,
+            isMinimized: widgetData.isMinimized || false,
+            settings: widgetData.settings || {},
+            containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS, ...(widgetData.containerSettings || {}) },
+            originalRowSpan: widgetData.originalRowSpan,
+        };
     }
 
+    const presetSizeTargets = WIDGET_SIZE_PRESETS[blueprint.defaultSizePreset];
+    let colSpan, rowSpan;
+
+    if (widgetData.colSpan !== undefined && widgetData.rowSpan !== undefined) {
+        colSpan = widgetData.colSpan;
+        rowSpan = widgetData.rowSpan;
+    } else {
+        colSpan = Math.max(blueprint.minColSpan, Math.max(1, Math.round(presetSizeTargets.targetWidthPx / currentCellSize)));
+        rowSpan = Math.max(blueprint.minRowSpan, Math.max(1, Math.round(presetSizeTargets.targetHeightPx / currentCellSize)));
+    }
+
+    let finalContentSettings = { ...(blueprint.defaultSettings || {}), ...(widgetData.settings || {}) };
+    if (widgetData.type === 'photo') finalContentSettings = ensurePhotoWidgetInstanceSettings(finalContentSettings as PhotoWidgetSettings);
+    else if (widgetData.type === 'portfolio') finalContentSettings = ensurePortfolioWidgetInstanceSettings(finalContentSettings as PortfolioWidgetSettings);
+    else if (widgetData.type === 'geminiChat') finalContentSettings = ensureGeminiChatWidgetInstanceSettings(finalContentSettings as GeminiChatWidgetSettings);
 
     const finalContainerSettings: WidgetContainerSettings = {
         ...DEFAULT_WIDGET_CONTAINER_SETTINGS,
         ...(widgetData.containerSettings || {})
     };
-    // Specific inner padding overrides for certain widget types
-    if (widgetData.type === 'portfolio' && widgetData.containerSettings?.innerPadding === undefined) {
-        finalContainerSettings.innerPadding = 'p-0';
-    }
-    if (widgetData.type === 'notes' && widgetData.containerSettings?.innerPadding === undefined) {
-        finalContainerSettings.innerPadding = 'p-0';
-    }
-    if (widgetData.type === 'geminiChat' && widgetData.containerSettings?.innerPadding === undefined) { 
-        finalContainerSettings.innerPadding = 'p-0';
-    }
-
 
     return {
-        id: widgetData.id || `generic-${Date.now()}`,
-        title: widgetData.title || blueprint?.defaultTitle || "Untitled Widget",
-        type: widgetData.type || 'generic', 
+        id: widgetData.id || `${blueprint.type}-${Date.now()}`,
+        title: widgetData.title || blueprint.defaultTitle,
+        type: blueprint.type,
         colStart: widgetData.colStart || 1,
         rowStart: widgetData.rowStart || 1,
-        colSpan: widgetData.colSpan || blueprint?.defaultColSpan || 6,
-        rowSpan: widgetData.rowSpan || blueprint?.defaultRowSpan || 6,
+        colSpan: colSpan,
+        rowSpan: rowSpan,
+        minColSpan: blueprint.minColSpan,
+        minRowSpan: blueprint.minRowSpan,
         isMinimized: widgetData.isMinimized || false,
         settings: finalContentSettings,
         containerSettings: finalContainerSettings,
@@ -315,44 +200,77 @@ const processWidgetConfig = (widgetData: Partial<PageWidgetConfig>): PageWidgetC
     };
 };
 
+interface StoredDashboardLayout {
+    dashboardVersion: string;
+    widgets: PageWidgetConfig[]; // This expects fully defined widgets
+    cellSize?: number;
+    notesCollection?: NotesCollectionStorage;
+    sharedGlobalTodos?: TodoItem[];
+    sharedGlobalPhotoHistory?: HistoricImage[];
+}
+
 
 export default function Home() {
+  const [cellSize, setCellSize] = useState<number>(DEFAULT_CELL_SIZE);
   const [widgetContainerCols, setWidgetContainerCols] = useState(0);
   const [widgetContainerRows, setWidgetContainerRows] = useState(0);
   const [activeWidgetId, setActiveWidgetId] = useState<string | null>(null);
 
-  const initialLayoutIsDefaultRef = useRef(false); 
-  const initialCenteringDoneRef = useRef(false); 
+  const initialLayoutIsDefaultRef = useRef(false);
+  const initialCenteringDoneRef = useRef(false);
+  const [widgets, setWidgets] = useState<PageWidgetConfig[]>([]);
 
-  const [widgets, setWidgets] = useState<PageWidgetConfig[]>(() => {
+
+  useEffect(() => {
+    let loadedCellSize = DEFAULT_CELL_SIZE;
+    if (typeof window !== 'undefined') {
+        const savedLayoutJSON = window.localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY);
+        if (savedLayoutJSON) {
+            try {
+                const savedData = JSON.parse(savedLayoutJSON) as StoredDashboardLayout;
+                if (savedData && typeof savedData.cellSize === 'number') {
+                    const validOption = CELL_SIZE_OPTIONS.find(opt => opt.value === savedData.cellSize);
+                    if (validOption) {
+                        loadedCellSize = savedData.cellSize;
+                    }
+                }
+            } catch (error) {
+                console.error("[page.tsx] Error parsing cellSize from localStorage, using default:", error);
+            }
+        }
+    }
+    setCellSize(loadedCellSize);
+
     if (typeof window !== 'undefined') {
         try {
             const savedLayoutJSON = window.localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY);
             if (savedLayoutJSON) {
-                const savedData = JSON.parse(savedLayoutJSON);
+                const savedData = JSON.parse(savedLayoutJSON) as StoredDashboardLayout; // Assume StoredDashboardLayout implies PageWidgetConfig[] for widgets
                 if (savedData && typeof savedData === 'object' && !Array.isArray(savedData) && savedData.dashboardVersion && Array.isArray(savedData.widgets)) {
                     const loadedVersion = String(savedData.dashboardVersion).replace('v','V');
                     const currentVersion = DASHBOARD_LAYOUT_STORAGE_KEY.replace('dashboardLayoutV','V');
 
                     if (loadedVersion === currentVersion) {
-                        initialLayoutIsDefaultRef.current = false; 
-                        return (savedData.widgets as Partial<PageWidgetConfig>[]).map(processWidgetConfig);
+                        initialLayoutIsDefaultRef.current = false;
+                        // Assuming savedData.widgets are already PageWidgetConfig[] or processWidgetConfig handles it
+                        // To be safe, process them, as saved data might be from an older Partial structure internally
+                        setWidgets((savedData.widgets).map(w => processWidgetConfig(w as Partial<PageWidgetConfig>, loadedCellSize)));
+                        return;
                     } else {
-                        console.log(`[page.tsx] Storage key version mismatch (Saved: ${loadedVersion}, Current: ${currentVersion}). Using new initial layout.`);
+                         console.log(`[page.tsx] Storage key version mismatch. Using new initial layout with cellSize: ${loadedCellSize}`);
                     }
-                } else if (Array.isArray(savedData)) { 
-                     console.log(`[page.tsx] Legacy layout format detected. Using new initial layout for ${DASHBOARD_LAYOUT_STORAGE_KEY}.`);
                 } else {
-                    console.log(`[page.tsx] Invalid saved layout structure. Using new initial layout.`);
+                    console.log(`[page.tsx] Invalid or legacy layout structure. Using new initial layout with cellSize: ${loadedCellSize}`);
                 }
             }
         } catch (error) {
             console.error("[page.tsx] Error loading/parsing dashboard layout from localStorage, using initial layout:", error);
         }
     }
-    initialLayoutIsDefaultRef.current = true; 
-    return initialWidgetsLayout.map(processWidgetConfig);
-  });
+    initialLayoutIsDefaultRef.current = true;
+    setWidgets(initialWidgetsLayout.map(w => processWidgetConfig(w as Partial<PageWidgetConfig>, loadedCellSize)));
+  }, []);
+
 
   const [sharedNotes, setSharedNotes] = useState<Note[]>([]);
   const [activeSharedNoteId, setActiveSharedNoteId] = useState<string | null>(null);
@@ -369,6 +287,8 @@ export default function Home() {
   const headerRef = useRef<HTMLElement>(null);
   const initialLoadAttempted = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dashboardAreaRef = useRef<HTMLDivElement>(null);
+  const densityMenuRef = useRef<HTMLDivElement>(null);
 
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [selectedWidgetForSettings, setSelectedWidgetForSettings] = useState<PageWidgetConfig | null>(null);
@@ -382,12 +302,16 @@ export default function Home() {
   const addWidgetMenuRef = useRef<HTMLDivElement>(null);
   const [historyDisplay, setHistoryDisplay] = useState({ pointer: 0, length: 0 });
 
+  const [isAddWidgetContextMenuOpen, setIsAddWidgetContextMenuOpen] = useState(false);
+  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+  const [contextMenuAvailableWidgets, setContextMenuAvailableWidgets] = useState<WidgetBlueprintContextMenuItem[]>([]);
+  const [isDensityMenuOpen, setIsDensityMenuOpen] = useState(false);
+
+
   const updateWidgetsAndPushToHistory = useCallback((newWidgetsState: PageWidgetConfig[], actionType?: string) => {
     if (isPerformingUndoRedo.current && actionType !== 'undo_redo_internal') return;
-
     const currentHistoryTop = historyPointer.current >= 0 && historyPointer.current < history.current.length ? history.current[historyPointer.current] : null;
     if (currentHistoryTop && JSON.stringify(currentHistoryTop) === JSON.stringify(newWidgetsState)) return;
-
     const newHistoryEntry = JSON.parse(JSON.stringify(newWidgetsState));
     const newHistoryBase = history.current.slice(0, historyPointer.current + 1);
     let finalHistory = [...newHistoryBase, newHistoryEntry];
@@ -402,10 +326,12 @@ export default function Home() {
 
    useEffect(() => {
     if (!initialLoadAttempted.current) {
-        history.current = [JSON.parse(JSON.stringify(widgets))];
-        historyPointer.current = 0;
-        setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length });
-        initialLoadAttempted.current = true;
+        if (widgets && widgets.length >= 0) {
+            history.current = [JSON.parse(JSON.stringify(widgets))];
+            historyPointer.current = 0;
+            setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length });
+            initialLoadAttempted.current = true;
+        }
     }
   }, [widgets]);
 
@@ -413,43 +339,46 @@ export default function Home() {
   useEffect(() => {
     if (typeof window !== 'undefined' && initialLoadAttempted.current) {
       try {
-        const dataToSave = {
+        const dataToSave: StoredDashboardLayout = {
             dashboardVersion: DASHBOARD_LAYOUT_STORAGE_KEY.replace('dashboardLayoutV','v'),
-            widgets: widgets
+            widgets: widgets, // widgets is PageWidgetConfig[] here
+            cellSize: cellSize
         };
         window.localStorage.setItem(DASHBOARD_LAYOUT_STORAGE_KEY, JSON.stringify(dataToSave));
       } catch (error) { console.error("Error saving dashboard layout to localStorage:", error); }
     }
-  }, [widgets]);
+  }, [widgets, cellSize]);
 
-  // Dynamic initial centering logic for Portfolio | Gemini Chat | Clock
   useEffect(() => {
-    if (widgetContainerCols > 0 && initialLayoutIsDefaultRef.current && !initialCenteringDoneRef.current) {
-        const portfolioWidgetConfig = initialWidgetsLayout.find(w => w.id === "portfolio-main");
-        const geminiChatWidgetConfig = initialWidgetsLayout.find(w => w.id === "gemini-chat-main");
-        const clockWidgetConfig = initialWidgetsLayout.find(w => w.id === "clock-widget-main");
+    if (widgetContainerCols > 0 && initialLayoutIsDefaultRef.current && !initialCenteringDoneRef.current && widgets.length > 0) {
+        const portfolioBlueprint = AVAILABLE_WIDGET_DEFINITIONS.find(b => b.type === "portfolio");
+        const geminiChatBlueprint = AVAILABLE_WIDGET_DEFINITIONS.find(b => b.type === "geminiChat");
+        const clockBlueprint = AVAILABLE_WIDGET_DEFINITIONS.find(b => b.type === "clock");
 
-        if (portfolioWidgetConfig && geminiChatWidgetConfig && clockWidgetConfig) {
-            const portfolioSpan = portfolioWidgetConfig.colSpan;
-            const geminiChatSpan = geminiChatWidgetConfig.colSpan;
-            const clockSpan = clockWidgetConfig.colSpan;
-            const gap = 2; 
+        if (portfolioBlueprint && geminiChatBlueprint && clockBlueprint) {
+            const portfolioPreset = WIDGET_SIZE_PRESETS[portfolioBlueprint.defaultSizePreset];
+            const geminiPreset = WIDGET_SIZE_PRESETS[geminiChatBlueprint.defaultSizePreset];
+            const clockPreset = WIDGET_SIZE_PRESETS[clockBlueprint.defaultSizePreset];
 
+            const portfolioSpan = Math.max(portfolioBlueprint.minColSpan, Math.max(1, Math.round(portfolioPreset.targetWidthPx / cellSize)));
+            const geminiChatSpan = Math.max(geminiChatBlueprint.minColSpan, Math.max(1, Math.round(geminiPreset.targetWidthPx / cellSize)));
+            const clockSpan = Math.max(clockBlueprint.minColSpan, Math.max(1, Math.round(clockPreset.targetWidthPx / cellSize)));
+
+            const gap = 2;
             const totalBlockSpan = portfolioSpan + gap + geminiChatSpan + gap + clockSpan;
-
             let leftOffset = Math.floor((widgetContainerCols - totalBlockSpan) / 2);
-            if (leftOffset < 1) leftOffset = 0; 
+            if (leftOffset < 1) leftOffset = 0;
 
             const newPortfolioColStart = Math.max(1, leftOffset + 1);
             const newGeminiChatColStart = newPortfolioColStart + portfolioSpan + gap;
             const newClockColStart = newGeminiChatColStart + geminiChatSpan + gap;
-            
-            if (newClockColStart + clockSpan -1 <= widgetContainerCols) { 
+
+            if (newClockColStart + clockSpan -1 <= widgetContainerCols) {
                 setWidgets(currentWidgets => {
                     const updated = currentWidgets.map(w => {
-                        if (w.id === "portfolio-main") return { ...w, colStart: newPortfolioColStart };
-                        if (w.id === "gemini-chat-main") return { ...w, colStart: newGeminiChatColStart };
-                        if (w.id === "clock-widget-main") return { ...w, colStart: newClockColStart };
+                        if (w.id === "portfolio-main") return { ...w, colStart: newPortfolioColStart, colSpan: portfolioSpan };
+                        if (w.id === "gemini-chat-main") return { ...w, colStart: newGeminiChatColStart, colSpan: geminiChatSpan };
+                        if (w.id === "clock-widget-main") return { ...w, colStart: newClockColStart, colSpan: clockSpan };
                         return w;
                     });
                     updateWidgetsAndPushToHistory(updated, 'initial_dynamic_center_layout');
@@ -458,13 +387,17 @@ export default function Home() {
                 initialCenteringDoneRef.current = true;
                 initialLayoutIsDefaultRef.current = false;
             } else {
-                console.warn("[page.tsx] Calculated dynamic centered layout (Portfolio | Gemini | Clock) would overflow. Widgets will start at column 1.");
-                initialCenteringDoneRef.current = true; 
+                console.warn("[page.tsx] Calculated dynamic centered layout would overflow. Widgets will start at column 1.");
+                initialCenteringDoneRef.current = true;
                 initialLayoutIsDefaultRef.current = false;
             }
+        } else {
+             console.warn("[page.tsx] Could not find all blueprints for initial centering logic.");
+             initialCenteringDoneRef.current = true;
+             initialLayoutIsDefaultRef.current = false;
         }
     }
-  }, [widgetContainerCols, updateWidgetsAndPushToHistory]);
+  }, [widgetContainerCols, updateWidgetsAndPushToHistory, widgets, cellSize]);
 
 
   useEffect(() => {
@@ -485,99 +418,112 @@ export default function Home() {
   useEffect(() => { if (typeof window !== 'undefined') { if (photoHistorySaveTimeoutRef.current) clearTimeout(photoHistorySaveTimeoutRef.current); photoHistorySaveTimeoutRef.current = setTimeout(() => { try { localStorage.setItem(GLOBAL_PHOTO_HISTORY_STORAGE_KEY, JSON.stringify(sharedPhotoHistory)); } catch (e) { console.error("Err save photo hist:", e); } }, DATA_SAVE_DEBOUNCE_MS); return () => { if (photoHistorySaveTimeoutRef.current) clearTimeout(photoHistorySaveTimeoutRef.current); }; } }, [sharedPhotoHistory]);
 
   useEffect(() => { if (deselectTimerRef.current) { clearTimeout(deselectTimerRef.current); deselectTimerRef.current = null; } if (activeWidgetId && !maximizedWidgetId) { deselectTimerRef.current = setTimeout(() => { setActiveWidgetId(null); }, WIDGET_DESELECT_TIMEOUT_MS); } return () => { if (deselectTimerRef.current) { clearTimeout(deselectTimerRef.current); deselectTimerRef.current = null; } }; }, [activeWidgetId, maximizedWidgetId]);
-  useEffect(() => { const ho = (e: MouseEvent) => { if (addWidgetMenuRef.current && !addWidgetMenuRef.current.contains(e.target as Node)) { setIsAddWidgetMenuOpen(false); } }; if (isAddWidgetMenuOpen) { document.addEventListener('mousedown', ho); } else { document.removeEventListener('mousedown', ho); } return () => { document.removeEventListener('mousedown', ho); }; }, [isAddWidgetMenuOpen]);
+  useEffect(() => { const handleClickOutside = (e: MouseEvent) => { if (addWidgetMenuRef.current && !addWidgetMenuRef.current.contains(e.target as Node)) { setIsAddWidgetMenuOpen(false); } if (densityMenuRef.current && !densityMenuRef.current.contains(e.target as Node)) { setIsDensityMenuOpen(false); }}; if (isAddWidgetMenuOpen || isDensityMenuOpen) { document.addEventListener('mousedown', handleClickOutside); } else { document.removeEventListener('mousedown', handleClickOutside); } return () => { document.removeEventListener('mousedown', handleClickOutside); }; }, [isAddWidgetMenuOpen, isDensityMenuOpen]);
 
 
   useEffect(() => {
     const determineWidgetContainerGridSize = () => {
       const screenWidth = window.innerWidth; const screenHeight = window.innerHeight;
-      const headerHeight = headerRef.current?.offsetHeight || 60;
-      const mainContentHeight = screenHeight - headerHeight;
-      setWidgetContainerCols(Math.floor(screenWidth / CELL_SIZE));
-      setWidgetContainerRows(Math.floor(mainContentHeight / CELL_SIZE));
+      const currentHeaderHeight = headerRef.current?.offsetHeight || 60;
+      const mainContentHeight = screenHeight - currentHeaderHeight;
+      setWidgetContainerCols(Math.floor(screenWidth / cellSize));
+      setWidgetContainerRows(Math.floor(mainContentHeight / cellSize));
     };
     determineWidgetContainerGridSize(); const timeoutId = setTimeout(determineWidgetContainerGridSize, 100);
     window.addEventListener('resize', determineWidgetContainerGridSize);
     return () => { clearTimeout(timeoutId); window.removeEventListener('resize', determineWidgetContainerGridSize); };
+  }, [cellSize]);
+
+  useEffect(() => {
+    setContextMenuAvailableWidgets(
+      AVAILABLE_WIDGET_DEFINITIONS.map(blueprint => mapBlueprintToContextMenuItem(blueprint))
+    );
   }, []);
 
   const handleExportLayout = () => {
     if (typeof window === 'undefined') return;
     try {
-      const layoutToExport = { dashboardVersion: DASHBOARD_LAYOUT_STORAGE_KEY.replace('dashboardLayoutV','v'), widgets: widgets, notesCollection: { notes: sharedNotes, activeNoteId: activeSharedNoteId }, sharedGlobalTodos: sharedTodos, sharedGlobalPhotoHistory: sharedPhotoHistory };
+      const layoutToExport: StoredDashboardLayout = { dashboardVersion: DASHBOARD_LAYOUT_STORAGE_KEY.replace('dashboardLayoutV','v'), widgets: widgets, cellSize: cellSize, notesCollection: { notes: sharedNotes, activeNoteId: activeSharedNoteId }, sharedGlobalTodos: sharedTodos, sharedGlobalPhotoHistory: sharedPhotoHistory };
       const jsonString = JSON.stringify(layoutToExport, null, 2); const blob = new Blob([jsonString],{type:'application/json'}); const href = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = href; link.download = `dashboard-layout-${layoutToExport.dashboardVersion}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(href);
     } catch (error) { console.error("Error exporting layout:", error); alert("Error exporting layout."); }
   };
 
-  interface ImportedLayoutData {
-    dashboardVersion?: string;
-    widgets?: Partial<PageWidgetConfig>[]; 
-    notesCollection?: NotesCollectionStorage;
-    sharedGlobalTodos?: TodoItem[];
-    sharedGlobalPhotoHistory?: HistoricImage[];
-  }
-
-
   const handleImportLayout = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (typeof window === 'undefined') return; const file = event.target.files?.[0]; if (!file) return;
+    if (typeof window === 'undefined') return;
+    const file = event.target.files?.[0];
+    if (!file) return;
+
     const reader = new FileReader();
     reader.onload = (e) => {
-      try {
-        const text = e.target?.result; if (typeof text !== 'string') throw new Error("Failed to read file content.");
-        const parsedJson = JSON.parse(text);
-        let importedData: ImportedLayoutData | Partial<PageWidgetConfig>[];
+        try {
+            const text = e.target?.result;
+            if (typeof text !== 'string') throw new Error("Failed to read file content.");
+            const parsedJson = JSON.parse(text);
 
-        if (typeof parsedJson === 'object' && !Array.isArray(parsedJson) && (parsedJson.dashboardVersion || parsedJson.widgets)) {
-            importedData = parsedJson as ImportedLayoutData;
-        } else if (Array.isArray(parsedJson)) {
-            importedData = parsedJson as Partial<PageWidgetConfig>[];
-        } else {
-            throw new Error("Invalid file format. Could not recognize dashboard structure.");
+            let finalWidgetsToSet: PageWidgetConfig[];
+            let finalCellSize = cellSize; // Default to current cellSize
+            let notesToSet = sharedNotes;
+            let activeNoteIdToSet = activeSharedNoteId;
+            let todosToSet = sharedTodos;
+            let photoHistoryToSet = sharedPhotoHistory;
+            let alertMessage = "";
+
+            if (typeof parsedJson === 'object' && !Array.isArray(parsedJson) && parsedJson.dashboardVersion && parsedJson.widgets) {
+                // Modern format (implements StoredDashboardLayout)
+                const modernData = parsedJson as StoredDashboardLayout;
+
+                if (typeof modernData.cellSize === 'number') {
+                    const validOption = CELL_SIZE_OPTIONS.find(opt => opt.value === modernData.cellSize);
+                    if (validOption) finalCellSize = validOption.value;
+                }
+
+                // Process widgets, ensuring they become PageWidgetConfig[]
+                // Cast individual items to Partial<PageWidgetConfig> for processWidgetConfig if structure isn't guaranteed
+                finalWidgetsToSet = (modernData.widgets || []).map(w => processWidgetConfig(w as Partial<PageWidgetConfig>, finalCellSize));
+
+                if (modernData.notesCollection) {
+                    notesToSet = modernData.notesCollection.notes || [];
+                    activeNoteIdToSet = modernData.notesCollection.activeNoteId || null;
+                }
+                if (modernData.sharedGlobalTodos) todosToSet = modernData.sharedGlobalTodos;
+                if (modernData.sharedGlobalPhotoHistory) photoHistoryToSet = modernData.sharedGlobalPhotoHistory;
+
+                alertMessage = `Dashboard layout, settings, and global data (version ${modernData.dashboardVersion}) imported successfully!`;
+
+            } else if (Array.isArray(parsedJson)) {
+                // Legacy format (array of Partial<PageWidgetConfig>)
+                // CellSize remains current, notes, todos, photo history also remain current
+                finalWidgetsToSet = (parsedJson as Partial<PageWidgetConfig>[]).map(w => processWidgetConfig(w, cellSize)); // Use current cellSize
+                alertMessage = "Dashboard layout (legacy format) imported. Global data and settings will use defaults or existing data.";
+            } else {
+                throw new Error("Invalid file format. Could not recognize dashboard structure.");
+            }
+
+            alert(alertMessage);
+
+            setCellSize(finalCellSize);
+            setWidgets(finalWidgetsToSet);
+            setSharedNotes(notesToSet);
+            setActiveSharedNoteId(activeNoteIdToSet);
+            setSharedTodos(todosToSet);
+            setSharedPhotoHistory(photoHistoryToSet);
+            setActiveWidgetId(null);
+            setMaximizedWidgetId(null);
+
+            history.current = [JSON.parse(JSON.stringify(finalWidgetsToSet))];
+            historyPointer.current = 0;
+            setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length });
+
+            initialLayoutIsDefaultRef.current = false;
+            initialCenteringDoneRef.current = true;
+
+        } catch (err: unknown) {
+            let message = 'Invalid file content.';
+            if (err instanceof Error) { message = err.message; }
+            console.error("Error importing layout:", err);
+            alert(`Error importing layout: ${message}`);
         }
-
-
-        let widgetsToImportRaw: Partial<PageWidgetConfig>[] = [];
-        let notesToImport: Note[] = sharedNotes; let activeNoteIdToImport: string | null = activeSharedNoteId;
-        let globalTodosToImport: TodoItem[] = sharedTodos; let globalPhotoHistoryToImport: HistoricImage[] = sharedPhotoHistory;
-
-        if ('dashboardVersion' in importedData && 'widgets' in importedData && Array.isArray(importedData.widgets)) { 
-            widgetsToImportRaw = importedData.widgets || [];
-            if (importedData.notesCollection) { notesToImport = importedData.notesCollection.notes || []; activeNoteIdToImport = importedData.notesCollection.activeNoteId || null; }
-            if (importedData.sharedGlobalTodos && Array.isArray(importedData.sharedGlobalTodos)) { globalTodosToImport = importedData.sharedGlobalTodos; }
-            if (importedData.sharedGlobalPhotoHistory && Array.isArray(importedData.sharedGlobalPhotoHistory)) { globalPhotoHistoryToImport = importedData.sharedGlobalPhotoHistory; }
-            alert(`Dashboard layout and global data (version ${importedData.dashboardVersion}) imported successfully!`);
-        } else if (Array.isArray(importedData)) { 
-            widgetsToImportRaw = importedData;
-            alert("Dashboard layout (legacy format) imported. Global data (notes, todos, photo history) will use defaults or existing data.");
-        } else {
-             throw new Error("Invalid file format. Could not recognize dashboard structure.");
-        }
-
-
-        if (widgetsToImportRaw.length > 0 && typeof widgetsToImportRaw[0]?.id !== 'string') {
-             console.warn("Imported widget data might be invalid or incomplete.", widgetsToImportRaw[0]);
-        }
-
-
-        const processedWidgetsToImport = widgetsToImportRaw.map(processWidgetConfig);
-
-        setWidgets(processedWidgetsToImport); setSharedNotes(notesToImport); setActiveSharedNoteId(activeNoteIdToImport);
-        setSharedTodos(globalTodosToImport); setSharedPhotoHistory(globalPhotoHistoryToImport);
-        setActiveWidgetId(null); setMaximizedWidgetId(null);
-        history.current = [JSON.parse(JSON.stringify(processedWidgetsToImport))]; historyPointer.current = 0;
-        setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length });
-        initialLayoutIsDefaultRef.current = false; 
-        initialCenteringDoneRef.current = true; 
-
-      } catch (err: unknown) { 
-          let message = 'Invalid file content.';
-          if (err instanceof Error) {
-            message = err.message;
-          }
-          console.error("Error importing layout:", err);
-          alert(`Error importing layout: ${message}`);
-      }
-      finally { if (fileInputRef.current) fileInputRef.current.value = ""; }
+        finally { if (fileInputRef.current) fileInputRef.current.value = ""; }
     };
     reader.onerror = () => { alert("Error reading file."); if (fileInputRef.current) fileInputRef.current.value = ""; };
     reader.readAsText(file);
@@ -585,101 +531,413 @@ export default function Home() {
 
   const triggerImportFileSelect = () => { if (fileInputRef.current) fileInputRef.current.click(); };
 
-  const doRectanglesOverlap = (r1C:number,r1R:number,r1CS:number,r1RS:number,r2C:number,r2R:number,r2CS:number,r2RS:number,b:number=0):boolean => { const r2BSC=Math.max(1,r2C-b); const r2BSR=Math.max(1,r2R-b); const r2BCE=Math.min(widgetContainerCols>0?widgetContainerCols:Infinity,r2C+r2CS-1+b); const r2BRE=Math.min(widgetContainerRows>0?widgetContainerRows:Infinity,r2R+r2RS-1+b); const r1ACE=r1C+r1CS-1; const r1ARE=r1R+r1RS-1; return r1C<=r2BCE&&r1ACE>=r2BSC&&r1R<=r2BRE&&r1ARE>=r2BSR; };
-  const findNextAvailablePosition = (pCS:number,pRS:number):{colStart:number,rowStart:number}|null => { if(widgetContainerCols===0||widgetContainerRows===0)return null; for(let r=1;r<=widgetContainerRows;r++){for(let c=1;c<=widgetContainerCols;c++){ if(r+pRS-1>widgetContainerRows||c+pCS-1>widgetContainerCols){if(c+pCS-1>widgetContainerCols)break;continue;} let coll=false; for(const ew of widgets){if(doRectanglesOverlap(c,r,pCS,pRS,ew.colStart,ew.rowStart,ew.colSpan,ew.rowSpan,1)){coll=true;break;}} if(!coll)return{colStart:c,rowStart:r};}} return null; };
+  const doRectanglesOverlap = useCallback((
+    r1C: number, r1R: number, r1CS: number, r1RS: number,
+    r2C: number, r2R: number, r2CS: number, r2RS: number,
+    buffer: number = 0
+  ): boolean => {
+    const r2BufferedColStart = Math.max(1, r2C - buffer);
+    const r2BufferedRowStart = Math.max(1, r2R - buffer);
+    const r2BufferedColEnd = Math.min(widgetContainerCols > 0 ? widgetContainerCols : Infinity, r2C + r2CS - 1 + buffer);
+    const r2BufferedRowEnd = Math.min(widgetContainerRows > 0 ? widgetContainerRows : Infinity, r2R + r2RS - 1 + buffer);
 
-  const handleAddNewWidget = (widgetType: WidgetType) => {
+    const r1ColEnd = r1C + r1CS - 1;
+    const r1RowEnd = r1R + r1RS - 1;
+    const overlapX = r1C <= r2BufferedColEnd && r1ColEnd >= r2BufferedColStart;
+    const overlapY = r1R <= r2BufferedRowEnd && r1RowEnd >= r2BufferedRowStart;
+
+    return overlapX && overlapY;
+  }, [widgetContainerCols, widgetContainerRows]); // Added dependencies
+
+  const canPlaceWidget = useCallback((
+    widgetToPlace: PageWidgetConfig,
+    targetCol: number,
+    targetRow: number,
+    currentLayout: PageWidgetConfig[]
+  ): boolean => {
+    if (widgetContainerCols === 0 || widgetContainerRows === 0) return false;
+    if (targetCol < 1 || targetRow < 1 ||
+        targetCol + widgetToPlace.colSpan - 1 > widgetContainerCols ||
+        targetRow + widgetToPlace.rowSpan - 1 > widgetContainerRows) {
+      return false;
+    }
+    for (const existingWidget of currentLayout) {
+      if (existingWidget.id === widgetToPlace.id) continue;
+      if (doRectanglesOverlap(
+        targetCol, targetRow, widgetToPlace.colSpan, widgetToPlace.rowSpan,
+        existingWidget.colStart, existingWidget.rowStart, existingWidget.colSpan, existingWidget.rowSpan
+      )) {
+        return false;
+      }
+    }
+    return true;
+  }, [widgetContainerCols, widgetContainerRows, doRectanglesOverlap]); // Added dependencies
+
+
+  const performAutoSort = useCallback((widgetsToSort: PageWidgetConfig[]): PageWidgetConfig[] | null => {
+    if (widgetContainerCols === 0 || widgetContainerRows === 0) return null;
+
+    const sortedWidgets = [...widgetsToSort].sort((a, b) => {
+        if (a.rowStart !== b.rowStart) return a.rowStart - b.rowStart;
+        if (a.colStart !== b.colStart) return a.colStart - b.colStart;
+        return a.id.localeCompare(b.id);
+    });
+
+    const newLayout: PageWidgetConfig[] = [];
+    for (const widget of sortedWidgets) {
+        let placed = false;
+        for (let r = 1; r <= widgetContainerRows; r++) {
+            for (let c = 1; c <= widgetContainerCols; c++) {
+                const checkWidget = {
+                    ...widget,
+                    colSpan: Math.max(widget.colSpan, widget.minColSpan),
+                    rowSpan: Math.max(widget.rowSpan, widget.minRowSpan),
+                };
+                if (canPlaceWidget(checkWidget, c, r, newLayout)) {
+                    newLayout.push({ ...widget, colStart: c, rowStart: r });
+                    placed = true;
+                    break;
+                }
+            }
+            if (placed) break;
+        }
+        if (!placed) {
+             console.warn(`[performAutoSort] Could not place widget: ${widget.id} (${widget.title}) with size ${widget.colSpan}x${widget.rowSpan}. Min size ${widget.minColSpan}x${widget.minRowSpan}. Grid might be too full.`);
+            return null;
+        }
+    }
+    return newLayout;
+  }, [widgetContainerCols, widgetContainerRows, canPlaceWidget]);
+
+  const handleAutoSortButtonClick = () => {
+    if (maximizedWidgetId) return;
+    const currentLayout = widgets.map(w => ({...w}));
+    const sortedLayout = performAutoSort(currentLayout);
+    if (sortedLayout) {
+      setWidgets(sortedLayout);
+      updateWidgetsAndPushToHistory(sortedLayout, 'auto_sort_button');
+      setActiveWidgetId(null);
+    } else {
+      console.error("[handleAutoSortButtonClick] Failed to sort existing widgets.");
+      alert("Could not fully sort the grid. Some widgets might be unplaceable or the grid is too full.");
+    }
+  };
+
+
+  const attemptPlaceWidgetWithShrinking = useCallback((
+    currentWidgetsImmutable: PageWidgetConfig[],
+    newWidgetConfig: PageWidgetConfig
+  ): PageWidgetConfig[] | null => {
+    if (widgetContainerCols === 0 || widgetContainerRows === 0) return null;
+
+    const tempWidgetsLayout = currentWidgetsImmutable.map(w => ({ ...w })); // Changed let to const
+
+    const sortedWithNew = performAutoSort([...tempWidgetsLayout, { ...newWidgetConfig }]); // Changed let to const
+    if (sortedWithNew) {
+        return sortedWithNew;
+    }
+
+    const shrinkableWidgets = tempWidgetsLayout.filter(
+        w => w.colSpan > w.minColSpan || w.rowSpan > w.minRowSpan
+    ).sort((a,b) => (b.colSpan*b.rowSpan) - (a.colSpan*a.rowSpan));
+
+    for (const existingWidget of shrinkableWidgets) {
+        const originalColSpan = existingWidget.colSpan;
+
+        if (existingWidget.colSpan > existingWidget.minColSpan) {
+            const widgetsWithShrunkCol = tempWidgetsLayout.map(w =>
+                w.id === existingWidget.id ? { ...w, colSpan: Math.max(w.minColSpan, w.colSpan - 1) } : { ...w }
+            );
+            const layoutWithShrunkCol = performAutoSort([...widgetsWithShrunkCol, { ...newWidgetConfig }]);
+            if (layoutWithShrunkCol) {
+                return layoutWithShrunkCol;
+            }
+        }
+
+        if (existingWidget.rowSpan > existingWidget.minRowSpan) {
+            const widgetsWithShrunkRow = tempWidgetsLayout.map(w =>
+                w.id === existingWidget.id ? { ...w, colSpan: originalColSpan, rowSpan: Math.max(w.minRowSpan, w.rowSpan - 1) } : { ...w }
+            );
+            const layoutWithShrunkRow = performAutoSort([...widgetsWithShrunkRow, { ...newWidgetConfig }]);
+            if (layoutWithShrunkRow) {
+                return layoutWithShrunkRow;
+            }
+        }
+    }
+    return null;
+  }, [widgetContainerCols, widgetContainerRows, performAutoSort]);
+
+
+  const findNextAvailablePosition = useCallback((
+    targetColSpan: number,
+    targetRowSpan: number,
+    currentLayout: PageWidgetConfig[]
+  ): { colStart: number, rowStart: number } | null => {
+    if (widgetContainerCols === 0 || widgetContainerRows === 0) return null;
+
+    for (let r = 1; r <= widgetContainerRows - targetRowSpan + 1; r++) {
+      for (let c = 1; c <= widgetContainerCols - targetColSpan + 1; c++) {
+        const dummyWidgetToCheck: PageWidgetConfig = {
+            id: 'temp-placement-check', type: 'generic', title: '',
+            colStart: c, rowStart: r, colSpan: targetColSpan, rowSpan: targetRowSpan,
+            minColSpan: targetColSpan, minRowSpan: targetRowSpan,
+        };
+        if (canPlaceWidget(dummyWidgetToCheck, c, r, currentLayout)) {
+          return { colStart: c, rowStart: r };
+        }
+      }
+    }
+    return null;
+  }, [widgetContainerCols, widgetContainerRows, canPlaceWidget]);
+
+  const handleAddNewWidget = useCallback((widgetType: WidgetType) => {
     if (maximizedWidgetId) return;
     const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(def => def.type === widgetType);
-    if (!blueprint) { alert(`Widget type "${widgetType}" is not available.`); setIsAddWidgetMenuOpen(false); return; }
-    const { defaultColSpan, defaultRowSpan } = blueprint;
-    if (widgetContainerCols === 0 || widgetContainerRows === 0) { alert("Grid not fully initialized. Please wait a moment and try again."); setIsAddWidgetMenuOpen(false); return; }
-    const position = findNextAvailablePosition(defaultColSpan, defaultRowSpan);
-    if (!position) { alert("No available space to add this widget. Try making some room or resizing existing widgets."); setIsAddWidgetMenuOpen(false); return; }
+    if (!blueprint) { alert(`Widget type "${widgetType}" is not available.`); setIsAddWidgetMenuOpen(false); setIsAddWidgetContextMenuOpen(false); return; }
 
-    let newWidgetInstanceSettings = JSON.parse(JSON.stringify(blueprint.defaultSettings || {}));
-    if (blueprint.type === 'photo') {
-        newWidgetInstanceSettings = ensurePhotoWidgetInstanceSettings(newWidgetInstanceSettings as PhotoWidgetSettings);
-    } else if (blueprint.type === 'portfolio') {
-        newWidgetInstanceSettings = ensurePortfolioWidgetInstanceSettings(newWidgetInstanceSettings as PortfolioWidgetSettings);
-    } else if (blueprint.type === 'geminiChat') { // Ensure settings for Gemini Chat
-        newWidgetInstanceSettings = ensureGeminiChatWidgetInstanceSettings(newWidgetInstanceSettings as GeminiChatWidgetSettings);
+    if (widgetContainerCols === 0 || widgetContainerRows === 0) {
+      alert("Grid not fully initialized. Please wait a moment and try again.");
+      setIsAddWidgetMenuOpen(false); setIsAddWidgetContextMenuOpen(false);
+      return;
+    }
+    const newWidgetConfig = processWidgetConfig({
+        id: `${blueprint.type}-${Date.now()}`,
+        type: blueprint.type,
+    }, cellSize);
+
+
+    let finalLayout: PageWidgetConfig[] | null = null;
+    const currentWidgetsCopy = widgets.map(w => ({...w}));
+
+    const initialPosition = findNextAvailablePosition(newWidgetConfig.colSpan, newWidgetConfig.rowSpan, currentWidgetsCopy);
+
+    if (initialPosition) {
+        const widgetWithPosition = {
+            ...newWidgetConfig,
+            colStart: initialPosition.colStart,
+            rowStart: initialPosition.rowStart
+        };
+        finalLayout = [...currentWidgetsCopy, widgetWithPosition];
+    } else {
+        finalLayout = performAutoSort([...currentWidgetsCopy, { ...newWidgetConfig }]);
+        if (!finalLayout) {
+            finalLayout = attemptPlaceWidgetWithShrinking(currentWidgetsCopy, { ...newWidgetConfig });
+        }
     }
 
+    if (finalLayout) {
+      setWidgets(finalLayout);
+      updateWidgetsAndPushToHistory(finalLayout, `add_widget_${widgetType}`);
+      const addedWidgetInLayout = finalLayout.find(w => w.id === newWidgetConfig.id);
+      if (addedWidgetInLayout) setActiveWidgetId(addedWidgetInLayout.id);
+      else setActiveWidgetId(null);
+    } else {
+      alert("No available space to add this widget, even after attempting to sort and shrink. Please make more room manually or try a smaller widget.");
+    }
+    setIsAddWidgetMenuOpen(false);
+    setIsAddWidgetContextMenuOpen(false);
+  }, [maximizedWidgetId, widgetContainerCols, widgetContainerRows, widgets, cellSize, findNextAvailablePosition, performAutoSort, attemptPlaceWidgetWithShrinking, updateWidgetsAndPushToHistory]);
 
-    const newWidgetContainerSettings = { ...DEFAULT_WIDGET_CONTAINER_SETTINGS };
-    if (blueprint.type === 'portfolio' || blueprint.type === 'notes' || blueprint.type === 'geminiChat') { 
-        newWidgetContainerSettings.innerPadding = 'p-0';
+  const handleApplyWidgetSizePreset = useCallback((widgetId: string, presetKey: WidgetSizePresetKey) => {
+    if (maximizedWidgetId) return;
+
+    const targetWidget = widgets.find(w => w.id === widgetId);
+    const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(b => b.type === targetWidget?.type);
+
+    if (!targetWidget || !blueprint) {
+        alert("Error: Could not find widget data to apply preset.");
+        return;
     }
 
-    const newWidget: PageWidgetConfig = {
-      id: `${blueprint.type}-${Date.now()}`,
-      title: blueprint.defaultTitle,
-      type: blueprint.type,
-      colStart: position.colStart,
-      rowStart: position.rowStart,
-      colSpan: defaultColSpan,
-      rowSpan: defaultRowSpan,
-      settings: newWidgetInstanceSettings,
-      containerSettings: newWidgetContainerSettings,
-      isMinimized: false,
+    const presetSizeTargets = WIDGET_SIZE_PRESETS[presetKey];
+    if (!presetSizeTargets) {
+        alert("Error: Invalid size preset selected.");
+        return;
+    }
+
+    const newColSpan = Math.max(blueprint.minColSpan, Math.max(1, Math.round(presetSizeTargets.targetWidthPx / cellSize)));
+    const newRowSpan = Math.max(blueprint.minRowSpan, Math.max(1, Math.round(presetSizeTargets.targetHeightPx / cellSize)));
+
+    const updatedWidgetConfig = {
+        ...targetWidget,
+        colSpan: newColSpan,
+        rowSpan: newRowSpan,
     };
 
+    let finalLayout: PageWidgetConfig[] | null = null;
+    const otherWidgets = widgets.filter(w => w.id !== widgetId).map(w => ({...w}));
 
-    setWidgets(prev => { const updatedWidgets = [...prev, newWidget]; updateWidgetsAndPushToHistory(updatedWidgets, `add_widget_${widgetType}`); return updatedWidgets; });
-    setActiveWidgetId(newWidget.id); setIsAddWidgetMenuOpen(false);
-  };
+    if (canPlaceWidget(updatedWidgetConfig, targetWidget.colStart, targetWidget.rowStart, otherWidgets)) {
+        finalLayout = widgets.map(w => w.id === widgetId ? { ...updatedWidgetConfig, colStart: targetWidget.colStart, rowStart: targetWidget.rowStart } : w);
+    } else {
+        const newPosition = findNextAvailablePosition(updatedWidgetConfig.colSpan, updatedWidgetConfig.rowSpan, otherWidgets);
+        if (newPosition) {
+            finalLayout = [...otherWidgets, { ...updatedWidgetConfig, colStart: newPosition.colStart, rowStart: newPosition.rowStart }];
+        } else {
+            const widgetsToTrySort = widgets.map(w => w.id === widgetId ? updatedWidgetConfig : {...w});
+            finalLayout = performAutoSort(widgetsToTrySort);
+        }
+    }
+
+    if (finalLayout) {
+        setWidgets(finalLayout);
+        updateWidgetsAndPushToHistory(finalLayout, `apply_preset_${presetKey}_to_${widgetId}`);
+        setActiveWidgetId(widgetId);
+        setIsContainerSettingsModalOpen(false);
+    } else {
+        alert(`Could not apply size preset "${presetKey}". There isn't enough space, even after trying to rearrange. Please try a different preset or make more room manually.`);
+    }
+  }, [widgets, maximizedWidgetId, cellSize, findNextAvailablePosition, performAutoSort, updateWidgetsAndPushToHistory, canPlaceWidget]);
+
+  const performAutoSortWithGivenGrid = useCallback((widgetsToSort: PageWidgetConfig[], newCols: number, newRows: number): PageWidgetConfig[] | null => {
+    if (newCols === 0 || newRows === 0) return null;
+
+    const sortedWidgets = [...widgetsToSort].sort((a, b) => {
+        if (a.rowStart !== b.rowStart) return a.rowStart - b.rowStart;
+        if (a.colStart !== b.colStart) return a.colStart - b.colStart;
+        return a.id.localeCompare(b.id);
+    });
+
+    const newLayout: PageWidgetConfig[] = [];
+    for (const widget of sortedWidgets) {
+        let placed = false;
+        for (let r = 1; r <= newRows; r++) {
+            for (let c = 1; c <= newCols; c++) {
+                const checkWidget = {
+                    ...widget,
+                    colSpan: Math.max(widget.colSpan, widget.minColSpan),
+                    rowSpan: Math.max(widget.rowSpan, widget.minRowSpan),
+                };
+                const canPlaceCustom = (
+                    wtp: PageWidgetConfig, tC: number, tR: number, cL: PageWidgetConfig[], cols: number, rows: number
+                ): boolean => {
+                    if (cols === 0 || rows === 0) return false;
+                    if (tC < 1 || tR < 1 || tC + wtp.colSpan - 1 > cols || tR + wtp.rowSpan - 1 > rows) return false;
+                    for (const ew of cL) { if (ew.id === wtp.id) continue; if (doRectanglesOverlap(tC, tR, wtp.colSpan, wtp.rowSpan, ew.colStart, ew.rowStart, ew.colSpan, ew.rowSpan)) return false; }
+                    return true;
+                };
+
+                if (canPlaceCustom(checkWidget, c, r, newLayout, newCols, newRows)) {
+                    newLayout.push({ ...widget, colStart: c, rowStart: r });
+                    placed = true;
+                    break;
+                }
+            }
+            if (placed) break;
+        }
+        if (!placed) {
+             console.warn(`[performAutoSortWithGivenGrid] Could not place widget: ${widget.id}`);
+            return null;
+        }
+    }
+    return newLayout;
+  }, [doRectanglesOverlap]); // Added doRectanglesOverlap dependency
+
+
+  const handleChangeCellSize = useCallback((newCellSize: number) => {
+    if (newCellSize === cellSize || maximizedWidgetId) return;
+
+    const oldCellSize = cellSize;
+    console.log(`[Grid Density] Changing from ${oldCellSize}px to ${newCellSize}px`);
+
+    const scaledWidgets = widgets.map(w => {
+        const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(b => b.type === w.type);
+        if (!blueprint) return w;
+
+        const currentPixelWidth = w.colSpan * oldCellSize;
+        const currentPixelHeight = w.rowSpan * oldCellSize;
+        const currentPixelX = (w.colStart - 1) * oldCellSize;
+        const currentPixelY = (w.rowStart - 1) * oldCellSize;
+
+        const newColSpan = Math.max(blueprint.minColSpan, Math.max(1, Math.round(currentPixelWidth / newCellSize))); // Changed let to const
+        const newRowSpan = Math.max(blueprint.minRowSpan, Math.max(1, Math.round(currentPixelHeight / newCellSize))); // Changed let to const
+
+        const newColStart = Math.max(1, Math.round(currentPixelX / newCellSize) + 1); // Changed let to const
+        const newRowStart = Math.max(1, Math.round(currentPixelY / newCellSize) + 1); // Changed let to const
+
+        return {
+            ...w,
+            colSpan: newColSpan,
+            rowSpan: newRowSpan,
+            colStart: newColStart,
+            rowStart: newRowStart,
+        };
+    });
+
+    setCellSize(newCellSize);
+
+    const tempNewCols = Math.floor(window.innerWidth / newCellSize);
+    const tempNewRows = Math.floor((window.innerHeight - (headerRef.current?.offsetHeight || 60)) / newCellSize);
+
+    const sortedLayout = performAutoSortWithGivenGrid(scaledWidgets, tempNewCols, tempNewRows);
+
+    if (sortedLayout) {
+        setWidgets(sortedLayout);
+        updateWidgetsAndPushToHistory(sortedLayout, `grid_density_change_${newCellSize}`);
+    } else {
+        console.warn("[Grid Density] Auto-sort after scaling failed. Layout might need manual adjustment.");
+        setWidgets(scaledWidgets);
+        updateWidgetsAndPushToHistory(scaledWidgets, `grid_density_change_scaled_only_${newCellSize}`);
+        alert("Grid density changed. Some widgets may need manual readjustment or use the 'Sort Grid' button.");
+    }
+    setIsDensityMenuOpen(false);
+
+  }, [cellSize, widgets, maximizedWidgetId, updateWidgetsAndPushToHistory, performAutoSortWithGivenGrid]); // Added performAutoSortWithGivenGrid
+
 
   const handleWidgetResizeLive = (id: string, newGeometry: WidgetResizeDataType) => { if (isPerformingUndoRedo.current || maximizedWidgetId) return; setWidgets(currentWidgets => currentWidgets.map(w => w.id === id ? { ...w, ...newGeometry, isMinimized: false } : w)); };
   const handleWidgetResizeEnd = (id: string, finalGeometry: WidgetResizeDataType) => { if (maximizedWidgetId) return; setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.map(w => w.id === id ? { ...w, ...finalGeometry, isMinimized: false, originalRowSpan: undefined } : w); updateWidgetsAndPushToHistory(updatedWidgets, `resize_end_${id}`); return updatedWidgets; }); setActiveWidgetId(id); };
   const handleWidgetMove = (id: string, newPosition: WidgetMoveDataType) => { if (maximizedWidgetId) return; const currentWidget = widgets.find(w => w.id === id); if (!currentWidget) return; if (currentWidget.colStart !== newPosition.colStart || currentWidget.rowStart !== newPosition.rowStart) { setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.map(w => w.id === id ? { ...w, ...newPosition } : w); updateWidgetsAndPushToHistory(updatedWidgets, `move_${id}`); return updatedWidgets; }); } setActiveWidgetId(id); };
   const handleWidgetDelete = (idToDelete: string) => { if (maximizedWidgetId === idToDelete) { setMaximizedWidgetId(null); setMaximizedWidgetOriginalState(null); } setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.filter(widget => widget.id !== idToDelete); updateWidgetsAndPushToHistory(updatedWidgets, `delete_${idToDelete}`); return updatedWidgets; }); if (activeWidgetId === idToDelete) setActiveWidgetId(null); };
   const handleWidgetFocus = (id: string) => { if (maximizedWidgetId && maximizedWidgetId !== id) return; setActiveWidgetId(id); };
-
   const handleOpenWidgetSettings = (widgetId: string) => { if (maximizedWidgetId && maximizedWidgetId !== widgetId) return; const widgetToEdit = widgets.find(w => w.id === widgetId); if (widgetToEdit) { setActiveWidgetId(widgetId); setSelectedWidgetForSettings(widgetToEdit); setIsSettingsModalOpen(true); } };
   const handleCloseSettingsModal = () => { setIsSettingsModalOpen(false); setSelectedWidgetForSettings(null); };
   const handleSaveWidgetInstanceSettings = useCallback((widgetId: string, newInstanceSettings: AllWidgetSettings) => { setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.map(w => w.id === widgetId ? { ...w, settings: { ...(w.settings || {}), ...newInstanceSettings } } : w); updateWidgetsAndPushToHistory(updatedWidgets, `save_settings_${widgetId}`); return updatedWidgets; }); setActiveWidgetId(widgetId); }, [updateWidgetsAndPushToHistory]);
-
-  const handleOpenContainerSettingsModal = (widgetId: string) => {
-    if (maximizedWidgetId && maximizedWidgetId !== widgetId) return;
-    const widgetToEdit = widgets.find(w => w.id === widgetId);
-    if (widgetToEdit) {
-      setActiveWidgetId(widgetId);
-      setSelectedWidgetForContainerSettings(widgetToEdit);
-      setIsContainerSettingsModalOpen(true);
-    }
-  };
-  const handleCloseContainerSettingsModal = () => {
-    setIsContainerSettingsModalOpen(false);
-    setSelectedWidgetForContainerSettings(null);
-  };
-  const handleSaveWidgetContainerSettings = useCallback((widgetId: string, newContainerSettings: WidgetContainerSettings) => {
-    setWidgets(currentWidgets => {
-        const updatedWidgets = currentWidgets.map(w => {
-            if (w.id === widgetId) {
-                const existingContainerSettings = w.containerSettings || DEFAULT_WIDGET_CONTAINER_SETTINGS;
-                return { ...w, containerSettings: { ...existingContainerSettings, ...newContainerSettings } };
-            }
-            return w;
-        });
-        updateWidgetsAndPushToHistory(updatedWidgets, `save_container_settings_${widgetId}`);
-        return updatedWidgets;
-    });
-    setActiveWidgetId(widgetId);
-  }, [updateWidgetsAndPushToHistory]);
-
-
+  const handleOpenContainerSettingsModal = (widgetId: string) => { if (maximizedWidgetId && maximizedWidgetId !== widgetId) return; const widgetToEdit = widgets.find(w => w.id === widgetId); if (widgetToEdit) { setActiveWidgetId(widgetId); setSelectedWidgetForContainerSettings(widgetToEdit); setIsContainerSettingsModalOpen(true); } };
+  const handleCloseContainerSettingsModal = () => { setIsContainerSettingsModalOpen(false); setSelectedWidgetForContainerSettings(null); };
+  const handleSaveWidgetContainerSettings = useCallback((widgetId: string, newContainerSettings: WidgetContainerSettings) => { setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.map(w => { if (w.id === widgetId) { const existingContainerSettings = w.containerSettings || DEFAULT_WIDGET_CONTAINER_SETTINGS; return { ...w, containerSettings: { ...existingContainerSettings, ...newContainerSettings } }; } return w; }); updateWidgetsAndPushToHistory(updatedWidgets, `save_container_settings_${widgetId}`); return updatedWidgets; }); setActiveWidgetId(widgetId); }, [updateWidgetsAndPushToHistory]);
   const handleWidgetMinimizeToggle = (widgetId: string) => { if (maximizedWidgetId) return; setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.map(w => { if (w.id === widgetId) { if (w.isMinimized) { return { ...w, isMinimized: false, rowSpan: w.originalRowSpan || w.rowSpan, originalRowSpan: undefined }; } else { return { ...w, isMinimized: true, originalRowSpan: w.rowSpan, rowSpan: MINIMIZED_WIDGET_ROW_SPAN }; } } return w; }); updateWidgetsAndPushToHistory(updatedWidgets, `minimize_toggle_${widgetId}`); return updatedWidgets; }); setActiveWidgetId(widgetId); };
   const handleWidgetMaximizeToggle = (widgetId: string) => { const widgetToToggle = widgets.find(w => w.id === widgetId); if (!widgetToToggle) return; if (maximizedWidgetId === widgetId) { setMaximizedWidgetId(null); setMaximizedWidgetOriginalState(null); setActiveWidgetId(widgetId); } else { let originalStateForMaximize = JSON.parse(JSON.stringify(widgetToToggle)); if (widgetToToggle.isMinimized) { originalStateForMaximize = { ...originalStateForMaximize, isMinimized: false, rowSpan: widgetToToggle.originalRowSpan || widgetToToggle.rowSpan, originalRowSpan: undefined }; } setMaximizedWidgetOriginalState(originalStateForMaximize); setMaximizedWidgetId(widgetId); setActiveWidgetId(widgetId); } };
-
   const handleUndo = () => { if (historyPointer.current > 0) { isPerformingUndoRedo.current = true; const newPointer = historyPointer.current - 1; historyPointer.current = newPointer; const historicWidgets = JSON.parse(JSON.stringify(history.current[newPointer])); setWidgets(historicWidgets); setActiveWidgetId(null); setMaximizedWidgetId(null); setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length }); requestAnimationFrame(() => { isPerformingUndoRedo.current = false; }); } };
   const handleRedo = () => { if (historyPointer.current < history.current.length - 1) { isPerformingUndoRedo.current = true; const newPointer = historyPointer.current + 1; historyPointer.current = newPointer; const historicWidgets = JSON.parse(JSON.stringify(history.current[newPointer])); setWidgets(historicWidgets); setActiveWidgetId(null); setMaximizedWidgetId(null); setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length }); requestAnimationFrame(() => { isPerformingUndoRedo.current = false; }); } };
-
   const handleSharedTodosChange = (newGlobalTodos: TodoItem[]) => { setSharedTodos(newGlobalTodos); };
   const handleSharedPhotoHistoryChange = (newGlobalPhotoHistory: HistoricImage[]) => { setSharedPhotoHistory(newGlobalPhotoHistory); };
 
+
+  const handleDashboardContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    let clickedOnWidgetOrInteractiveContent = false;
+    for (const widget of widgets) {
+        if (target.closest(`#${CSS.escape(widget.id)}`)) {
+            clickedOnWidgetOrInteractiveContent = true;
+            break;
+        }
+    }
+    if (target.closest('button, a, input, select, textarea, [role="button"], [role="link"], [contenteditable="true"]')) {
+        if (target !== dashboardAreaRef.current && target.id !== 'widget-grid-container' && !target.closest('.grid-background-svg')) {
+            clickedOnWidgetOrInteractiveContent = true;
+        }
+    }
+
+    if (clickedOnWidgetOrInteractiveContent) { return; }
+
+    if ( target === dashboardAreaRef.current || target.id === 'widget-grid-container' || target.closest('.grid-background-svg') ) {
+        event.preventDefault();
+        setIsAddWidgetMenuOpen(false);
+        setContextMenuPosition({ x: event.clientX, y: event.clientY });
+        setIsAddWidgetContextMenuOpen(true);
+        setActiveWidgetId(null);
+    }
+  };
+
+  const handleCloseContextMenu = () => {
+    setIsAddWidgetContextMenuOpen(false);
+  };
+
   const renderWidgetContent = (widgetConfig: PageWidgetConfig) => {
     const currentWidgetSettings = widgetConfig.settings || {};
+    const notesSettings = currentWidgetSettings as PageInstanceNotesSettings | undefined;
+
     switch (widgetConfig.type) {
       case 'weather': return <WeatherWidget id={widgetConfig.id} settings={currentWidgetSettings as WeatherWidgetSettings | undefined} />;
       case 'clock': return <ClockWidget id={widgetConfig.id} settings={currentWidgetSettings as ClockWidgetSettings | undefined} />;
@@ -690,9 +948,8 @@ export default function Home() {
       case 'countdownStopwatch': return <CountdownStopwatchWidget id={widgetConfig.id} settings={currentWidgetSettings as CountdownStopwatchWidgetSettings | undefined} />;
       case 'photo': return <PhotoWidget id={widgetConfig.id} settings={currentWidgetSettings as PhotoWidgetSettings | undefined} onSettingsChange={handleSaveWidgetInstanceSettings} sharedHistory={sharedPhotoHistory} onSharedHistoryChange={handleSharedPhotoHistoryChange} />;
       case 'todo': return <TodoWidget instanceId={widgetConfig.id} settings={currentWidgetSettings as TodoWidgetSettings | undefined} todos={sharedTodos} onTodosChange={handleSharedTodosChange} />;
-      case 'notes': return <NotesWidget instanceId={widgetConfig.id} settings={currentWidgetSettings as PageInstanceNotesSettings | undefined} notes={sharedNotes} activeNoteId={activeSharedNoteId} onNotesChange={setSharedNotes} onActiveNoteIdChange={setActiveSharedNoteId} />;
+      case 'notes': return <NotesWidget instanceId={widgetConfig.id} settings={notesSettings} notes={sharedNotes} activeNoteId={activeSharedNoteId} onNotesChange={setSharedNotes} onActiveNoteIdChange={setActiveSharedNoteId} />;
       case 'portfolio': return <PortfolioWidget settings={currentWidgetSettings as PortfolioWidgetSettings | undefined} />;
-      // Add Gemini Chat Widget rendering
       case 'geminiChat': return <GeminiChatWidget instanceId={widgetConfig.id} settings={currentWidgetSettings as GeminiChatWidgetSettings | undefined} />;
       default: return <p className="text-xs text-secondary italic">Generic widget content.</p>;
     }
@@ -702,6 +959,8 @@ export default function Home() {
     if (!widgetConfig) return null; const currentContentSettings = widgetConfig.settings || {};
     const boundSaveInstanceContentSettings = (newInstanceContentSettings: AllWidgetSettings) => { handleSaveWidgetInstanceSettings(widgetConfig.id, newInstanceContentSettings); handleCloseSettingsModal(); };
     const boundSavePhotoInstanceContentSettings = (newInstancePhotoSettings: PhotoWidgetSettings) => { handleSaveWidgetInstanceSettings(widgetConfig.id, newInstancePhotoSettings); handleCloseSettingsModal(); };
+    const notesSettingsPanel = currentContentSettings as PageInstanceNotesSettings | undefined;
+
     switch (widgetConfig.type) {
       case 'weather': return <WeatherSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as WeatherWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} />;
       case 'clock': return <ClockSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as ClockWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} />;
@@ -711,14 +970,14 @@ export default function Home() {
       case 'unitConverter': return <UnitConverterSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as UnitConverterWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} />;
       case 'countdownStopwatch': return <CountdownStopwatchSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as CountdownStopwatchWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} />;
       case 'photo': return <PhotoSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as PhotoWidgetSettings | undefined} onSaveInstanceSettings={boundSavePhotoInstanceContentSettings} onClearGlobalHistory={() => { handleSharedPhotoHistoryChange([]); alert('Global photo history has been cleared.'); }} globalHistoryLength={sharedPhotoHistory.length} />;
-      case 'notes': return <NotesSettingsPanel widgetInstanceId={widgetConfig.id} currentSettings={currentContentSettings as PageInstanceNotesSettings | undefined} onSaveLocalSettings={boundSaveInstanceContentSettings} onClearAllNotesGlobal={() => { setSharedNotes([]); setActiveSharedNoteId(null); alert("All notes have been cleared from the dashboard."); }} />;
+      case 'notes': return <NotesSettingsPanel widgetInstanceId={widgetConfig.id} currentSettings={notesSettingsPanel} onSaveLocalSettings={boundSaveInstanceContentSettings} onClearAllNotesGlobal={() => { setSharedNotes([]); setActiveSharedNoteId(null); alert("All notes have been cleared from the dashboard."); }} />;
       case 'todo': return <TodoSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as TodoWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} onClearAllTasks={() => { handleSharedTodosChange([]); alert(`The global to-do list has been cleared.`); }} />;
       case 'portfolio': return <PortfolioSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as PortfolioWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} />;
-      // Add Gemini Chat Widget settings panel
       case 'geminiChat': return <GeminiChatSettingsPanel widgetInstanceId={widgetConfig.id} currentSettings={currentContentSettings as GeminiChatWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} />;
       default: return <p className="text-sm text-secondary">No specific content settings available for this widget type.</p>;
     }
   };
+
 
   if (!initialLoadAttempted.current || widgetContainerCols === 0 || widgetContainerRows === 0) {
     return <div className="w-full h-screen bg-page-background flex items-center justify-center text-page-foreground">Loading Dashboard...</div>;
@@ -726,16 +985,63 @@ export default function Home() {
 
   return (
     <main className="w-full h-screen bg-page-background text-page-foreground overflow-hidden relative flex flex-col"
-      onClick={(e) => { if (e.target === e.currentTarget && !maximizedWidgetId) setActiveWidgetId(null); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !maximizedWidgetId && !isAddWidgetContextMenuOpen) {
+            setActiveWidgetId(null);
+        }
+        if (isAddWidgetContextMenuOpen && e.target === e.currentTarget) {
+            handleCloseContextMenu();
+        }
+      }}
+      onContextMenu={handleDashboardContextMenu}
     >
       <header ref={headerRef} className="p-3 bg-dark-surface text-primary flex items-center justify-between shadow-lg z-40 shrink-0 border-b border-[var(--dark-border-interactive)]">
         <div className="flex items-center space-x-2">
           <button onClick={handleUndo} disabled={historyPointer.current <= 0 || !!maximizedWidgetId} className="control-button" aria-label="Undo"><UndoIcon /></button>
           <button onClick={handleRedo} disabled={historyPointer.current >= history.current.length - 1 || !!maximizedWidgetId} className="control-button" aria-label="Redo"><RedoIcon /></button>
+
           <div className="relative" ref={addWidgetMenuRef}>
-            <button id="add-widget-button" onClick={() => setIsAddWidgetMenuOpen(prev => !prev)} disabled={!!maximizedWidgetId} className="control-button flex items-center" aria-expanded={isAddWidgetMenuOpen} aria-haspopup="true" aria-label="Add New Widget" > <AddIcon /> <span className="ml-1.5 text-xs hidden sm:inline">Add Widget</span> </button>
+            <button id="add-widget-button" onClick={() => {setIsAddWidgetMenuOpen(prev => !prev); setIsAddWidgetContextMenuOpen(false); setIsDensityMenuOpen(false);}} disabled={!!maximizedWidgetId} className="control-button flex items-center" aria-expanded={isAddWidgetMenuOpen} aria-haspopup="true" aria-label="Add New Widget" > <AddIcon /> <span className="ml-1.5 text-xs hidden sm:inline">Add Widget</span> </button>
             {isAddWidgetMenuOpen && ( <div className="absolute backdrop-blur-md left-0 mt-2 w-56 origin-top-left rounded-md bg-dark-surface border border-dark-border-interactive shadow-xl py-1 z-50 focus:outline-none animate-modalFadeInScale" role="menu" aria-orientation="vertical" aria-labelledby="add-widget-button" > {AVAILABLE_WIDGET_DEFINITIONS.map(widgetDef => ( <button key={widgetDef.type} onClick={() => handleAddNewWidget(widgetDef.type)} className="group flex items-center w-full text-left px-3 py-2.5 text-sm text-dark-text-primary hover:bg-dark-accent-primary hover:text-dark-text-on-accent focus:bg-dark-accent-primary focus:text-dark-text-on-accent focus:outline-none transition-all duration-150 ease-in-out hover:pl-4" role="menuitem" disabled={!!maximizedWidgetId} > {widgetDef.icon && <widgetDef.icon />} <span className="flex-grow">{widgetDef.displayName || widgetDef.defaultTitle.replace("New ", "")}</span> </button> ))} </div> )}
           </div>
+
+           <div className="relative" ref={densityMenuRef}>
+            <button
+              onClick={() => {setIsDensityMenuOpen(prev => !prev); setIsAddWidgetMenuOpen(false);}}
+              disabled={!!maximizedWidgetId}
+              className="control-button flex items-center"
+              aria-expanded={isDensityMenuOpen}
+              aria-haspopup="true"
+              aria-label="Change Grid Density"
+              title="Change Grid Density"
+            >
+              <DensityIcon />
+              <span className="ml-1.5 text-xs hidden sm:inline">
+                {CELL_SIZE_OPTIONS.find(opt => opt.value === cellSize)?.label || `${cellSize}px`}
+              </span>
+            </button>
+            {isDensityMenuOpen && (
+              <div className="absolute backdrop-blur-md left-0 mt-2 w-40 origin-top-left rounded-md bg-dark-surface border border-dark-border-interactive shadow-xl py-1 z-50 focus:outline-none animate-modalFadeInScale" role="menu">
+                {CELL_SIZE_OPTIONS.map(option => (
+                  <button
+                    key={option.value}
+                    onClick={() => handleChangeCellSize(option.value)}
+                    className={`group flex items-center w-full text-left px-3 py-2.5 text-sm transition-all duration-150 ease-in-out
+                                ${cellSize === option.value
+                                    ? 'bg-dark-accent-primary-hover text-dark-text-on-accent font-semibold'
+                                    : 'text-dark-text-primary hover:bg-dark-accent-primary hover:text-dark-text-on-accent focus:bg-dark-accent-primary focus:text-dark-text-on-accent'
+                                }`}
+                    role="menuitem"
+                    disabled={!!maximizedWidgetId}
+                  >
+                    {option.label} ({option.value}px)
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button onClick={handleAutoSortButtonClick} disabled={!!maximizedWidgetId || widgets.length === 0} className="control-button flex items-center" aria-label="Auto Sort Grid"> <AutoSortIcon /> <span className="ml-1.5 text-xs hidden sm:inline">Sort Grid</span> </button>
           <button onClick={handleExportLayout} disabled={!!maximizedWidgetId} className="control-button" aria-label="Export Layout"><ExportIcon /></button>
           <button onClick={triggerImportFileSelect} disabled={!!maximizedWidgetId} className="control-button" aria-label="Import Layout"><ImportIcon /></button>
           <input type="file" ref={fileInputRef} onChange={handleImportLayout} accept=".json" style={{ display: 'none' }} />
@@ -743,16 +1049,39 @@ export default function Home() {
         <div className="text-xs text-secondary px-3 py-1 bg-slate-700 rounded-md">History: {historyDisplay.pointer} / {historyDisplay.length}</div>
       </header>
 
-      {maximizedWidgetId && ( <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-30" onClick={() => maximizedWidgetId && handleWidgetMaximizeToggle(maximizedWidgetId)} /> )}
+      {maximizedWidgetId && ( <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[45]" onClick={() => maximizedWidgetId && handleWidgetMaximizeToggle(maximizedWidgetId)} /> )}
 
-      <div className={`flex-grow relative ${maximizedWidgetId ? 'pointer-events-none' : ''}`}>
-        <GridBackground />
-        <div className="absolute inset-0 grid gap-0" style={{ gridTemplateColumns: `repeat(${widgetContainerCols}, ${CELL_SIZE}px)`, gridTemplateRows: `repeat(${widgetContainerRows}, ${CELL_SIZE}px)`, alignContent: 'start' }}>
+      <div ref={dashboardAreaRef} className={`flex-grow relative ${maximizedWidgetId ? 'pointer-events-none' : ''}`}>
+        <GridBackground cellSize={cellSize} />
+        <div
+            id="widget-grid-container"
+            className="absolute inset-0 grid gap-0"
+            style={{
+                gridTemplateColumns: `repeat(${widgetContainerCols}, ${cellSize}px)`,
+                gridTemplateRows: `repeat(${widgetContainerRows}, ${cellSize}px)`,
+                alignContent: 'start'
+            }}
+        >
           {widgets.map((widgetConfig) => {
             if (maximizedWidgetId && maximizedWidgetId !== widgetConfig.id) return null;
-            const currentWidgetState = maximizedWidgetId === widgetConfig.id && maximizedWidgetOriginalState ? { ...maximizedWidgetOriginalState, colStart: 1, rowStart: 1, colSpan: widgetContainerCols > 2 ? widgetContainerCols - 2 : widgetContainerCols, rowSpan: widgetContainerRows > 2 ? widgetContainerRows - 2 : widgetContainerRows, isMinimized: false } : widgetConfig;
-            const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(def => def.type === widgetConfig.type); let minCol = blueprint?.minColSpan || 3; let minRow = blueprint?.minRowSpan || 3;
-            if (widgetConfig.isMinimized && maximizedWidgetId !== widgetConfig.id) { minCol = widgetConfig.colSpan; minRow = MINIMIZED_WIDGET_ROW_SPAN; }
+            const currentWidgetState = maximizedWidgetId === widgetConfig.id && maximizedWidgetOriginalState
+                ? {
+                    ...maximizedWidgetOriginalState,
+                    colStart: 1,
+                    rowStart: 1,
+                    colSpan: widgetContainerCols > 2 ? widgetContainerCols - 1 : widgetContainerCols,
+                    rowSpan: widgetContainerRows > 2 ? widgetContainerRows - 1 : widgetContainerRows,
+                    isMinimized: false,
+                  }
+                : widgetConfig;
+
+            let minCol = widgetConfig.minColSpan;
+            let minRow = widgetConfig.minRowSpan;
+
+            if (widgetConfig.isMinimized && maximizedWidgetId !== widgetConfig.id) {
+                minCol = widgetConfig.colSpan;
+                minRow = MINIMIZED_WIDGET_ROW_SPAN;
+            }
 
             return (
               <Widget
@@ -763,8 +1092,9 @@ export default function Home() {
                 onOpenSettings={handleOpenWidgetSettings}
                 onOpenContainerSettings={handleOpenContainerSettingsModal}
                 containerSettings={widgetConfig.containerSettings}
-                isActive={widgetConfig.id === activeWidgetId && !maximizedWidgetId} CELL_SIZE={CELL_SIZE}
-                minColSpan={minCol} minRowSpan={minRow} totalGridCols={widgetContainerCols} totalGridRows={widgetContainerRows}
+                isActive={widgetConfig.id === activeWidgetId && !maximizedWidgetId} CELL_SIZE={cellSize}
+                minColSpan={minCol} minRowSpan={minRow}
+                totalGridCols={widgetContainerCols} totalGridRows={widgetContainerRows}
                 isMinimized={widgetConfig.isMinimized && maximizedWidgetId !== widgetConfig.id} onMinimizeToggle={() => handleWidgetMinimizeToggle(widgetConfig.id)}
                 isMaximized={maximizedWidgetId === widgetConfig.id} onMaximizeToggle={() => handleWidgetMaximizeToggle(widgetConfig.id)}
               >
@@ -777,23 +1107,37 @@ export default function Home() {
 
       {isSettingsModalOpen && selectedWidgetForSettings && (
         <SettingsModal
-          isOpen={isSettingsModalOpen}
-          onClose={handleCloseSettingsModal}
-          title={selectedWidgetForSettings.title}
-          settingsContent={getSettingsPanelForWidget(selectedWidgetForSettings)}
+            isOpen={isSettingsModalOpen}
+            onClose={handleCloseSettingsModal}
+            title={selectedWidgetForSettings.title}
+            settingsContent={getSettingsPanelForWidget(selectedWidgetForSettings)}
+        />
+      )}
+      {isContainerSettingsModalOpen && selectedWidgetForContainerSettings && (
+        <WidgetContainerSettingsModal
+            isOpen={isContainerSettingsModalOpen}
+            onClose={handleCloseContainerSettingsModal}
+            widgetId={selectedWidgetForContainerSettings.id}
+            widgetTitle={selectedWidgetForContainerSettings.title}
+            currentSettings={selectedWidgetForContainerSettings.containerSettings}
+            onSave={handleSaveWidgetContainerSettings}
+            availableSizePresets={WIDGET_SIZE_PRESETS}
+            onApplySizePreset={handleApplyWidgetSizePreset}
+            currentWidgetSize={{ colSpan: selectedWidgetForContainerSettings.colSpan, rowSpan: selectedWidgetForContainerSettings.rowSpan }}
         />
       )}
 
-      {isContainerSettingsModalOpen && selectedWidgetForContainerSettings && (
-        <WidgetContainerSettingsModal
-          isOpen={isContainerSettingsModalOpen}
-          onClose={handleCloseContainerSettingsModal}
-          widgetId={selectedWidgetForContainerSettings.id}
-          widgetTitle={selectedWidgetForContainerSettings.title}
-          currentSettings={selectedWidgetForContainerSettings.containerSettings}
-          onSave={handleSaveWidgetContainerSettings}
-        />
-      )}
+      <AddWidgetContextMenu
+        isOpen={isAddWidgetContextMenuOpen}
+        onClose={handleCloseContextMenu}
+        position={contextMenuPosition}
+        onAddWidget={handleAddNewWidget}
+        availableWidgets={contextMenuAvailableWidgets}
+        widgetContainerCols={widgetContainerCols}
+        widgetContainerRows={widgetContainerRows}
+        CELL_SIZE={cellSize}
+        headerHeight={headerRef.current?.offsetHeight}
+      />
     </main>
   );
 }

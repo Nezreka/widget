@@ -130,7 +130,6 @@ export const WeatherSettingsPanel: React.FC<WeatherSettingsPanelProps> = ({ widg
 
 
 // --- Main WeatherWidget Component ---
-// The 'id' prop is accepted here due to WeatherWidgetProps, but not destructured or used directly in this component's body.
 const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
   const [weatherData, setWeatherData] = useState<TomorrowWeatherData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -168,10 +167,14 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
 
     let locationToQuery: string | undefined | null = settings?.location;
     if (settings?.useCurrentLocation) {
-      if (geoCoordinates) locationToQuery = geoCoordinates;
-      else {
-        if (!isRequestingGeo) setError("Could not get current location. Check permissions or enter manually.");
-        setLoading(false); return;
+      if (geoCoordinates) {
+        locationToQuery = geoCoordinates;
+      } else {
+        if (!isRequestingGeo) {
+            setError("Could not get current location. Check permissions or enter manually.");
+        }
+        setLoading(false); 
+        return;
       }
     }
 
@@ -181,7 +184,7 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
     }
 
     setLoading(true); setError(null);
-    const trimmedLocation = locationToQuery.trim();
+    const trimmedLocation = locationToQuery.trim(); // This will be lat,lon if useCurrentLocation is true
     const locationQueryParam = encodeURIComponent(trimmedLocation);
     const unitsQuery = settings?.units || 'imperial';
     const realtimeFields = "temperature,temperatureApparent,weatherCode,humidity,windSpeed,windDirection";
@@ -220,10 +223,22 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
         weatherCode: item.values.weatherCode,
       })) || [];
 
+      // MODIFIED: Logic to determine display name
+      let displayName;
+      if (realtimeData.location?.name) {
+        displayName = realtimeData.location.name; // Prefer API-provided name
+      } else if (settings?.useCurrentLocation) {
+        // If using current location and API didn't provide a name, use a generic placeholder
+        displayName = "Current Location";
+      } else {
+        // If manual location and API didn't provide a specific name, use the user's input
+        displayName = trimmedLocation; 
+      }
+
       setWeatherData({
         current: realtimeData.data.values,
         hourly: processedHourly,
-        locationDisplay: { name: realtimeData.location?.name || trimmedLocation }
+        locationDisplay: { name: displayName } // Use the determined displayName
       });
 
     } catch (err: unknown) {
@@ -262,19 +277,25 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
         setIsRequestingGeo(false); setLoading(false);
       }
     } else {
-      setGeoCoordinates(null); setIsRequestingGeo(false);
+      setGeoCoordinates(null); setIsRequestingGeo(false); // Clear geoCoordinates if not using current location
     }
   }, [settings?.useCurrentLocation]);
 
   useEffect(() => {
-    if (settings?.useCurrentLocation && isRequestingGeo) return;
-    if (settings?.useCurrentLocation && !geoCoordinates && !settings.location) {
-      if(!error) setError("Location needed."); setLoading(false); return;
+    // Prevent fetching if 'useCurrentLocation' is true but geoCoordinates are not yet available (still requesting or error).
+    if (settings?.useCurrentLocation && (isRequestingGeo || !geoCoordinates)) {
+        if (!isRequestingGeo && !geoCoordinates && !error) { // Only set error if not already requesting and no geoCoords
+             setError("Waiting for location data or permission...");
+        }
+        setLoading(false); // Ensure loading is false if we can't fetch
+        return;
     }
+    // If not using current location, or if using current location and geoCoordinates are available
     fetchWeatherData();
-  // The ESLint warning for missing 'error' and 'isRequestingGeo' in the dependency array
-  // is intentional here. Adding them can cause re-fetch loops under certain error/geo-requesting conditions.
-  // The logic is structured to prevent fetches while geo is pending or if an error already exists that needs user action.
+  // The ESLint warning for missing 'error' in the dependency array
+  // is acceptable here as 'error' state changes are handled internally or trigger UI updates,
+  // and adding it could cause re-fetch loops under certain error conditions.
+  // isRequestingGeo is also intentionally omitted for similar reasons.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings?.location, settings?.units, settings?.useCurrentLocation, geoCoordinates, fetchWeatherData]);
 
@@ -289,7 +310,7 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
   if (isRequestingGeo && settings?.useCurrentLocation && !error) {
     return <div className={`${commonMessageStyles} ${neumorphicMessageCardStyles}`}>Getting current location...</div>;
   }
-  if (loading && !error) {
+  if (loading && !error) { // Only show general loading if not specifically an error or geo-requesting phase
     return <div className={`${commonMessageStyles} ${neumorphicMessageCardStyles}`}>Loading weather data...</div>;
   }
   if (error) {
@@ -298,7 +319,14 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
         <p className="font-semibold">Error:</p>
         <p className="text-sm mb-3">{error}</p>
         <button
-          onClick={fetchWeatherData}
+          onClick={() => {
+            setError(null); // Clear error before retrying
+            if (settings?.useCurrentLocation && !geoCoordinates) { // If error was due to geo, re-trigger geo request
+                setIsRequestingGeo(true); // This will re-trigger the geo useEffect
+            } else {
+                fetchWeatherData(); // Otherwise, just fetch weather
+            }
+          }}
           className="mt-2 px-4 py-2 text-xs bg-accent-primary text-on-accent rounded-md hover:bg-accent-primary-hover"
         >
           Retry
@@ -311,7 +339,10 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
   }
 
   const { current, hourly, locationDisplay } = weatherData;
-  const locationName = locationDisplay?.name || (settings?.useCurrentLocation && geoCoordinates ? "Current Location" : settings?.location) || "Selected Location";
+  // The locationName rendering logic will now use the improved weatherData.locationDisplay.name
+  const locationName = locationDisplay?.name || 
+                       (settings?.useCurrentLocation && geoCoordinates ? "Current Location" : settings?.location) || 
+                       "Selected Location";
 
   return (
     <div
@@ -359,7 +390,7 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
                 </div>
               </div>
             ))}
-            <div className="flex-shrink-0 w-0.5"></div>
+            <div className="flex-shrink-0 w-0.5"></div> {/* Spacer for better scroll */}
           </div>
         </div>
       )}

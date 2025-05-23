@@ -46,7 +46,7 @@ export interface GeminiChatWidgetSettings {
 interface SessionChatMessage {
     role: 'user' | 'model';
     text: string;
-    timestamp: number; 
+    timestamp: number;
 }
 
 // Props expected by this widget when used within the dashboard framework
@@ -55,7 +55,9 @@ interface GeminiChatWidgetProps {
     settings?: GeminiChatWidgetSettings;
 }
 
-const GeminiChatWidget: React.FC<GeminiChatWidgetProps> = ({ instanceId, settings }) => {
+const GeminiChatWidget: React.FC<GeminiChatWidgetProps> = ({ /* instanceId, */ settings }) => {
+    // instanceId is passed but not used in this component. Commenting out to satisfy lint.
+    // If it's needed for future features (e.g., saving chat history per instance), it can be uncommented.
     const [inputValue, setInputValue] = useState('');
     const [chatMessages, setChatMessages] = useState<SessionChatMessage[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -89,13 +91,13 @@ const GeminiChatWidget: React.FC<GeminiChatWidgetProps> = ({ instanceId, setting
                 role: msg.role,
                 parts: [{ text: msg.text }]
             }));
-            
-            const systemInstruction = settings?.customSystemPrompt 
-                ? { role: "system", parts: [{ text: settings.customSystemPrompt }] } 
+
+            const systemInstruction = settings?.customSystemPrompt
+                ? { role: "system", parts: [{ text: settings.customSystemPrompt }] }
                 : null;
-            
-            const contentsForApi = systemInstruction 
-                ? [systemInstruction, ...geminiChatHistory] 
+
+            const contentsForApi = systemInstruction
+                ? [systemInstruction, ...geminiChatHistory]
                 : geminiChatHistory;
 
             const payload = {
@@ -127,18 +129,22 @@ const GeminiChatWidget: React.FC<GeminiChatWidgetProps> = ({ instanceId, setting
             } else {
                 console.warn("Unexpected Gemini API response structure:", result);
             }
-            
+
             const newAiMessage: SessionChatMessage = { role: 'model', text: aiResponseText, timestamp: Date.now() };
             setChatMessages(prevMessages => [...prevMessages, newAiMessage]);
 
-        } catch (err: any) {
+        } catch (err: unknown) { // Changed 'any' to 'unknown'
             console.error('Error in handleSendMessage:', err);
-            setError(`Failed to get response. ${err.message}`);
+            if (err instanceof Error) {
+                setError(`Failed to get response. ${err.message}`);
+            } else {
+                setError('Failed to get response due to an unknown error.');
+            }
         } finally {
             setIsLoading(false);
         }
     };
-    
+
     const handleClearCurrentChat = () => {
         setShowClearConfirmModal(true);
     };
@@ -200,7 +206,7 @@ const GeminiChatWidget: React.FC<GeminiChatWidgetProps> = ({ instanceId, setting
     return (
         <>
             <style>{animationStyles}</style>
-            {/* This div is the main container for the chat content. 
+            {/* This div is the main container for the chat content.
                 It assumes the parent Widget component handles outer borders, title, etc.
                 The \`p-0\` innerPadding on the parent Widget (set in page.tsx for this widget type)
                 allows this component to control its own full background and padding.
@@ -218,18 +224,18 @@ const GeminiChatWidget: React.FC<GeminiChatWidgetProps> = ({ instanceId, setting
                         <ClearChatIcon />
                     </button>
                 </div>
-                
+
                 {/* Chat Messages Area */}
                 <div className="flex-grow p-4 md:p-5 space-y-4 overflow-y-auto gemini-chat-scrollbar">
                     {chatMessages.map((msg) => (
                         <div
-                            key={msg.timestamp} 
+                            key={msg.timestamp}
                             className={`flex message-animate-enter ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                         >
                             <div
                                 className={`max-w-[85%] md:max-w-[75%] py-2.5 px-4 rounded-xl shadow-md break-words ${
-                                    msg.role === 'user' 
-                                        ? 'bg-sky-700 text-white rounded-br-sm' 
+                                    msg.role === 'user'
+                                        ? 'bg-sky-700 text-white rounded-br-sm'
                                         : 'bg-slate-700 text-slate-200 rounded-bl-sm'
                                 }`}
                             >
@@ -237,7 +243,7 @@ const GeminiChatWidget: React.FC<GeminiChatWidgetProps> = ({ instanceId, setting
                             </div>
                         </div>
                     ))}
-                    <div ref={chatEndRef} /> 
+                    <div ref={chatEndRef} />
                 </div>
 
                 {error && <p className="p-3 text-center text-red-400 text-xs bg-slate-800/50 border-t border-slate-700/70 shrink-0">{error}</p>}
@@ -304,7 +310,7 @@ const GeminiChatWidget: React.FC<GeminiChatWidgetProps> = ({ instanceId, setting
 // Settings Panel for Gemini Chat Widget
 // Props match what page.tsx expects for settings panels
 interface GeminiChatSettingsPanelProps {
-    widgetInstanceId: string; 
+    widgetInstanceId: string;
     currentSettings: GeminiChatWidgetSettings | undefined;
     onSave: (newSettings: GeminiChatWidgetSettings) => void;
 }
@@ -321,7 +327,7 @@ export const GeminiChatSettingsPanel: React.FC<GeminiChatSettingsPanelProps> = (
         onSave({ customSystemPrompt: systemPrompt });
         // The modal will be closed by the \`onSave\` callback in page.tsx which calls \`handleCloseSettingsModal\`
     };
-    
+
     // Styling consistent with the masterclass theme for the settings panel itself
     return (
         <div className="space-y-5 text-slate-200"> {/* Adjusted text color for dark modal from page.tsx */}
@@ -338,7 +344,7 @@ export const GeminiChatSettingsPanel: React.FC<GeminiChatSettingsPanelProps> = (
                     className="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg text-sm placeholder-slate-400 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-colors duration-200 shadow-sm text-slate-100" // Ensure text is light
                 />
                 <p className="text-xs text-slate-400 mt-2">
-                    This instruction guides the AI's personality and response style for the current session. It's sent with each new conversation turn.
+                    This instruction guides the AI&apos;s personality and response style for the current session. It&apos;s sent with each new conversation turn.
                 </p>
             </div>
 
