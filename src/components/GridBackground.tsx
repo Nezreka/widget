@@ -322,7 +322,7 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
         timeOffsetLuminosity: Math.random() * 1000,
       });
     }
-  }, [config, masterHue]);
+  }, [config, masterHue]); // masterHue is a ref, its .current is used. If masterHue object itself could change, it's needed. Typically it's stable.
 
 
   const drawRevealedGrid = useCallback((canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
@@ -383,7 +383,7 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
         }
       });
     });
-  }, [config, cellSize, masterHue, animationTime]);
+  }, [config, cellSize, masterHue, animationTime]); // masterHue, animationTime are refs. If their .current is used, they usually don't need to be deps.
 
   const animate = useCallback((canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
     animationTime.current += 0.016; 
@@ -541,7 +541,7 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
     });
 
     animationFrameId.current = requestAnimationFrame(() => animate(canvas, ctx));
-  }, [config, drawRevealedGrid, initParticles, initCosmicDust, initNebulaClouds, cellSize]); // Added cellSize to dependencies of animate
+  }, [config, drawRevealedGrid]); // Corrected dependencies for animate
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -609,7 +609,6 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
       }
     };
   // Ensure all dependencies that might change and affect initialization or animation are included.
-  // Specifically, `animate` now depends on `cellSize` through `drawRevealedGrid`.
   }, [initParticles, initCosmicDust, initNebulaClouds, animate, config, cellSize]); 
 
   return (
