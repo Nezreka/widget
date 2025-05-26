@@ -1026,10 +1026,10 @@ export default function Home() {
       const addedWidgetInLayout = finalLayout.find(w => w.id === newWidgetConfigProcessed.id);
       if (addedWidgetInLayout) setActiveWidgetId(addedWidgetInLayout.id);
       else setActiveWidgetId(null);
-      speakText(`${widgetType} widget added.`);
+      //speakText(`${widgetType} widget added.`);
     } else {
       alert("No available space to add this widget, even after attempting to sort and shrink. Please make more room manually or try a smaller widget.");
-      speakText("No available space to add this widget.");
+      //speakText("No available space to add this widget.");
     }
     setIsAddWidgetMenuOpen(false);
     setIsAddWidgetContextMenuOpen(false);
