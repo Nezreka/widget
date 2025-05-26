@@ -57,16 +57,15 @@ type ResizeDirection = 'top' | 'bottom' | 'left' | 'right' | 'top-left' | 'top-r
 export interface WidgetResizeDataType { colStart: number; rowStart: number; colSpan: number; rowSpan: number; }
 export interface WidgetMoveDataType { colStart: number; rowStart: number; }
 
-// Ensure this interface matches what WidgetContainerSettingsModal expects
 export interface WidgetContainerSettings {
   containerBackgroundColor?: string;
   alwaysShowTitleBar?: boolean;
   innerPadding?: 'p-0' | 'px-1.5 py-1' | 'px-2.5 py-2' | 'px-3.5 py-3' | 'px-5 py-4';
-  borderColor?: string; // This field is crucial
-  opacity?: number;     // This field is crucial
+  borderColor?: string;
+  opacity?: number;
 }
 
-interface WidgetProps {
+export interface WidgetProps {
   id: string;
   colStart: number;
   rowStart: number;
@@ -87,14 +86,14 @@ interface WidgetProps {
   totalGridCols?: number;
   totalGridRows?: number;
   isMinimized?: boolean;
-  // isDraggable?: boolean; // Can be controlled by isLocked
-  // isResizable?: boolean; // Can be controlled by isLocked
+  isDraggable?: boolean; // Re-added: Controls if widget can be dragged by title bar
+  isResizable?: boolean; // Re-added: Controls if widget shows resize handles
   onMinimizeToggle?: (id: string) => void;
   isMaximized?: boolean;
   onMaximizeToggle?: (id: string) => void;
   containerSettings?: WidgetContainerSettings;
   onOpenContainerSettings?: (id: string) => void;
-  isLocked?: boolean;
+  isLocked?: boolean; // Overrides isDraggable and isResizable if true
   onLockToggle?: (id: string) => void;
   customHeaderControls?: React.ReactNode;
   disableHeader?: boolean;
@@ -105,7 +104,10 @@ const Widget: React.FC<WidgetProps> = ({
   id, colStart, rowStart, colSpan, rowSpan, title = "My Widget", children,
   onResize, onResizeEnd, onMove, onDelete, onFocus, onOpenSettings,
   isActive, CELL_SIZE, minColSpan = 1, minRowSpan = 1, totalGridCols = Infinity, totalGridRows = Infinity,
-  isMinimized, onMinimizeToggle, isMaximized, onMaximizeToggle,
+  isMinimized,
+  isDraggable = true, // Default to true if not provided
+  isResizable = true, // Default to true if not provided
+  onMinimizeToggle, isMaximized, onMaximizeToggle,
   containerSettings, onOpenContainerSettings,
   isLocked = false,
   onLockToggle,
@@ -127,14 +129,17 @@ const Widget: React.FC<WidgetProps> = ({
   const liftedShadowStyle = '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)';
   const maximizedShadowStyle = '0 25px 50px -12px rgba(0,0,0,0.25)';
 
-  // Apply defaults for containerSettings if provided, otherwise use component defaults
   const currentContainerSettings: WidgetContainerSettings = {
     containerBackgroundColor: containerSettings?.containerBackgroundColor,
-    alwaysShowTitleBar: containerSettings?.alwaysShowTitleBar ?? false, // Default to false if not in containerSettings
-    innerPadding: containerSettings?.innerPadding ?? 'px-3.5 py-3', // Default padding
-    borderColor: containerSettings?.borderColor, // Will be undefined if not set
-    opacity: containerSettings?.opacity,         // Will be undefined if not set
+    alwaysShowTitleBar: containerSettings?.alwaysShowTitleBar ?? false,
+    innerPadding: containerSettings?.innerPadding ?? 'px-3.5 py-3',
+    borderColor: containerSettings?.borderColor,
+    opacity: containerSettings?.opacity,
   };
+
+  // Determine actual draggable and resizable states, considering isLocked
+  const actualIsDraggable = isDraggable && !isLocked;
+  const actualIsResizable = isResizable && !isLocked;
 
   const getWidgetStyle = (): React.CSSProperties => {
     let style: React.CSSProperties = {};
@@ -158,7 +163,6 @@ const Widget: React.FC<WidgetProps> = ({
     if (currentContainerSettings.borderColor) {
       style.borderColor = currentContainerSettings.borderColor;
     }
-    // Apply opacity only if it's defined (0 is a valid opacity)
     if (typeof currentContainerSettings.opacity === 'number') {
         style.opacity = currentContainerSettings.opacity;
     }
@@ -167,7 +171,7 @@ const Widget: React.FC<WidgetProps> = ({
   const widgetStyle = getWidgetStyle();
 
   const handleMouseDownOnResize = (e: React.MouseEvent<HTMLDivElement>, direction: ResizeDirection) => {
-    if (isLocked || isMinimized || isMaximized) return;
+    if (!actualIsResizable || isMinimized || isMaximized) return; // Use actualIsResizable
     e.preventDefault(); e.stopPropagation(); if (e.button !== 0) return;
     if (onFocus) onFocus(id);
     setIsResizing(true); setCurrentResizeDirection(direction);
@@ -178,7 +182,7 @@ const Widget: React.FC<WidgetProps> = ({
 
   useEffect(() => {
     const handleMouseMoveForResize = (e: MouseEvent) => {
-      if (!isResizing || !currentResizeDirection || isMinimized || isMaximized || isLocked) return;
+      if (!isResizing || !currentResizeDirection || isMinimized || isMaximized || !actualIsResizable) return; // Use actualIsResizable
       const deltaX = e.clientX - dragStartMousePos.current.x;
       const deltaY = e.clientY - dragStartMousePos.current.y;
       const deltaCols = Math.round(deltaX / CELL_SIZE);
@@ -213,13 +217,19 @@ const Widget: React.FC<WidgetProps> = ({
         latestResizeGeometry.current = null;
       }
     };
-    if (isResizing && !isLocked) { document.addEventListener('mousemove', handleMouseMoveForResize); document.addEventListener('mouseup', handleMouseUpForResize); }
-    return () => { document.removeEventListener('mousemove', handleMouseMoveForResize); document.removeEventListener('mouseup', handleMouseUpForResize); };
-  }, [isResizing, currentResizeDirection, id, onResize, onResizeEnd, CELL_SIZE, minColSpan, minRowSpan, totalGridCols, totalGridRows, isMinimized, isMaximized, isLocked]);
+    if (isResizing && actualIsResizable) { // Use actualIsResizable
+        document.addEventListener('mousemove', handleMouseMoveForResize);
+        document.addEventListener('mouseup', handleMouseUpForResize);
+    }
+    return () => {
+        document.removeEventListener('mousemove', handleMouseMoveForResize);
+        document.removeEventListener('mouseup', handleMouseUpForResize);
+    };
+  }, [isResizing, currentResizeDirection, id, onResize, onResizeEnd, CELL_SIZE, minColSpan, minRowSpan, totalGridCols, totalGridRows, isMinimized, isMaximized, actualIsResizable]); // Added actualIsResizable
 
   const handleMouseDownOnDrag = (e: React.MouseEvent<HTMLElement>) => {
-    if (isLocked || (e.target as HTMLElement).closest('.widget-control-button, .widget-resize-handle, .widget-appearance-button') || isMaximized) return;
-    if (e.button !== 0) return; // Only allow left-click to drag
+    if (!actualIsDraggable || (e.target as HTMLElement).closest('.widget-control-button, .widget-resize-handle, .widget-appearance-button') || isMaximized) return; // Use actualIsDraggable
+    if (e.button !== 0) return;
     if (onFocus) onFocus(id);
     e.preventDefault(); e.stopPropagation();
     setIsDragging(true); dragStartMousePos.current = { x: e.clientX, y: e.clientY };
@@ -227,13 +237,13 @@ const Widget: React.FC<WidgetProps> = ({
 
   useEffect(() => {
     const handleMouseMoveForDrag = (e: MouseEvent) => {
-      if (!isDragging || isMaximized || isLocked) return;
+      if (!isDragging || isMaximized || !actualIsDraggable) return; // Use actualIsDraggable
       const deltaX = e.clientX - dragStartMousePos.current.x;
       const deltaY = e.clientY - dragStartMousePos.current.y;
       setVisualDragOffset({ x: deltaX, y: deltaY });
     };
     const handleMouseUpForDrag = () => {
-      if (isDragging && !isMaximized && !isLocked) {
+      if (isDragging && !isMaximized && actualIsDraggable) { // Use actualIsDraggable
         const currentWidgetLeftPx = (colStart - 1) * CELL_SIZE + visualDragOffset.x;
         const currentWidgetTopPx = (rowStart - 1) * CELL_SIZE + visualDragOffset.y;
         let newColStart = Math.round(currentWidgetLeftPx / CELL_SIZE) + 1;
@@ -244,13 +254,19 @@ const Widget: React.FC<WidgetProps> = ({
             if (onMove) onMove(id, { colStart: newColStart, rowStart: newRowStart });
         }
         setIsDragging(false); setVisualDragOffset({ x: 0, y: 0 });
-      } else if (isDragging && (isMaximized || isLocked)) {
+      } else if (isDragging && (isMaximized || !actualIsDraggable)) {
         setIsDragging(false); setVisualDragOffset({ x: 0, y: 0 });
       }
     };
-    if (isDragging && !isLocked) { document.addEventListener('mousemove', handleMouseMoveForDrag); document.addEventListener('mouseup', handleMouseUpForDrag); }
-    return () => { document.removeEventListener('mousemove', handleMouseMoveForDrag); document.removeEventListener('mouseup', handleMouseUpForDrag); };
-  }, [isDragging, id, onMove, CELL_SIZE, colStart, rowStart, colSpan, rowSpan, totalGridCols, totalGridRows, visualDragOffset, isMaximized, isLocked]);
+    if (isDragging && actualIsDraggable) { // Use actualIsDraggable
+        document.addEventListener('mousemove', handleMouseMoveForDrag);
+        document.addEventListener('mouseup', handleMouseUpForDrag);
+    }
+    return () => {
+        document.removeEventListener('mousemove', handleMouseMoveForDrag);
+        document.removeEventListener('mouseup', handleMouseUpForDrag);
+    };
+  }, [isDragging, id, onMove, CELL_SIZE, colStart, rowStart, colSpan, rowSpan, totalGridCols, totalGridRows, visualDragOffset, isMaximized, actualIsDraggable]); // Added actualIsDraggable
 
   const handleDeleteClick = (e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); if (onDelete) onDelete(id); };
   const handleSettingsClick = (e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); if (onOpenSettings) onOpenSettings(id); };
@@ -293,7 +309,7 @@ const Widget: React.FC<WidgetProps> = ({
         flex flex-col overflow-hidden box-border group relative
         pointer-events-auto
         ${!currentContainerSettings.containerBackgroundColor && (showSolidBackground ? 'bg-widget dark:bg-dark-surface' : 'bg-transparent')}
-        ${isDragging && !isLocked && typeof currentContainerSettings.opacity !== 'number' ? 'opacity-80' : ''} 
+        ${isDragging && actualIsDraggable && typeof currentContainerSettings.opacity !== 'number' ? 'opacity-80' : ''} 
         ${isMaximized ?
             'transition-all duration-300 ease-in-out' :
             'transition-[opacity,box-shadow,grid-column-start,grid-row-start,grid-column-end,grid-row-end,background-color,border-color] duration-300 ease-in-out'
@@ -308,10 +324,10 @@ const Widget: React.FC<WidgetProps> = ({
       {!disableHeader && (
         <div
             ref={titleBarRef}
-            onMouseDown={!isMaximized && !isLocked ? handleMouseDownOnDrag : undefined}
+            onMouseDown={!isMaximized && actualIsDraggable ? handleMouseDownOnDrag : undefined} // Use actualIsDraggable
             className={`
             flex justify-between items-center px-3
-            ${!isMaximized && !isLocked && onMove ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : (isLocked ? 'cursor-default' : '')}
+            ${!isMaximized && actualIsDraggable && onMove ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : (isLocked ? 'cursor-default' : '')}
             transition-all duration-300 ease-in-out overflow-hidden
             ${titleBarActuallyVisible
                 ? `py-2 opacity-100 max-h-20 ${title ? 'border-b border-slate-200 dark:border-slate-700' : ''}`
@@ -341,12 +357,12 @@ const Widget: React.FC<WidgetProps> = ({
                     {isMinimized ? <RestoreMinimizedIcon /> : <MinimizeIcon />}
                     </button>
                 )}
-                {onMaximizeToggle && !isLocked && (
+                {onMaximizeToggle && !isLocked && ( // Maximize button not available when locked
                     <button onClick={handleMaximizeToggleClick} className={controlButtonClass} aria-label={isMaximized ? "Restore widget from maximized" : "Maximize widget"}>
                     {isMaximized ? <RestoreMaximizedIcon /> : <MaximizeIcon />}
                     </button>
                 )}
-                {onDelete && !isLocked && (
+                {onDelete && !isLocked && ( // Delete button not available when locked
                     <button onClick={handleDeleteClick} className={controlButtonClass} aria-label="Delete widget">
                     <DeleteIcon/>
                     </button>
@@ -381,7 +397,7 @@ const Widget: React.FC<WidgetProps> = ({
         {children ? children : <p className="text-xs text-secondary italic">Widget content goes here.</p>}
       </div>
 
-      {!isLocked && !isMinimized && !isMaximized && onResize && (
+      {actualIsResizable && !isMinimized && !isMaximized && onResize && ( // Use actualIsResizable for showing handles
         <>
           <div onMouseDown={(e) => handleMouseDownOnResize(e, 'top-left')} className={`${resizeHandleMarkerClass} absolute -top-1 -left-1 w-4 h-4 cursor-nwse-resize z-30 rounded-full hover:bg-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-150`} style={{ touchAction: 'none' }} />
           <div onMouseDown={(e) => handleMouseDownOnResize(e, 'top-right')} className={`${resizeHandleMarkerClass} absolute -top-1 -right-1 w-4 h-4 cursor-nesw-resize z-30 rounded-full hover:bg-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-150`} style={{ touchAction: 'none' }} />
