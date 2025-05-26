@@ -32,7 +32,14 @@ import {
   ImportIcon,
   AddIcon,
   AutoSortIcon,
-  DensityIcon
+  DensityIcon,
+  // AI Command Bar Icons
+  AiIcon,
+  MicIcon,
+  MicOffIcon,
+  SendArrowIcon,
+  CloseIcon as AiCloseIcon,
+  ProcessingIcon,
 } from '@/components/Icons';
 
 import {
@@ -49,6 +56,129 @@ import {
   type PageInstanceNotesSettings,
 } from '@/definitions/widgetConfig';
 
+// AI Command Integration
+import {
+    type ParsedAiCommand,
+    AI_COMMAND_SCHEMA,
+    getGeminiSystemPrompt as getBaseGeminiSystemPrompt, // Renamed original to avoid conflict
+    type AddWidgetAiCommand,
+    type DeleteWidgetAiCommand,
+    type MoveWidgetAiCommand,
+    type ResizeWidgetAiCommand,
+    type ChangeWidgetSettingAiCommand,
+    type MinimizeWidgetAiCommand,
+    type MaximizeWidgetAiCommand,
+    type RestoreWidgetAiCommand,
+    type ChangeCellSizeAiCommand,
+    type SendChatMessageAiCommand,
+    type GetWidgetInfoAiCommand,
+    type ClarifyCommandAiCommand,
+    type OpenOrFocusWidgetAiCommand,
+    type TargetWidgetAiCommand,
+    type BaseAiCommand,
+    type UnknownAiCommand,
+} from '@/definitions/aiCommands';
+
+
+// --- Web Speech API Type Definitions ---
+interface SpeechRecognitionResult {
+  readonly isFinal: boolean;
+  readonly length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  readonly transcript: string;
+  readonly confidence: number;
+}
+
+interface SpeechRecognitionResultList {
+  readonly length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionEvent extends Event {
+  readonly resultIndex: number;
+  readonly results: SpeechRecognitionResultList;
+  readonly interpretation?: unknown;
+  readonly emma?: Document;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  readonly error: string;
+  readonly message: string;
+}
+
+interface SpeechGrammar {
+  src: string;
+  weight?: number;
+}
+interface SpeechGrammarList {
+  readonly length: number;
+  item(index: number): SpeechGrammar;
+  [index: number]: SpeechGrammar;
+  addFromString(string: string, weight?: number): void;
+  addFromURI(src: string, weight?: number): void;
+}
+
+interface SpeechRecognitionStatic {
+  new (): SpeechRecognition;
+}
+interface SpeechRecognition extends EventTarget {
+  grammars: SpeechGrammarList;
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  serviceURI?: string;
+
+  onaudiostart: ((this: SpeechRecognition, ev: Event) => void) | null;
+  onaudioend: ((this: SpeechRecognition, ev: Event) => void) | null;
+  onend: ((this: SpeechRecognition, ev: Event) => void) | null;
+  onerror: ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => void) | null;
+  onnomatch: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => void) | null;
+  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => void) | null;
+  onsoundstart: ((this: SpeechRecognition, ev: Event) => void) | null;
+  onsoundend: ((this: SpeechRecognition, ev: Event) => void) | null;
+  onspeechstart: ((this: SpeechRecognition, ev: Event) => void) | null;
+  onspeechend: ((this: SpeechRecognition, ev: Event) => void) | null;
+  onstart: ((this: SpeechRecognition, ev: Event) => void) | null;
+
+  abort(): void;
+  start(): void;
+  stop(): void;
+
+  addEventListener<K extends keyof SpeechRecognitionEventMap>(type: K, listener: (this: SpeechRecognition, ev: SpeechRecognitionEventMap[K]) => void, options?: boolean | AddEventListenerOptions): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
+  removeEventListener<K extends keyof SpeechRecognitionEventMap>(type: K, listener: (this: SpeechRecognition, ev: SpeechRecognitionEventMap[K]) => void, options?: boolean | EventListenerOptions): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void;
+}
+
+interface SpeechRecognitionEventMap {
+  "audiostart": Event;
+  "audioend": Event;
+  "end": Event;
+  "error": SpeechRecognitionErrorEvent;
+  "nomatch": SpeechRecognitionEvent;
+  "result": SpeechRecognitionEvent;
+  "soundstart": Event;
+  "soundend": Event;
+  "speechstart": Event;
+  "speechend": Event;
+  "start": Event;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: SpeechRecognitionStatic;
+    webkitSpeechRecognition: SpeechRecognitionStatic;
+    SpeechSynthesisUtterance: typeof SpeechSynthesisUtterance;
+    readonly speechSynthesis: SpeechSynthesis;
+  }
+}
+
 
 // --- Page-Specific Constants ---
 const CELL_SIZE_OPTIONS = [
@@ -61,7 +191,7 @@ const CELL_SIZE_OPTIONS = [
 
 const MAX_HISTORY_LENGTH = 50;
 const MINIMIZED_WIDGET_ROW_SPAN = 2;
-const DASHBOARD_LAYOUT_STORAGE_KEY = 'dashboardLayoutV3.21';
+const DASHBOARD_LAYOUT_STORAGE_KEY = 'dashboardLayoutV3.22_AI';
 const GLOBAL_NOTES_STORAGE_KEY = 'dashboardGlobalNotesCollection_v1';
 const GLOBAL_TODOS_STORAGE_KEY = 'dashboardGlobalSingleTodoList_v1';
 const GLOBAL_PHOTO_HISTORY_STORAGE_KEY = 'dashboardGlobalPhotoHistory_v1';
@@ -142,7 +272,7 @@ const processWidgetConfig = (
         return {
             id: widgetData.id || `generic-${Date.now()}`,
             title: widgetData.title || "Untitled Widget",
-            type: widgetData.type || 'generic',
+            type: widgetData.type || 'generic', 
             colStart: widgetData.colStart || 1,
             rowStart: widgetData.rowStart || 1,
             colSpan: widgetData.colSpan || Math.max(1, Math.round(defaultPresetFallback.targetWidthPx / currentCellSize)),
@@ -210,6 +340,45 @@ interface StoredDashboardLayout {
     isMobileLayout?: boolean;
 }
 
+// MODIFICATION START: Enhanced getGeminiSystemPrompt
+const getGeminiSystemPrompt = (widgets: PageWidgetConfig[]): string => {
+  const basePrompt = getBaseGeminiSystemPrompt(widgets); 
+  const promptLines = [basePrompt];
+
+  promptLines.push("\n--- YouTube Widget Specific Instructions (CRITICAL - READ CAREFULLY) ---");
+  promptLines.push("When the user's command is about YouTube:");
+  promptLines.push("1. The action is ALWAYS 'openOrFocusWidget' with 'widgetType': 'youtube'.");
+  promptLines.push("2. **If the user's command includes ANY phrases like 'search for', 'find videos of', 'show me videos of', 'look for', 'YouTube [something]' or ANY other indication they want to find specific content on YouTube:**");
+  promptLines.push("   - You **MUST** extract the search term (e.g., if they say 'YouTube search for epic cat fails', the search term is 'epic cat fails').");
+  promptLines.push("   - You **MUST** include the 'initialSettings' field in your JSON command.");
+  promptLines.push("   - Inside 'initialSettings', you **MUST** include a key named 'defaultSearchQuery'.");
+  promptLines.push("   - The value for 'defaultSearchQuery' **MUST BE** the exact search term you extracted.");
+  promptLines.push("   - **THIS IS NOT OPTIONAL. IF A SEARCH IS INTENDED, `initialSettings.defaultSearchQuery` IS REQUIRED.** Failure to include it means the search will NOT happen, and the command is INCORRECT.");
+  promptLines.push("   - **CORRECT Example** for user prompt 'Show me music videos by Virtual Mage on YouTube':");
+  promptLines.push("     `{ \"action\": \"openOrFocusWidget\", \"widgetType\": \"youtube\", \"initialSettings\": { \"defaultSearchQuery\": \"music videos by Virtual Mage\" }, \"feedbackToUser\": \"Searching YouTube for music videos by Virtual Mage...\" }`");
+  promptLines.push("   - **INCORRECT Example** for user prompt 'Show me music videos by Virtual Mage on YouTube':");
+  promptLines.push("     `{ \"action\": \"openOrFocusWidget\", \"widgetType\": \"youtube\", \"feedbackToUser\": \"Opening YouTube...\" }` <-- WRONG! Missing `initialSettings.defaultSearchQuery`.");
+  promptLines.push("3. If, and ONLY IF, the user's command is simply to 'open YouTube' or 'focus on YouTube' WITHOUT ANY search term or search intent mentioned:");
+  promptLines.push("   - Then 'initialSettings' can be omitted, or 'defaultSearchQuery' can be an empty string if 'initialSettings' is present for other reasons.");
+  promptLines.push("   - Example for 'open YouTube':");
+  promptLines.push("     `{ \"action\": \"openOrFocusWidget\", \"widgetType\": \"youtube\", \"feedbackToUser\": \"Opening YouTube...\" }`");
+
+  const youtubeWidgets = widgets.filter(w => w.type === 'youtube');
+  if (youtubeWidgets.length > 0) {
+    promptLines.push("\nExisting YouTube Widgets:");
+    youtubeWidgets.forEach(ytWidget => {
+      const currentSearch = (ytWidget.settings as YoutubeWidgetSettings)?.defaultSearchQuery;
+      promptLines.push(`- Title: '${ytWidget.title}', ID: '${ytWidget.id}'. Current search: ${currentSearch ? `'${currentSearch}'` : 'none'}. If user wants to search in THIS specific widget, use its ID/title and include the new 'initialSettings.defaultSearchQuery'.`);
+    });
+  } else {
+    promptLines.push("\nNo YouTube widgets exist. If user wants to search, you MUST add a new one AND include 'initialSettings.defaultSearchQuery'.");
+  }
+  promptLines.push("--- End YouTube Widget Specific Instructions ---");
+
+  return promptLines.join('\n');
+};
+// MODIFICATION END: Enhanced getGeminiSystemPrompt
+
 
 export default function Home() {
   const [isMobileView, setIsMobileView] = useState(false);
@@ -221,9 +390,17 @@ export default function Home() {
   const initialLayoutIsDefaultRef = useRef(false);
   const initialCenteringDoneRef = useRef(false);
   const [widgets, setWidgets] = useState<PageWidgetConfig[]>([]);
-  const [isLayoutEngineReady, setIsLayoutEngineReady] = useState(false); // MODIFIED: Replaced initialLoadAttempted ref
+  const [isLayoutEngineReady, setIsLayoutEngineReady] = useState(false);
 
-  // Effect for determining mobile view
+  const [showAiCommandBar, setShowAiCommandBar] = useState(false);
+  const [aiInputValue, setAiInputValue] = useState('');
+  const [aiIsListening, setAiIsListening] = useState(false);
+  const [aiIsProcessing, setAiIsProcessing] = useState(false);
+  const [aiLastFeedback, setAiLastFeedback] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const speechRecognitionRef = useRef<SpeechRecognition | null>(null);
+
+
   useEffect(() => {
     const checkMobile = () => {
       setIsMobileView(window.innerWidth < MOBILE_BREAKPOINT_PX);
@@ -233,7 +410,6 @@ export default function Home() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Effect for initializing widgets based on mobile view or localStorage
  useEffect(() => {
     let loadedCellSize = DEFAULT_CELL_SIZE;
     let loadedWidgets: PageWidgetConfig[] | null = null;
@@ -297,7 +473,7 @@ export default function Home() {
         initialLayoutIsDefaultRef.current = true;
         initialCenteringDoneRef.current = isMobileView;
     }
-    setIsLayoutEngineReady(true); // MODIFIED: Set layout engine ready state
+    setIsLayoutEngineReady(true);
   }, [isMobileView]);
 
 
@@ -353,24 +529,15 @@ export default function Home() {
 
 
    useEffect(() => {
-    // MODIFIED: Initialize history based on isLayoutEngineReady and widgets
     if (isLayoutEngineReady && widgets && widgets.length >= 0 && history.current.length === 0) {
         history.current = [JSON.parse(JSON.stringify(widgets))];
         historyPointer.current = 0;
         setHistoryDisplay({ pointer: historyPointer.current + 1, length: history.current.length });
     }
-  }, [widgets, isLayoutEngineReady]); // MODIFIED: Dependency
-
-  // REMOVED: Separate useEffect for initialLoadAttempted.current
-  // useEffect(() => {
-  //     if (widgets.length > 0 && !initialLoadAttempted.current) {
-  //         initialLoadAttempted.current = true;
-  //     }
-  // }, [widgets]);
+  }, [widgets, isLayoutEngineReady]);
 
 
   useEffect(() => {
-    // MODIFIED: Save only if layout engine is ready
     if (typeof window !== 'undefined' && isLayoutEngineReady) {
       try {
         const dataToSave: StoredDashboardLayout = {
@@ -382,7 +549,7 @@ export default function Home() {
         window.localStorage.setItem(DASHBOARD_LAYOUT_STORAGE_KEY, JSON.stringify(dataToSave));
       } catch (error) { console.error("Error saving dashboard layout to localStorage:", error); }
     }
-  }, [widgets, cellSize, isMobileView, isLayoutEngineReady]); // MODIFIED: Dependency
+  }, [widgets, cellSize, isMobileView, isLayoutEngineReady]);
 
   useEffect(() => {
     if (widgetContainerCols > 0 && initialLayoutIsDefaultRef.current && !initialCenteringDoneRef.current && widgets.length > 0 && !isMobileView) {
@@ -460,7 +627,9 @@ export default function Home() {
     const determineWidgetContainerGridSize = () => {
       const screenWidth = window.innerWidth; const screenHeight = window.innerHeight;
       const currentHeaderHeight = headerRef.current?.offsetHeight || 60;
-      const mainContentHeight = screenHeight - currentHeaderHeight;
+      const aiCommandBarHeight = showAiCommandBar ? (document.getElementById('ai-command-bar')?.offsetHeight || 70) : 0;
+      const mainContentHeight = screenHeight - currentHeaderHeight - aiCommandBarHeight;
+
       const newCols = Math.max(1, Math.floor(screenWidth / cellSize));
       const newRows = Math.max(1, Math.floor(mainContentHeight / cellSize));
       setWidgetContainerCols(newCols);
@@ -484,7 +653,7 @@ export default function Home() {
     determineWidgetContainerGridSize(); const timeoutId = setTimeout(determineWidgetContainerGridSize, 100);
     window.addEventListener('resize', determineWidgetContainerGridSize);
     return () => { clearTimeout(timeoutId); window.removeEventListener('resize', determineWidgetContainerGridSize); };
-  }, [cellSize, isMobileView, widgets]);
+  }, [cellSize, isMobileView, widgets, showAiCommandBar]); 
 
   useEffect(() => {
     setContextMenuAvailableWidgets(
@@ -510,7 +679,7 @@ export default function Home() {
         try {
             const text = e.target?.result;
             if (typeof text !== 'string') throw new Error("Failed to read file content.");
-            const parsedJson = JSON.parse(text);
+            const parsedJson = JSON.parse(text); 
 
             let finalWidgetsToSet: PageWidgetConfig[];
             let finalCellSize = cellSize;
@@ -522,8 +691,8 @@ export default function Home() {
             let importedIsMobileLayout = false;
 
 
-            if (typeof parsedJson === 'object' && !Array.isArray(parsedJson) && parsedJson.dashboardVersion && parsedJson.widgets) {
-                const modernData = parsedJson as StoredDashboardLayout;
+            if (typeof parsedJson === 'object' && parsedJson !== null && !Array.isArray(parsedJson) && 'dashboardVersion' in parsedJson && 'widgets' in parsedJson) {
+                const modernData = parsedJson as StoredDashboardLayout; 
                 importedIsMobileLayout = modernData.isMobileLayout || false;
 
                 if (typeof modernData.cellSize === 'number') {
@@ -561,7 +730,7 @@ export default function Home() {
                 if (modernData.sharedGlobalPhotoHistory) photoHistoryToSet = modernData.sharedGlobalPhotoHistory;
 
 
-            } else if (Array.isArray(parsedJson)) {
+            } else if (Array.isArray(parsedJson)) { 
                 alertMessage = "Dashboard layout (legacy format) imported. Adapting to current view. Global data and settings will use defaults or existing data.";
                 const tempCols = Math.floor(window.innerWidth / cellSize);
                 const tempRows = Math.floor((window.innerHeight - (headerRef.current?.offsetHeight || 60)) / cellSize);
@@ -763,7 +932,7 @@ export default function Home() {
         const dummyWidgetToCheck: PageWidgetConfig = {
             id: 'temp-placement-check', type: 'generic', title: '',
             colStart: c, rowStart: r, colSpan: targetColSpan, rowSpan: targetRowSpan,
-            minColSpan: targetColSpan, minRowSpan: targetRowSpan,
+            minColSpan: targetColSpan, minRowSpan: targetRowSpan, settings: {},
         };
         if (canPlaceWidget(dummyWidgetToCheck, c, r, currentLayout)) {
           return { colStart: c, rowStart: r };
@@ -773,56 +942,99 @@ export default function Home() {
     return null;
   }, [widgetContainerCols, widgetContainerRows, canPlaceWidget]);
 
-  const handleAddNewWidget = useCallback((widgetType: WidgetType) => {
-    if (maximizedWidgetId || isMobileView) {
-        if(isMobileView) alert("Adding new widgets is disabled in mobile full-portfolio view.");
+  const handleAddNewWidget = useCallback((
+    widgetType: WidgetType,
+    newTitle?: string,
+    newColStart?: number,
+    newRowStart?: number,
+    newColSpan?: number,
+    newRowSpan?: number,
+    newSizePreset?: WidgetSizePresetKey,
+    initialSettingsFromAI?: Partial<AllWidgetSettings> 
+) => {
+    if (maximizedWidgetId || (isMobileView && widgetType !== 'portfolio')) {
+        if(isMobileView && widgetType !== 'portfolio') {
+            alert("Adding new widgets is disabled in mobile full-portfolio view, except for the initial portfolio widget.");
+            speakText("Adding new widgets is disabled in mobile view.");
+        }
         return;
     }
     const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(def => def.type === widgetType);
-    if (!blueprint) { alert(`Widget type "${widgetType}" is not available.`); setIsAddWidgetMenuOpen(false); setIsAddWidgetContextMenuOpen(false); return; }
+    if (!blueprint) {
+        alert(`Widget type "${widgetType}" is not available.`);
+        speakText(`Widget type "${widgetType}" is not available.`);
+        setIsAddWidgetMenuOpen(false); setIsAddWidgetContextMenuOpen(false); return;
+    }
 
     if (widgetContainerCols === 0 || widgetContainerRows === 0) {
       alert("Grid not fully initialized. Please wait a moment and try again.");
+      speakText("Grid not fully initialized. Please wait a moment and try again.");
       setIsAddWidgetMenuOpen(false); setIsAddWidgetContextMenuOpen(false);
       return;
     }
-    const newWidgetConfig = processWidgetConfig({
+
+    const baseConfig: Partial<PageWidgetConfig> = {
         id: `${blueprint.type}-${Date.now()}`,
         type: blueprint.type,
-    }, cellSize);
+        title: newTitle || blueprint.defaultTitle,
+        settings: initialSettingsFromAI || {}, 
+    };
+
+    if (newSizePreset) {
+        const preset = WIDGET_SIZE_PRESETS[newSizePreset];
+        if (preset) {
+            baseConfig.colSpan = Math.max(blueprint.minColSpan, Math.round(preset.targetWidthPx / cellSize));
+            baseConfig.rowSpan = Math.max(blueprint.minRowSpan, Math.round(preset.targetHeightPx / cellSize));
+        }
+    }
+    if (newColSpan) baseConfig.colSpan = newColSpan;
+    if (newRowSpan) baseConfig.rowSpan = newRowSpan;
+
+
+    const newWidgetConfigProcessed = processWidgetConfig(baseConfig, cellSize);
+    const finalColSpan = newWidgetConfigProcessed.colSpan;
+    const finalRowSpan = newWidgetConfigProcessed.rowSpan;
 
 
     let finalLayout: PageWidgetConfig[] | null = null;
     const currentWidgetsCopy = widgets.map(w => ({...w}));
 
-    const initialPosition = findNextAvailablePosition(newWidgetConfig.colSpan, newWidgetConfig.rowSpan, currentWidgetsCopy);
-
-    if (initialPosition) {
-        const widgetWithPosition = {
-            ...newWidgetConfig,
-            colStart: initialPosition.colStart,
-            rowStart: initialPosition.rowStart
-        };
-        finalLayout = [...currentWidgetsCopy, widgetWithPosition];
-    } else {
-        finalLayout = performAutoSort([...currentWidgetsCopy, { ...newWidgetConfig }]);
-        if (!finalLayout) {
-            finalLayout = attemptPlaceWidgetWithShrinking(currentWidgetsCopy, { ...newWidgetConfig });
+    let positionFound = false;
+    if (newColStart && newRowStart) {
+        if (canPlaceWidget({...newWidgetConfigProcessed, colSpan: finalColSpan, rowSpan: finalRowSpan }, newColStart, newRowStart, currentWidgetsCopy)) {
+            finalLayout = [...currentWidgetsCopy, {...newWidgetConfigProcessed, colStart: newColStart, rowStart: newRowStart, colSpan: finalColSpan, rowSpan: finalRowSpan }];
+            positionFound = true;
         }
     }
+
+    if (!positionFound) {
+        const initialPosition = findNextAvailablePosition(finalColSpan, finalRowSpan, currentWidgetsCopy);
+        if (initialPosition) {
+            finalLayout = [...currentWidgetsCopy, { ...newWidgetConfigProcessed, colStart: initialPosition.colStart, rowStart: initialPosition.rowStart, colSpan: finalColSpan, rowSpan: finalRowSpan }];
+        } else {
+            finalLayout = performAutoSort([...currentWidgetsCopy, { ...newWidgetConfigProcessed, colSpan: finalColSpan, rowSpan: finalRowSpan }]);
+            if (!finalLayout) {
+                finalLayout = attemptPlaceWidgetWithShrinking(currentWidgetsCopy, { ...newWidgetConfigProcessed, colSpan: finalColSpan, rowSpan: finalRowSpan });
+            }
+        }
+    }
+
 
     if (finalLayout) {
       setWidgets(finalLayout);
       updateWidgetsAndPushToHistory(finalLayout, `add_widget_${widgetType}`);
-      const addedWidgetInLayout = finalLayout.find(w => w.id === newWidgetConfig.id);
+      const addedWidgetInLayout = finalLayout.find(w => w.id === newWidgetConfigProcessed.id);
       if (addedWidgetInLayout) setActiveWidgetId(addedWidgetInLayout.id);
       else setActiveWidgetId(null);
+      speakText(`${widgetType} widget added.`);
     } else {
       alert("No available space to add this widget, even after attempting to sort and shrink. Please make more room manually or try a smaller widget.");
+      speakText("No available space to add this widget.");
     }
     setIsAddWidgetMenuOpen(false);
     setIsAddWidgetContextMenuOpen(false);
-  }, [maximizedWidgetId, widgetContainerCols, widgetContainerRows, widgets, cellSize, findNextAvailablePosition, performAutoSort, attemptPlaceWidgetWithShrinking, updateWidgetsAndPushToHistory, isMobileView]);
+  }, [maximizedWidgetId, widgetContainerCols, widgetContainerRows, widgets, cellSize, findNextAvailablePosition, performAutoSort, attemptPlaceWidgetWithShrinking, updateWidgetsAndPushToHistory, isMobileView, canPlaceWidget]);
+
 
   const handleApplyWidgetSizePreset = useCallback((widgetId: string, presetKey: WidgetSizePresetKey) => {
     if (maximizedWidgetId || isMobileView) return;
@@ -832,12 +1044,14 @@ export default function Home() {
 
     if (!targetWidget || !blueprint) {
         alert("Error: Could not find widget data to apply preset.");
+        speakText("Error: Could not find widget data to apply preset.");
         return;
     }
 
     const presetSizeTargets = WIDGET_SIZE_PRESETS[presetKey];
     if (!presetSizeTargets) {
         alert("Error: Invalid size preset selected.");
+        speakText("Error: Invalid size preset selected.");
         return;
     }
 
@@ -870,8 +1084,10 @@ export default function Home() {
         updateWidgetsAndPushToHistory(finalLayout, `apply_preset_${presetKey}_to_${widgetId}`);
         setActiveWidgetId(widgetId);
         setIsContainerSettingsModalOpen(false);
+        speakText(`Applied size preset ${presetKey.replace("_", " ")} to ${targetWidget.title}.`);
     } else {
         alert(`Could not apply size preset "${presetKey}". There isn't enough space, even after trying to rearrange. Please try a different preset or make more room manually.`);
+        speakText(`Could not apply size preset ${presetKey.replace("_", " ")}.`);
     }
   }, [widgets, maximizedWidgetId, cellSize, findNextAvailablePosition, performAutoSort, updateWidgetsAndPushToHistory, canPlaceWidget, isMobileView]);
 
@@ -974,6 +1190,7 @@ export default function Home() {
         updateWidgetsAndPushToHistory(scaledWidgets, `grid_density_change_scaled_only_${newCellSize}`);
         if (!isMobileView) {
              alert("Grid density changed. Some widgets may need manual readjustment or use the 'Sort Grid' button.");
+             speakText("Grid density changed. Some widgets may need manual readjustment or use the 'Sort Grid' button.");
         }
     }
     setIsDensityMenuOpen(false);
@@ -984,7 +1201,7 @@ export default function Home() {
   const handleWidgetResizeLive = (id: string, newGeometry: WidgetResizeDataType) => { if (isPerformingUndoRedo.current || maximizedWidgetId || isMobileView) return; setWidgets(currentWidgets => currentWidgets.map(w => w.id === id ? { ...w, ...newGeometry, isMinimized: false } : w)); };
   const handleWidgetResizeEnd = (id: string, finalGeometry: WidgetResizeDataType) => { if (maximizedWidgetId || isMobileView) return; setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.map(w => w.id === id ? { ...w, ...finalGeometry, isMinimized: false, originalRowSpan: undefined } : w); updateWidgetsAndPushToHistory(updatedWidgets, `resize_end_${id}`); return updatedWidgets; }); setActiveWidgetId(id); };
   const handleWidgetMove = (id: string, newPosition: WidgetMoveDataType) => { if (maximizedWidgetId || isMobileView) return; const currentWidget = widgets.find(w => w.id === id); if (!currentWidget) return; if (currentWidget.colStart !== newPosition.colStart || currentWidget.rowStart !== newPosition.rowStart) { setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.map(w => w.id === id ? { ...w, ...newPosition } : w); updateWidgetsAndPushToHistory(updatedWidgets, `move_${id}`); return updatedWidgets; }); } setActiveWidgetId(id); };
-  const handleWidgetDelete = (idToDelete: string) => { if (isMobileView) return; if (maximizedWidgetId === idToDelete) { setMaximizedWidgetId(null); setMaximizedWidgetOriginalState(null); } setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.filter(widget => widget.id !== idToDelete); updateWidgetsAndPushToHistory(updatedWidgets, `delete_${idToDelete}`); return updatedWidgets; }); if (activeWidgetId === idToDelete) setActiveWidgetId(null); };
+  const handleWidgetDelete = (idToDelete: string) => { if (isMobileView && widgets.find(w=>w.id === idToDelete)?.type === 'portfolio') return; if (maximizedWidgetId === idToDelete) { setMaximizedWidgetId(null); setMaximizedWidgetOriginalState(null); } setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.filter(widget => widget.id !== idToDelete); updateWidgetsAndPushToHistory(updatedWidgets, `delete_${idToDelete}`); return updatedWidgets; }); if (activeWidgetId === idToDelete) setActiveWidgetId(null); };
   const handleWidgetFocus = (id: string) => { if (maximizedWidgetId && maximizedWidgetId !== id) return; setActiveWidgetId(id); };
   const handleOpenWidgetSettings = (widgetId: string) => { if (maximizedWidgetId && maximizedWidgetId !== widgetId) return; const widgetToEdit = widgets.find(w => w.id === widgetId); if (widgetToEdit) { setActiveWidgetId(widgetId); setSelectedWidgetForSettings(widgetToEdit); setIsSettingsModalOpen(true); } };
   const handleCloseSettingsModal = () => { setIsSettingsModalOpen(false); setSelectedWidgetForSettings(null); };
@@ -1031,6 +1248,546 @@ export default function Home() {
     setIsAddWidgetContextMenuOpen(false);
   };
 
+  // --- AI Integration Functions ---
+
+  const speakText = (text: string) => {
+    if (typeof window !== 'undefined' && window.speechSynthesis && window.SpeechSynthesisUtterance) {
+      window.speechSynthesis.cancel();
+      const utterance = new window.SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+      utterance.rate = 1;
+      utterance.pitch = 1;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  const startListening = () => {
+    if (typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)) {
+      const SpeechRecognitionImpl = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognitionImpl) {
+        setAiError("Speech recognition is not supported by your browser.");
+        speakText("Speech recognition is not supported by your browser.");
+        return;
+      }
+      if (speechRecognitionRef.current && aiIsListening) {
+        speechRecognitionRef.current.stop();
+        return; 
+      }
+
+      speechRecognitionRef.current = new SpeechRecognitionImpl();
+      speechRecognitionRef.current.continuous = false;
+      speechRecognitionRef.current.interimResults = true;
+      speechRecognitionRef.current.lang = 'en-US';
+
+      speechRecognitionRef.current.onstart = () => {
+        setAiIsListening(true);
+        setAiLastFeedback('Listening...');
+        setAiError(null);
+      };
+
+      speechRecognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
+        }
+        setAiLastFeedback(finalTranscript || interimTranscript || "Listening...");
+        if (finalTranscript) {
+          setAiInputValue(finalTranscript);
+          handleSendAiCommand(finalTranscript);
+        }
+      };
+
+      speechRecognitionRef.current.onerror = (event: SpeechRecognitionErrorEvent) => {
+        console.error('Speech recognition error:', event.error);
+        let errorMsg = `Speech recognition error: ${event.error}.`;
+        if (event.error === 'no-speech') errorMsg = "No speech detected. Please try again.";
+        else if (event.error === 'audio-capture') errorMsg = "Microphone error. Please check permissions.";
+        else if (event.error === 'not-allowed') errorMsg = "Microphone access denied. Please enable it in browser settings.";
+        setAiError(errorMsg);
+        setAiLastFeedback(errorMsg);
+        speakText(errorMsg);
+        setAiIsListening(false); 
+      };
+
+      speechRecognitionRef.current.onend = () => {
+        setAiIsListening(false);
+      };
+
+      speechRecognitionRef.current.start();
+    } else {
+      const errorMsg = "Speech recognition not available in this browser.";
+      setAiError(errorMsg);
+      setAiLastFeedback(errorMsg);
+      speakText(errorMsg);
+    }
+  };
+
+  const handleSendAiCommand = async (commandText: string) => {
+    if (!commandText.trim()) return;
+
+    setAiIsProcessing(true);
+    setAiLastFeedback(`Processing: "${commandText}"`);
+    setAiError(null);
+    speakText(`Processing: ${commandText.substring(0, 50)}`);
+
+    const systemPrompt = getGeminiSystemPrompt(widgets);
+    const fullPrompt = systemPrompt + "\nUser Command: " + commandText; 
+
+    try {
+      const chatHistory = [{ role: "user", parts: [{ text: fullPrompt }] }];
+      const payload = {
+        contents: chatHistory,
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: AI_COMMAND_SCHEMA,
+        }
+      };
+      const userProvidedApiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+      const apiKey = userProvidedApiKey || "";
+
+      if (!apiKey && !userProvidedApiKey) {
+          console.warn("Gemini API Key is missing. Please set NEXT_PUBLIC_GEMINI_API_KEY or ensure Canvas provides it.");
+      }
+
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Gemini API Error Response:', errorData);
+        const message = errorData?.error?.message || `API request failed with status ${response.status}`;
+        throw new Error(message);
+      }
+
+      const result = await response.json();
+
+      if (result.candidates && result.candidates.length > 0 &&
+          result.candidates[0].content && result.candidates[0].content.parts &&
+          result.candidates[0].content.parts.length > 0 &&
+          result.candidates[0].content.parts[0].text
+      ) {
+        const rawJsonText = result.candidates[0].content.parts[0].text;
+        const parsedCommand = JSON.parse(rawJsonText) as ParsedAiCommand;
+
+        setAiLastFeedback(parsedCommand.feedbackToUser || "Command received.");
+        if (parsedCommand.feedbackToUser) speakText(parsedCommand.feedbackToUser);
+
+        dispatchAiCommand(parsedCommand);
+
+      } else {
+        console.warn("Unexpected Gemini API response structure:", result);
+        throw new Error("Received an unexpected response structure from AI.");
+      }
+
+    } catch (err: unknown) {
+      console.error('Error processing AI command:', err);
+      const errorMsg = err instanceof Error ? err.message : "An unknown error occurred with AI.";
+      setAiError(`AI Error: ${errorMsg}`);
+      setAiLastFeedback(`Error: ${errorMsg}`);
+      speakText(`Error: ${errorMsg}`);
+    } finally {
+      setAiIsProcessing(false);
+      setAiInputValue('');
+    }
+  };
+
+  const findTargetWidget = (command: TargetWidgetAiCommand): PageWidgetConfig | null | undefined => {
+    if (command.targetWidgetId) {
+        return widgets.find(w => w.id === command.targetWidgetId);
+    }
+    if (command.targetWidgetType) {
+        const matchingTypeWidgets = widgets.filter(w => w.type === command.targetWidgetType);
+        if (matchingTypeWidgets.length === 1) {
+            return matchingTypeWidgets[0];
+        }
+        if (matchingTypeWidgets.length > 1 && command.targetWidgetTitle) {
+            const exactTitleMatch = matchingTypeWidgets.find(w => w.title.toLowerCase() === command.targetWidgetTitle!.toLowerCase());
+            if (exactTitleMatch) return exactTitleMatch;
+            const partialTitleMatch = matchingTypeWidgets.find(w => w.title.toLowerCase().includes(command.targetWidgetTitle!.toLowerCase()));
+            if (partialTitleMatch) return partialTitleMatch;
+            return null; 
+        }
+         if (matchingTypeWidgets.length > 1 && !command.targetWidgetTitle) {
+            return null; 
+        }
+        if (matchingTypeWidgets.length === 0) {
+            return undefined; 
+        }
+        return matchingTypeWidgets[0]; 
+    }
+    if (command.targetWidgetTitle) {
+        const exactTitleMatchAll = widgets.find(w => w.title.toLowerCase() === command.targetWidgetTitle!.toLowerCase());
+        if (exactTitleMatchAll) return exactTitleMatchAll;
+        const matchingTitleWidgets = widgets.filter(w => w.title.toLowerCase().includes(command.targetWidgetTitle!.toLowerCase()));
+        if (matchingTitleWidgets.length === 1) {
+            return matchingTitleWidgets[0];
+        }
+        if (matchingTitleWidgets.length > 1) {
+             return null; 
+        }
+        return undefined; 
+    }
+    return undefined; 
+  };
+
+
+  const dispatchAiCommand = (command: ParsedAiCommand) => {
+    console.log("Dispatching AI Command:", command); // Keep this log to see the command *before* processing
+    setActiveWidgetId(null); 
+
+    let feedbackMessage = command.feedbackToUser || ""; 
+
+    switch (command.action) {
+      case 'addWidget': {
+        const addCmd = command as AddWidgetAiCommand;
+        let parsedInitialSettings: Partial<AllWidgetSettings> | undefined = undefined;
+        if (typeof addCmd.initialSettings === 'string') {
+            try {
+                parsedInitialSettings = JSON.parse(addCmd.initialSettings);
+            } catch (e) {
+                console.error("Error parsing initialSettings JSON for addWidget:", e);
+                feedbackMessage = "Error applying initial settings due to invalid format.";
+                setAiLastFeedback(feedbackMessage);
+                speakText(feedbackMessage);
+                break;
+            }
+        } else if (typeof addCmd.initialSettings === 'object') {
+            parsedInitialSettings = addCmd.initialSettings;
+        }
+        handleAddNewWidget(addCmd.widgetType, addCmd.title, addCmd.colStart, addCmd.rowStart, addCmd.colSpan, addCmd.rowSpan, addCmd.sizePreset, parsedInitialSettings);
+        if (!feedbackMessage) feedbackMessage = `${addCmd.widgetType} widget added.`;
+        break;
+      }
+      case 'deleteWidget': {
+        const delCmd = command as DeleteWidgetAiCommand;
+        const widgetToDelete = findTargetWidget(delCmd);
+        if (widgetToDelete) {
+          handleWidgetDelete(widgetToDelete.id);
+          feedbackMessage = feedbackMessage || `Deleted ${widgetToDelete.title}.`;
+        } else if (widgetToDelete === null) { 
+            feedbackMessage = delCmd.feedbackToUser || `Multiple widgets match "${delCmd.targetWidgetTitle || delCmd.targetWidgetType}". Please be more specific.`;
+        } else { 
+            feedbackMessage = delCmd.feedbackToUser || `Could not find the widget to delete.`;
+        }
+        break;
+      }
+      case 'moveWidget': {
+        const moveCmd = command as MoveWidgetAiCommand;
+        const widgetToMove = findTargetWidget(moveCmd);
+        if (widgetToMove && typeof moveCmd.newColStart === 'number' && typeof moveCmd.newRowStart === 'number') {
+            const newCol = Math.max(1, Math.min(moveCmd.newColStart, widgetContainerCols - widgetToMove.colSpan + 1));
+            const newRow = Math.max(1, Math.min(moveCmd.newRowStart, widgetContainerRows - widgetToMove.rowSpan + 1));
+            handleWidgetMove(widgetToMove.id, { colStart: newCol, rowStart: newRow });
+            feedbackMessage = feedbackMessage || `Moved ${widgetToMove.title}.`;
+        } else if (widgetToMove === null) {
+            feedbackMessage = moveCmd.feedbackToUser || `Multiple widgets match for moving. Please be more specific.`;
+        } else {
+            feedbackMessage = moveCmd.feedbackToUser || `Could not move widget. Target or position unclear.`;
+        }
+        break;
+      }
+      case 'resizeWidget': {
+        const resizeCmd = command as ResizeWidgetAiCommand;
+        const widgetToResize = findTargetWidget(resizeCmd);
+        if (!widgetToResize) {
+            feedbackMessage = resizeCmd.feedbackToUser || (widgetToResize === null ? `Multiple widgets match for resizing. Please be more specific.` : `Could not find widget to resize.`);
+            break;
+        }
+        if (resizeCmd.sizePreset) {
+            handleApplyWidgetSizePreset(widgetToResize.id, resizeCmd.sizePreset);
+            if (!command.feedbackToUser) return; 
+            else feedbackMessage = command.feedbackToUser;
+            break;
+        }
+
+        let { newColSpan, newRowSpan } = resizeCmd;
+        const currentBlueprint = AVAILABLE_WIDGET_DEFINITIONS.find(b => b.type === widgetToResize.type);
+        const minCS = currentBlueprint?.minColSpan || 1;
+        const minRS = currentBlueprint?.minRowSpan || 1;
+
+        if (resizeCmd.resizeDirection) {
+            let cSpan = widgetToResize.colSpan;
+            let rSpan = widgetToResize.rowSpan;
+            switch (resizeCmd.resizeDirection) {
+                case 'larger': cSpan += 2; rSpan += 2; break;
+                case 'smaller': cSpan = Math.max(minCS, cSpan - 2); rSpan = Math.max(minRS, rSpan - 2); break;
+                case 'wider': cSpan += 2; break;
+                case 'narrower': cSpan = Math.max(minCS, cSpan - 2); break;
+                case 'taller': rSpan += 2; break;
+                case 'shorter': rSpan = Math.max(minRS, rSpan - 2); break;
+                case 'resetSize':
+                    if(currentBlueprint) {
+                        const preset = WIDGET_SIZE_PRESETS[currentBlueprint.defaultSizePreset];
+                        cSpan = Math.max(minCS, Math.round(preset.targetWidthPx / cellSize));
+                        rSpan = Math.max(minRS, Math.round(preset.targetHeightPx / cellSize));
+                    }
+                    break;
+            }
+            newColSpan = Math.min(widgetContainerCols - widgetToResize.colStart + 1, cSpan);
+            newRowSpan = Math.min(widgetContainerRows - widgetToResize.rowStart + 1, rSpan);
+        }
+
+        if (typeof newColSpan === 'number' || typeof newRowSpan === 'number') {
+            const finalCS = typeof newColSpan === 'number' ? Math.max(minCS, Math.min(newColSpan, widgetContainerCols - widgetToResize.colStart + 1)) : widgetToResize.colSpan;
+            const finalRS = typeof newRowSpan === 'number' ? Math.max(minRS, Math.min(newRowSpan, widgetContainerRows - widgetToResize.rowStart + 1)) : widgetToResize.rowSpan;
+
+            const otherWidgets = widgets.filter(w => w.id !== widgetToResize.id);
+            if (canPlaceWidget({...widgetToResize, colSpan: finalCS, rowSpan: finalRS}, widgetToResize.colStart, widgetToResize.rowStart, otherWidgets)) {
+                 handleWidgetResizeEnd(widgetToResize.id, { colStart: widgetToResize.colStart, rowStart: widgetToResize.rowStart, colSpan: finalCS, rowSpan: finalRS });
+                 feedbackMessage = feedbackMessage || `Resized ${widgetToResize.title}.`;
+            } else {
+                const tempLayout = widgets.map(w => w.id === widgetToResize.id ? {...w, colSpan: finalCS, rowSpan: finalRS} : w);
+                const sorted = performAutoSort(tempLayout);
+                if (sorted) {
+                    setWidgets(sorted);
+                    updateWidgetsAndPushToHistory(sorted, `ai_resize_sort_${widgetToResize.id}`);
+                    feedbackMessage = feedbackMessage || `Resized ${widgetToResize.title} and rearranged grid.`;
+                } else {
+                    feedbackMessage = feedbackMessage || `Could not resize ${widgetToResize.title} as requested due to space constraints.`;
+                }
+            }
+        } else {
+             feedbackMessage = feedbackMessage || `No specific resize dimensions provided for ${widgetToResize.title}.`;
+        }
+        break;
+      }
+      case 'changeWidgetSetting': {
+        const settingCmd = command as ChangeWidgetSettingAiCommand<AllWidgetSettings>;
+        const widgetToChange = findTargetWidget(settingCmd);
+        if (widgetToChange && settingCmd.settingName) {
+            const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(b => b.type === widgetToChange.type);
+            let valueToSet: string | number | boolean | undefined | null = settingCmd.settingValue;
+
+            if (blueprint?.defaultSettings) {
+                const settingDef = blueprint.defaultSettings[settingCmd.settingName as keyof typeof blueprint.defaultSettings];
+                if (settingDef !== undefined) {
+                    const expectedType = typeof settingDef;
+                    if (expectedType === 'boolean' && typeof valueToSet === 'string') {
+                        valueToSet = ['true', 'on', 'yes', 'enable', 'show', 'enabled'].includes(valueToSet.toLowerCase());
+                    } else if (expectedType === 'number' && typeof valueToSet === 'string') {
+                        const numVal = parseFloat(valueToSet);
+                        if (!isNaN(numVal)) valueToSet = numVal;
+                        else { feedbackMessage = `Invalid number "${valueToSet}" for ${settingCmd.settingName}.`; break; }
+                    }
+                }
+            }
+            handleSaveWidgetInstanceSettings(widgetToChange.id, { [settingCmd.settingName]: valueToSet });
+            feedbackMessage = feedbackMessage || `Setting ${settingCmd.settingName} for ${widgetToChange.title} updated.`;
+        } else if (widgetToChange === null) {
+            feedbackMessage = settingCmd.feedbackToUser || `Multiple widgets match for setting change. Please be more specific.`;
+        } else {
+            feedbackMessage = settingCmd.feedbackToUser || `Could not change setting. Widget or setting name unclear.`;
+        }
+        break;
+      }
+      case 'minimizeWidget': {
+        const minCmd = command as MinimizeWidgetAiCommand;
+        const widgetToMinimize = findTargetWidget(minCmd);
+        if (widgetToMinimize) {
+          if (!widgetToMinimize.isMinimized) {
+            handleWidgetMinimizeToggle(widgetToMinimize.id);
+            feedbackMessage = feedbackMessage || `Minimized ${widgetToMinimize.title}.`;
+          } else {
+            feedbackMessage = feedbackMessage || `${widgetToMinimize.title} is already minimized.`;
+          }
+        } else if (widgetToMinimize === null) {
+            feedbackMessage = minCmd.feedbackToUser || `Multiple widgets match for minimizing. Please be more specific.`;
+        } else {
+            feedbackMessage = minCmd.feedbackToUser || `Could not find widget to minimize.`;
+        }
+        break;
+      }
+      case 'maximizeWidget': {
+        const maxCmd = command as MaximizeWidgetAiCommand;
+        const widgetToMaximize = findTargetWidget(maxCmd);
+        if (widgetToMaximize) {
+          if (maximizedWidgetId !== widgetToMaximize.id) {
+            handleWidgetMaximizeToggle(widgetToMaximize.id);
+            feedbackMessage = feedbackMessage || `Maximized ${widgetToMaximize.title}.`;
+          } else {
+            feedbackMessage = feedbackMessage || `${widgetToMaximize.title} is already maximized.`;
+          }
+        } else if (widgetToMaximize === null) {
+            feedbackMessage = maxCmd.feedbackToUser || `Multiple widgets match for maximizing. Please be more specific.`;
+        } else {
+            feedbackMessage = maxCmd.feedbackToUser || `Could not find widget to maximize.`;
+        }
+        break;
+      }
+      case 'restoreWidget': {
+        const restoreCmd = command as RestoreWidgetAiCommand;
+        const widgetToRestore = findTargetWidget(restoreCmd);
+        if (widgetToRestore) {
+          if (widgetToRestore.isMinimized) {
+            handleWidgetMinimizeToggle(widgetToRestore.id); 
+            feedbackMessage = feedbackMessage || `Restored ${widgetToRestore.title} from minimized state.`;
+          } else if (maximizedWidgetId === widgetToRestore.id) {
+            handleWidgetMaximizeToggle(widgetToRestore.id); 
+            feedbackMessage = feedbackMessage || `Restored ${widgetToRestore.title} from maximized state.`;
+          } else {
+            feedbackMessage = feedbackMessage || `${widgetToRestore.title} is not currently minimized or maximized.`;
+          }
+        } else if (widgetToRestore === null) {
+            feedbackMessage = restoreCmd.feedbackToUser || `Multiple widgets match for restoring. Please be more specific.`;
+        } else {
+            feedbackMessage = restoreCmd.feedbackToUser || `Could not find widget to restore.`;
+        }
+        break;
+      }
+      case 'openOrFocusWidget': {
+        const openCmd = command as OpenOrFocusWidgetAiCommand;
+        let settingsToApply: Partial<AllWidgetSettings> | null = null;
+
+        if (typeof openCmd.initialSettings === 'string') {
+            try {
+                settingsToApply = JSON.parse(openCmd.initialSettings);
+            } catch (e) {
+                console.error("Error parsing initialSettings JSON for openOrFocusWidget:", e);
+                feedbackMessage = "Error applying initial settings due to invalid format.";
+                break; 
+            }
+        } else if (typeof openCmd.initialSettings === 'object') {
+            settingsToApply = openCmd.initialSettings;
+        }
+
+        const matchingTypeWidgets = widgets.filter(w => w.type === openCmd.widgetType);
+        let targetWidget: PageWidgetConfig | null | undefined = undefined;
+
+        if (matchingTypeWidgets.length === 0) {
+            const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(b => b.type === openCmd.widgetType);
+            const newWidgetTitle = openCmd.targetWidgetTitle || blueprint?.defaultTitle || `New ${openCmd.widgetType}`;
+            handleAddNewWidget(
+                openCmd.widgetType,
+                newWidgetTitle,
+                undefined, undefined, undefined, undefined, undefined, 
+                settingsToApply || undefined 
+            );
+            feedbackMessage = feedbackMessage || `Opened new ${newWidgetTitle} widget. ${settingsToApply ? 'Initial settings applied.' : ''}`;
+        } else if (matchingTypeWidgets.length === 1) {
+            targetWidget = matchingTypeWidgets[0];
+        } else { 
+            if (openCmd.targetWidgetTitle) {
+                targetWidget = matchingTypeWidgets.find(w => w.title.toLowerCase() === openCmd.targetWidgetTitle!.toLowerCase());
+                if (!targetWidget) {
+                    targetWidget = matchingTypeWidgets.find(w => w.title.toLowerCase().includes(openCmd.targetWidgetTitle!.toLowerCase()));
+                }
+            }
+            if (!targetWidget) { 
+                feedbackMessage = `Multiple ${openCmd.widgetType} widgets exist. Please specify which one (e.g., by title) or use "the [title] ${openCmd.widgetType}".`;
+                break; 
+            }
+        }
+
+        if (targetWidget) { 
+            setActiveWidgetId(targetWidget.id);
+
+            if (maximizedWidgetId && maximizedWidgetId !== targetWidget.id) {
+                const maximizedOriginal = widgets.find(w => w.id === maximizedWidgetId);
+                if (maximizedOriginal) handleWidgetMaximizeToggle(maximizedOriginal.id); 
+            }
+            if (targetWidget.isMinimized) {
+                handleWidgetMinimizeToggle(targetWidget.id); 
+            }
+            if (settingsToApply) {
+                handleSaveWidgetInstanceSettings(targetWidget.id, settingsToApply);
+            }
+            feedbackMessage = feedbackMessage || `Focused ${targetWidget.title}. ${settingsToApply ? 'Settings applied.' : ''}`;
+        }
+        break;
+      }
+      case 'changeCellSize': {
+        const cellCmd = command as ChangeCellSizeAiCommand;
+        let targetCellSize = cellCmd.newCellSize;
+        if (cellCmd.densityLabel) {
+            const option = CELL_SIZE_OPTIONS.find(opt => opt.label.toLowerCase() === cellCmd.densityLabel!.toLowerCase());
+            if (option) targetCellSize = option.value;
+        }
+        if (typeof targetCellSize === 'number' && CELL_SIZE_OPTIONS.some(opt => opt.value === targetCellSize)) {
+          handleChangeCellSize(targetCellSize);
+          feedbackMessage = feedbackMessage || `Cell size changed to ${targetCellSize}px.`;
+        } else {
+            feedbackMessage = cellCmd.feedbackToUser || `Invalid cell size or density label.`;
+        }
+        break;
+      }
+      case 'undoAction': handleUndo(); feedbackMessage = feedbackMessage || "Undo action performed."; break;
+      case 'redoAction': handleRedo(); feedbackMessage = feedbackMessage || "Redo action performed."; break;
+      case 'exportLayout': handleExportLayout(); feedbackMessage = feedbackMessage || "Layout exported."; break;
+      case 'autoSortGrid': handleAutoSortButtonClick(); feedbackMessage = feedbackMessage || "Grid auto-sorted."; break;
+      case 'sendChatMessage': {
+        const chatCmd = command as SendChatMessageAiCommand;
+        const chatWidget = findTargetWidget(chatCmd); 
+        if (chatWidget && chatWidget.type === 'geminiChat' && chatCmd.message) {
+          console.log(`AI wants to send to ${chatWidget.id} (${chatWidget.title}): "${chatCmd.message}"`);
+          feedbackMessage = feedbackMessage || `Sending message to ${chatWidget.title}: "${chatCmd.message.substring(0,30)}..." (Display in widget not implemented in this example).`;
+        } else if (chatWidget === null) {
+            feedbackMessage = chatCmd.feedbackToUser || `Multiple chat widgets match. Please be more specific.`;
+        } else {
+          feedbackMessage = chatCmd.feedbackToUser || `Could not send chat message. Target chat widget or message unclear.`;
+        }
+        break;
+      }
+      case 'getWidgetInfo': {
+        const infoCmd = command as GetWidgetInfoAiCommand;
+        const widgetToQuery = findTargetWidget(infoCmd);
+        if (widgetToQuery && infoCmd.requestedInfo) {
+          let info = "Information not found.";
+          const settingKey = infoCmd.requestedInfo.toLowerCase().replace(/\s/g, '');
+          const widgetSettings = widgetToQuery.settings as Record<string, string | number | boolean | undefined | null>;
+
+          if (widgetSettings && Object.prototype.hasOwnProperty.call(widgetSettings, settingKey)) {
+            info = `The ${infoCmd.requestedInfo} for ${widgetToQuery.title} is ${JSON.stringify(widgetSettings[settingKey])}.`;
+          } else if (settingKey === 'title') {
+            info = `The title is ${widgetToQuery.title}.`;
+          } else if (settingKey === 'type') {
+            info = `${widgetToQuery.title} is a ${widgetToQuery.type} widget.`;
+          } else if (settingKey === 'size' || settingKey === 'dimensions') {
+            info = `${widgetToQuery.title} is ${widgetToQuery.colSpan} columns wide and ${widgetToQuery.rowSpan} rows tall.`;
+          } else {
+            info = `I couldn't find the specific detail "${infoCmd.requestedInfo}" for ${widgetToQuery.title}. Its current settings are: ${JSON.stringify(widgetToQuery.settings)}.`;
+          }
+          feedbackMessage = info;
+        } else if (widgetToQuery === null) {
+            feedbackMessage = infoCmd.feedbackToUser || `Multiple widgets match. Please be more specific.`;
+        } else {
+          feedbackMessage = infoCmd.feedbackToUser || `Could not get widget info. Target or requested info unclear.`;
+        }
+        break;
+      }
+      case 'clarifyCommand': {
+        const clarifyCmd = command as ClarifyCommandAiCommand;
+        feedbackMessage = clarifyCmd.feedbackToUser || clarifyCmd.clarificationNeeded || "I need more information to proceed.";
+        break;
+      }
+      case 'unknown': {
+        const unknownCmd = command as UnknownAiCommand;
+        feedbackMessage = unknownCmd.feedbackToUser || `Sorry, I didn't understand the command: "${unknownCmd.originalCommand}".`;
+        break;
+      }
+      default:
+        const unhandledAction = (command as BaseAiCommand).action;
+        feedbackMessage = `Sorry, I can't handle the action: ${unhandledAction}. This might be an unhandled command type.`;
+    }
+
+    if (feedbackMessage) { 
+        setAiLastFeedback(feedbackMessage);
+        speakText(feedbackMessage);
+    }
+  };
+
+
+  // --- End AI Integration Functions ---
+
   const renderWidgetContent = (widgetConfig: PageWidgetConfig) => {
     const currentWidgetSettings = widgetConfig.settings || {};
     const notesSettings = currentWidgetSettings as PageInstanceNotesSettings | undefined;
@@ -1048,7 +1805,7 @@ export default function Home() {
       case 'notes': return <NotesWidget instanceId={widgetConfig.id} settings={notesSettings} notes={sharedNotes} activeNoteId={activeSharedNoteId} onNotesChange={setSharedNotes} onActiveNoteIdChange={setActiveSharedNoteId} />;
       case 'portfolio': return <PortfolioWidget settings={currentWidgetSettings as PortfolioWidgetSettings | undefined} isMobileFullScreen={isMobileView && widgets.length === 1 && widgets[0].type === 'portfolio'} />;
       case 'geminiChat': return <GeminiChatWidget instanceId={widgetConfig.id} settings={currentWidgetSettings as GeminiChatWidgetSettings | undefined} />;
-      default: return <p className="text-xs text-secondary italic">Generic widget content.</p>;
+      default: return <p className="text-xs text-secondary italic">Generic widget content for type: {widgetConfig.type}.</p>;
     }
   };
 
@@ -1075,7 +1832,6 @@ export default function Home() {
     }
   };
 
-  // MODIFIED: Loading condition uses isLayoutEngineReady
   if (!isLayoutEngineReady || widgetContainerCols === 0 || widgetContainerRows === 0) {
     return <div className="w-full h-screen bg-page-background flex items-center justify-center text-page-foreground">Loading Dashboard...</div>;
   }
@@ -1101,7 +1857,7 @@ export default function Home() {
             <>
               <div className="relative" ref={addWidgetMenuRef}>
                 <button id="add-widget-button" onClick={() => {setIsAddWidgetMenuOpen(prev => !prev); setIsAddWidgetContextMenuOpen(false); setIsDensityMenuOpen(false);}} disabled={!!maximizedWidgetId} className="control-button flex items-center" aria-expanded={isAddWidgetMenuOpen} aria-haspopup="true" aria-label="Add New Widget" > <AddIcon /> <span className="ml-1.5 text-xs hidden sm:inline">Add Widget</span> </button>
-                {isAddWidgetMenuOpen && ( <div className="absolute backdrop-blur-md left-0 mt-2 w-56 origin-top-left rounded-md bg-dark-surface border border-dark-border-interactive shadow-xl py-1 z-50 focus:outline-none animate-modalFadeInScale" role="menu" aria-orientation="vertical" aria-labelledby="add-widget-button" > {AVAILABLE_WIDGET_DEFINITIONS.map(widgetDef => ( <button key={widgetDef.type} onClick={() => handleAddNewWidget(widgetDef.type)} className="group flex items-center w-full text-left px-3 py-2.5 text-sm text-dark-text-primary hover:bg-dark-accent-primary hover:text-dark-text-on-accent focus:bg-dark-accent-primary focus:text-dark-text-on-accent focus:outline-none transition-all duration-150 ease-in-out hover:pl-4" role="menuitem" disabled={!!maximizedWidgetId} > {widgetDef.icon && <widgetDef.icon />} <span className="flex-grow">{widgetDef.displayName || widgetDef.defaultTitle.replace("New ", "")}</span> </button> ))} </div> )}
+                {isAddWidgetMenuOpen && ( <div className="absolute backdrop-blur-md left-0 mt-2 w-56 origin-top-left rounded-md bg-dark-surface border border-dark-border-interactive shadow-xl py-1 z-50 focus:outline-none animate-modalFadeInScale" role="menu" aria-orientation="vertical" aria-labelledby="add-widget-button" > {AVAILABLE_WIDGET_DEFINITIONS.map(widgetDef => ( <button key={widgetDef.type} onClick={() => handleAddNewWidget(widgetDef.type)} className="group flex items-center w-full text-left px-3 py-2.5 text-sm text-dark-text-primary hover:bg-dark-accent-primary hover:text-dark-text-on-accent focus:bg-dark-accent-primary focus:text-dark-text-on-accent focus:outline-none transition-all duration-150 ease-in-out hover:pl-4" role="menuitem" disabled={!!maximizedWidgetId} > {widgetDef.icon && <widgetDef.icon />} <span className="flex-grow">{widgetDef.displayName || widgetDef.defaultTitle.replace("New ", "")}</span> </button>))} </div> )}
               </div>
               <button onClick={handleAutoSortButtonClick} disabled={!!maximizedWidgetId || widgets.length === 0} className="control-button flex items-center" aria-label="Auto Sort Grid"> <AutoSortIcon /> <span className="ml-1.5 text-xs hidden sm:inline">Sort Grid</span> </button>
               <button onClick={handleExportLayout} disabled={!!maximizedWidgetId} className="control-button" aria-label="Export Layout"><ExportIcon /></button>
@@ -1145,6 +1901,14 @@ export default function Home() {
             )}
           </div>
         </div>
+        <button
+            onClick={() => setShowAiCommandBar(prev => !prev)}
+            className="control-button"
+            aria-label={showAiCommandBar ? "Hide AI Command Bar" : "Show AI Command Bar"}
+            title={showAiCommandBar ? "Hide AI Command Bar" : "Show AI Command Bar"}
+        >
+            <AiIcon />
+        </button>
         <div className="text-xs text-secondary px-2 sm:px-3 py-1 bg-slate-700 rounded-md">
             {isMobileView ? "Mobile View" : `History: ${historyDisplay.pointer}/${historyDisplay.length}`}
         </div>
@@ -1167,7 +1931,7 @@ export default function Home() {
             if (maximizedWidgetId && maximizedWidgetId !== widgetConfig.id && !isMobileView) return null;
 
             const currentWidgetState = maximizedWidgetId === widgetConfig.id && maximizedWidgetOriginalState && !isMobileView
-                ? { 
+                ? {
                     ...maximizedWidgetOriginalState,
                     colStart: 1,
                     rowStart: 1,
@@ -1209,6 +1973,57 @@ export default function Home() {
         </div>
       </div>
 
+      {showAiCommandBar && (
+        <div id="ai-command-bar" className="fixed bottom-0 left-0 right-0 bg-slate-800/90 dark:bg-dark-surface/90 backdrop-blur-md p-3 md:p-4 shadow-2xl_top z-[60] border-t border-slate-700 dark:border-dark-border-interactive transition-transform duration-300 ease-out animate-slideUp">
+            <div className="max-w-3xl mx-auto">
+                <div className="flex items-center space-x-2 md:space-x-3">
+                    <button
+                        onClick={startListening}
+                        disabled={aiIsProcessing}
+                        className={`p-2.5 md:p-3 rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 ${aiIsListening ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse' : 'bg-sky-500 hover:bg-sky-600 text-white'}`}
+                        aria-label={aiIsListening ? "Stop listening" : "Start voice command"}
+                        title={aiIsListening ? "Stop listening" : "Start voice command"}
+                    >
+                        {aiIsListening ? <MicOffIcon /> : <MicIcon />}
+                    </button>
+                    <input
+                        type="text"
+                        value={aiInputValue}
+                        onChange={(e) => setAiInputValue(e.target.value)}
+                        onKeyPress={(e) => { if (e.key === 'Enter' && !aiIsProcessing) handleSendAiCommand(aiInputValue); }}
+                        placeholder={aiIsListening ? "Listening..." : "Type your command or use microphone..."}
+                        className="flex-grow p-3 bg-slate-700 dark:bg-slate-900 border border-slate-600 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none text-sm placeholder-slate-400 text-slate-100 transition-all duration-200 shadow-sm"
+                        disabled={aiIsProcessing}
+                        aria-label="AI command input"
+                    />
+                    <button
+                        onClick={() => handleSendAiCommand(aiInputValue)}
+                        disabled={aiIsProcessing || !aiInputValue.trim()}
+                        className="p-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg disabled:bg-slate-600 disabled:text-slate-400 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center aspect-square focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-slate-800 shadow-md"
+                        aria-label="Send command"
+                    >
+                        {aiIsProcessing ? <ProcessingIcon /> : <SendArrowIcon />}
+                    </button>
+                     <button
+                        onClick={() => setShowAiCommandBar(false)}
+                        className="p-2.5 md:p-3 rounded-full bg-slate-600 hover:bg-slate-500 text-slate-300 hover:text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 focus:ring-offset-slate-800"
+                        aria-label="Close AI Command Bar"
+                        title="Close AI Command Bar"
+                    >
+                        <AiCloseIcon />
+                    </button>
+                </div>
+                {(aiLastFeedback || aiError) && (
+                    <div className={`mt-2.5 p-2.5 rounded-md text-xs ${aiError ? 'bg-red-500/20 text-red-300 border border-red-500/30' : 'bg-sky-500/10 text-sky-300 border border-sky-500/20'}`}>
+                        <strong>{aiError ? 'Error: ' : (aiIsProcessing ? 'Processing: ' : (aiIsListening && !aiInputValue.trim() ? '' : 'AI: '))}</strong>
+                        {aiError || aiLastFeedback}
+                    </div>
+                )}
+            </div>
+        </div>
+      )}
+
+
       {isSettingsModalOpen && selectedWidgetForSettings && (
         <SettingsModal
             isOpen={isSettingsModalOpen}
@@ -1240,11 +2055,26 @@ export default function Home() {
         widgetContainerCols={widgetContainerCols}
         widgetContainerRows={widgetContainerRows}
         CELL_SIZE={cellSize}
-        headerHeight={headerRef.current?.offsetHeight}
+        headerHeight={headerRef.current?.offsetHeight || 0} 
       />}
     </main>
   );
 }
 
-const styles = ` .control-button { display:flex; align-items:center; justify-content:center; padding:0.5rem; background-color:var(--dark-accent-primary); border-radius:0.375rem; color:var(--dark-text-on-accent); transition:background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out; box-shadow:0 1px 2px 0 rgba(0,0,0,0.05); } .control-button:hover { background-color:var(--dark-accent-primary-hover); box-shadow:0 2px 4px 0 rgba(0,0,0,0.1); } .control-button:disabled { background-color:hsl(222,47%,25%); color:hsl(215,20%,55%); cursor:not-allowed; box-shadow:none; } .control-button:focus-visible { outline:2px solid var(--dark-accent-primary-hover); outline-offset:2px; } `;
-if (typeof window !== 'undefined') { if (!document.getElementById('custom-dashboard-styles')) { const styleSheet = document.createElement("style"); styleSheet.id = 'custom-dashboard-styles'; styleSheet.type = "text/css"; styleSheet.innerText = styles; document.head.appendChild(styleSheet); }}
+const styles = `
+  .control-button { display:flex; align-items:center; justify-content:center; padding:0.5rem; background-color:var(--dark-accent-primary); border-radius:0.375rem; color:var(--dark-text-on-accent); transition:background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out; box-shadow:0 1px 2px 0 rgba(0,0,0,0.05); }
+  .control-button:hover { background-color:var(--dark-accent-primary-hover); box-shadow:0 2px 4px 0 rgba(0,0,0,0.1); }
+  .control-button:disabled { background-color:hsl(222,47%,25%); color:hsl(215,20%,55%); cursor:not-allowed; box-shadow:none; }
+  .control-button:focus-visible { outline:2px solid var(--dark-accent-primary-hover); outline-offset:2px; }
+  @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .animate-slideUp { animation: slideUp 0.3s ease-out forwards; }
+  .shadow-2xl_top { box-shadow: 0 -20px 25px -5px rgba(0,0,0,0.1), 0 -10px 10px -5px rgba(0,0,0,0.04); }
+`;
+if (typeof window !== 'undefined' && !document.getElementById('custom-dashboard-styles')) {
+  const styleSheet = document.createElement("style");
+  styleSheet.id = 'custom-dashboard-styles';
+  styleSheet.type = "text/css";
+  styleSheet.innerText = styles;
+  document.head.appendChild(styleSheet);
+}
+

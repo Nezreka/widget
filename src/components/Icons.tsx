@@ -61,3 +61,50 @@ export const GeminiChatIcon = () => (
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 3.75l.938-.469L12 2.25l-.938 1.031L12 3.75zm0 0v1.5m0 0V3.75m0 1.5h1.5m-1.5 0H10.5m1.5 1.5l.938.469L12 7.75l-.938-.469L12 6.75zm0 0v-1.5m0 0V6.75m0-1.5h-1.5m1.5 0H13.5" />
     </svg>
 );
+
+// --- NEW AI Command Bar Icons ---
+
+// AI Icon (e.g., a stylized brain or abstract AI symbol)
+export const AiIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 7.5V6.108c0-1.135.845-2.098 1.976-2.192.373-.03.748-.03 1.123 0 1.131.094 1.976 1.057 1.976 2.192V7.5M8.25 7.5h7.5M8.25 7.5c0 1.135-.845 2.098-1.976 2.192a48.424 48.424 0 01-1.123 0C3.845 9.598 3 8.635 3 7.5m6.750 0v.375c0 .621.504 1.125 1.125 1.125h3.75c.621 0 1.125-.504 1.125-1.125V7.5m-6.750 0h6.75" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 12.586l.293.293a1 1 0 001.414 0l.293-.293m-1.707-1.707l.293.293a1 1 0 001.414 0l.293-.293m-1.707-1.707l1.707 1.707M6 15a6 6 0 1012 0v-1.5a6 6 0 10-12 0v1.5z" />
+    </svg>
+);
+
+// Microphone Icon
+export const MicIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+    </svg>
+);
+
+// Microphone Off Icon
+export const MicOffIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75l16.5 16.5" />
+    </svg>
+);
+
+// Send Arrow Icon (Paper plane style)
+export const SendArrowIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+    </svg>
+);
+
+// Close Icon (Simple X) - page.tsx aliases this to AiCloseIcon
+export const CloseIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+    </svg>
+);
+
+// Processing Icon (Spinner/Dots)
+export const ProcessingIcon = () => (
+    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+);

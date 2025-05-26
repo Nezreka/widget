@@ -1,13 +1,10 @@
 // src/components/YoutubeWidget.tsx
 "use client";
 
-import React, { useState, FormEvent, useEffect, useCallback } from 'react';
-import Image from 'next/image'; // Import next/image
+import React, { useState, FormEvent, useEffect, useCallback} from 'react'; // Ensured useRef is imported
+import Image from 'next/image';
 
 // --- Constants ---
-// IMPORTANT: Replace with your actual YouTube Data API v3 key
-// Ensure this key is kept secure and not exposed publicly in client-side code if possible
-// Consider using environment variables and a backend proxy for API calls in a production app.
 const YOUTUBE_API_KEY: string = 'AIzaSyAIsr27eVlsTIgd0kLM9Lq_WDr-vGbJjtI'; // User provided key. WARNING: Exposing API keys on the client side is insecure.
 
 // --- Icons ---
@@ -43,10 +40,9 @@ interface YouTubeSearchResultItem {
 
 interface YoutubeWidgetProps {
   settings?: YoutubeWidgetSettings;
-  id: string; // This ID might be used by parent components for keying or identification.
+  id: string; 
 }
 
-// Define props for the Settings Panel
 interface YoutubeSettingsPanelProps {
   widgetId: string;
   currentSettings: YoutubeWidgetSettings | undefined;
@@ -64,7 +60,7 @@ export const YoutubeSettingsPanel: React.FC<YoutubeSettingsPanelProps> = ({
   const handleSaveClick = () => {
     onSave({
         defaultSearchQuery: defaultSearchQuery.trim(),
-        maxResults: Math.max(1, Math.min(25, maxResults)), // Ensure maxResults is within 1-25 range
+        maxResults: Math.max(1, Math.min(25, maxResults)),
         showResultsPanel: showResultsPanelConfig,
     });
   };
@@ -108,44 +104,35 @@ export const YoutubeSettingsPanel: React.FC<YoutubeSettingsPanelProps> = ({
       >
         Save YouTube Settings
       </button>
-      {/* The check for YOUTUBE_API_KEY === 'YOUR_API_KEY' was removed 
-        because YOUTUBE_API_KEY is now a specific real key, making the 
-        comparison always false and flagged by TypeScript.
-        The general warning about client-side key exposure remains important.
-      */}
     </div>
   );
 };
 
 // --- Main YoutubeWidget Component ---
-const YoutubeWidget: React.FC<YoutubeWidgetProps> = ({ settings, id }) => {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const widgetInstanceId = id; // Use the id prop, e.g. for unique child keys or pass to settings panel if needed
-
-  const [searchQuery, setSearchQuery] = useState('');
+const YoutubeWidget: React.FC<YoutubeWidgetProps> = ({ settings }) => { 
+  const [searchQuery, setSearchQuery] = useState(settings?.defaultSearchQuery || '');
   const [searchResults, setSearchResults] = useState<YouTubeSearchResultItem[]>([]);
   const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isResultsPanelVisible, setIsResultsPanelVisible] = useState(settings?.showResultsPanel === undefined ? true : settings.showResultsPanel);
-
+  
   const maxResultsCount = settings?.maxResults || 10;
 
   const fetchSearchResults = useCallback(async (query: string) => {
-    if (!YOUTUBE_API_KEY || YOUTUBE_API_KEY === 'YOUR_API_KEY_PLACEHOLDER_IF_YOU_REVERT') { 
-      setError("YouTube API Key is not configured correctly. Please set it in the YoutubeWidget.tsx file or as an environment variable.");
+    if (!YOUTUBE_API_KEY || YOUTUBE_API_KEY === 'YOUR_API_KEY_PLACEHOLDER_IF_YOU_REVERT') {
+      setError("YouTube API Key is not configured correctly.");
       setIsLoading(false);
       setSearchResults([]);
       return;
     }
     if (!query.trim()) {
-      setSearchResults([]);
+      setSearchResults([]); // Clear results if query is empty
       setError(null);
       return;
     }
     setIsLoading(true);
     setError(null);
-    setSearchResults([]);
     try {
       const response = await fetch(
         `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${maxResultsCount}&q=${encodeURIComponent(query.trim())}&key=${YOUTUBE_API_KEY}`
@@ -161,7 +148,7 @@ const YoutubeWidget: React.FC<YoutubeWidgetProps> = ({ settings, id }) => {
       }
       const data = await response.json();
       setSearchResults(data.items || []);
-    } catch (err: unknown) { // Changed from any to unknown
+    } catch (err: unknown) {
       console.error("YouTube API search error:", err);
       if (err instanceof Error) {
         setError(err.message);
@@ -169,10 +156,56 @@ const YoutubeWidget: React.FC<YoutubeWidgetProps> = ({ settings, id }) => {
         setError("An unknown error occurred while fetching results. Check API key and quota.");
       }
       setSearchResults([]);
+      setSelectedVideoId(null);
     } finally {
       setIsLoading(false);
     }
   }, [maxResultsCount]);
+
+  // Effect 1: Sync settings.defaultSearchQuery prop to internal searchQuery state
+  useEffect(() => {
+    const newQueryFromSettings = settings?.defaultSearchQuery;
+    console.log(`[YT Widget Sync Effect] settings.defaultSearchQuery: "${newQueryFromSettings}", current searchQuery state: "${searchQuery}"`);
+    
+    // If the prop has a value and it's different from the current internal state, update the internal state.
+    // This handles both initial load (if settings.defaultSearchQuery is present) and subsequent updates from AI.
+    if (newQueryFromSettings !== undefined && newQueryFromSettings !== searchQuery) {
+        console.log(`[YT Widget Sync Effect] Updating searchQuery state to: "${newQueryFromSettings}"`);
+        setSearchQuery(newQueryFromSettings);
+    }
+    // If the prop becomes undefined (or was initially undefined) and searchQuery is not empty,
+    // it means a default was removed or never existed. We don't clear user's current input in this case.
+    // If newQueryFromSettings is an empty string and differs, searchQuery will be set to ""
+    
+  }, [settings?.defaultSearchQuery, searchQuery]); // searchQuery is in dependency to re-evaluate if it externally changes while prop is same (less common)
+
+
+  // Effect 2: Fetch results when internal searchQuery state changes and is non-empty
+  useEffect(() => {
+    console.log(`[YT Widget Fetch Effect] searchQuery state is now: "${searchQuery}". Checking if fetch is needed.`);
+    if (searchQuery.trim()) {
+        console.log(`[YT Widget Fetch Effect] searchQuery is non-empty. Fetching results for: "${searchQuery}"`);
+        fetchSearchResults(searchQuery);
+        setIsResultsPanelVisible(true); // Show results panel when a search is made
+    } else {
+        // If searchQuery becomes empty (e.g., user clears input, or defaultSearchQuery was empty string)
+        // fetchSearchResults('') will handle clearing results.
+        // We might also want to hide panel or clear selected video if search query is cleared.
+        console.log(`[YT Widget Fetch Effect] searchQuery is empty. Clearing results (via fetchSearchResults with empty query).`);
+        fetchSearchResults(''); // This will clear results as per its internal logic
+        // setSelectedVideoId(null); // Optionally clear selected video
+        // setIsResultsPanelVisible(settings?.showResultsPanel === undefined ? true : settings.showResultsPanel); // Reset to default visibility or keep as is
+    }
+  }, [searchQuery, fetchSearchResults]); // Only depends on searchQuery (internal state) and the memoized fetcher
+
+
+  // Effect to handle changes in settings.showResultsPanel
+  useEffect(() => {
+    if (settings?.showResultsPanel !== undefined) {
+        setIsResultsPanelVisible(settings.showResultsPanel);
+    }
+  }, [settings?.showResultsPanel]);
+
 
   const getVideoEmbedUrl = (videoId: string | null): string => {
     if (!videoId) return '';
@@ -181,25 +214,17 @@ const YoutubeWidget: React.FC<YoutubeWidgetProps> = ({ settings, id }) => {
 
   const handleSearchSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    fetchSearchResults(searchQuery);
+    // fetchSearchResults is already called by the useEffect hook when searchQuery changes.
+    // This explicit call might be redundant if the state update from input onChange is immediate enough.
+    // However, it ensures search on explicit submit if state update hasn't triggered effect yet.
+    // For safety and explicitness on user action:
     if (searchQuery.trim()) {
+        fetchSearchResults(searchQuery);
         setIsResultsPanelVisible(true);
+    } else {
+        fetchSearchResults(''); // Clear results if submitted empty
     }
   };
-
-  useEffect(() => {
-    if (settings?.defaultSearchQuery && !searchQuery && !isLoading && !error && searchResults.length === 0) {
-      setSearchQuery(settings.defaultSearchQuery);
-      fetchSearchResults(settings.defaultSearchQuery);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings?.defaultSearchQuery, fetchSearchResults]);
-
-  useEffect(() => {
-    if (settings?.showResultsPanel !== undefined) {
-        setIsResultsPanelVisible(settings.showResultsPanel);
-    }
-  }, [settings?.showResultsPanel]);
 
   const toggleResultsPanel = () => setIsResultsPanelVisible(prev => !prev);
 
@@ -221,7 +246,7 @@ const YoutubeWidget: React.FC<YoutubeWidgetProps> = ({ settings, id }) => {
             />
         </div>
         <button
-          type="submit" 
+          type="submit"
           disabled={isLoading || !YOUTUBE_API_KEY || YOUTUBE_API_KEY === 'YOUR_API_KEY_PLACEHOLDER_IF_YOU_REVERT'}
           className="px-5 py-2.5 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white text-sm font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-slate-800 transition-colors shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
         >
@@ -278,7 +303,7 @@ const YoutubeWidget: React.FC<YoutubeWidgetProps> = ({ settings, id }) => {
                 {isLoading && <p className="text-slate-400 text-sm p-3 text-center">Loading results...</p>}
                 {error && <p className="text-red-400 text-sm p-3 text-center">Error: {error}</p>}
                 {!isLoading && !error && searchResults.length === 0 && searchQuery.trim() && (
-                  <p className="text-slate-400 text-sm p-3 text-center">No results for &quot;{searchQuery}&quot;.</p> 
+                  <p className="text-slate-400 text-sm p-3 text-center">No results for &quot;{searchQuery}&quot;.</p>
                 )}
                 {!isLoading && !error && searchResults.length === 0 && !searchQuery.trim() && (
                   <p className="text-slate-400 text-sm p-3 text-center">Enter a search to see videos.</p>
@@ -290,13 +315,13 @@ const YoutubeWidget: React.FC<YoutubeWidgetProps> = ({ settings, id }) => {
                                 ${selectedVideoId === item.id.videoId ? 'bg-slate-700 ring-2 ring-red-500/70 shadow-lg' : 'bg-slate-800/60 hover:shadow-md'}`}
                     onClick={() => setSelectedVideoId(item.id.videoId)} title={item.snippet.title}
                   >
-                    <Image // Replaced <img> with Image
+                    <Image
                       src={item.snippet.thumbnails.default.url} alt={item.snippet.title}
-                      width={item.snippet.thumbnails.default.width || 96} // Provide width
-                      height={item.snippet.thumbnails.default.height || 54} // Provide height
+                      width={item.snippet.thumbnails.default.width || 96}
+                      height={item.snippet.thumbnails.default.height || 54}
                       className="rounded-md flex-shrink-0 object-cover bg-slate-700 border border-slate-600/50"
                       onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/96x54/1E293B/94A3B8?text=No+Thumb&font=sans'; }}
-                      unoptimized={true} // Added unoptimized if specific loader isn't configured and to prevent errors with external URLs
+                      unoptimized={true}
                     />
                     <div className="overflow-hidden flex-grow">
                       <h4 className="text-xs font-semibold text-slate-100 line-clamp-2" title={item.snippet.title}>
