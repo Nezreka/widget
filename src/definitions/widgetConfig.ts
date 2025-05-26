@@ -15,7 +15,7 @@ import {
   PhotoIcon,
   PortfolioIcon,
   GeminiChatIcon
-} from '@/components/Icons';
+} from '@/components/Icons'; // Assuming Icons.tsx is in @/components/
 
 // Import specific widget settings types from their respective component files
 // Note: Adjust paths if your widget components are structured differently
@@ -23,25 +23,30 @@ import { type WeatherWidgetSettings } from "@/components/WeatherWidget";
 import { type ClockWidgetSettings } from "@/components/ClockWidget";
 import { type CalculatorWidgetSettings } from "@/components/CalculatorWidget";
 import { type YoutubeWidgetSettings } from "@/components/YoutubeWidget";
-// Removed unused 'Note' import from here
 import { type NotesWidgetSettings } from "@/components/NotesWidget";
-// Removed unused 'TodoItem' import from here
 import { type TodoWidgetSettings } from "@/components/TodoWidget";
 import { type MinesweeperWidgetSettings } from "@/components/MinesweeperWidget";
 import { type UnitConverterWidgetSettings } from "@/components/UnitConverterWidget";
 import { type CountdownStopwatchWidgetSettings } from "@/components/CountdownStopwatchWidget";
-// Removed unused 'HistoricImage' import from here
 import { type PhotoWidgetSettings } from "@/components/PhotoWidget";
 import { type PortfolioWidgetSettings } from "@/components/PortfolioWidget";
 import { type GeminiChatWidgetSettings } from "@/components/GeminiChatWidget";
 
-// Import WidgetContainerSettings if it's used by PageWidgetConfig
+// Import WidgetContainerSettings from Widget.tsx as it's used by PageWidgetConfig
 import { type WidgetContainerSettings } from '@/components/Widget';
 
 // --- Constants ---
 export const DEFAULT_CELL_SIZE = 30; // Base cell size for defining target pixel dimensions
 
 // --- Widget Size Presets ---
+
+// NEW: Explicitly define WidgetSizePresetDetails
+export interface WidgetSizePresetDetails {
+  targetWidthPx: number;
+  targetHeightPx: number;
+  description?: string; // Optional description for the preset
+}
+
 export type WidgetSizePresetKey =
   | 'icon' | 'small_square' | 'medium_square' | 'large_square' | 'xlarge_square'
   | 'small_wide' | 'medium_wide' | 'large_wide'
@@ -51,22 +56,23 @@ export type WidgetSizePresetKey =
   | 'full_width_short'
   | 'half_width_medium';
 
-export const WIDGET_SIZE_PRESETS: Record<WidgetSizePresetKey, { targetWidthPx: number; targetHeightPx: number }> = {
-  icon: { targetWidthPx: 4 * DEFAULT_CELL_SIZE, targetHeightPx: 4 * DEFAULT_CELL_SIZE },
-  small_square: { targetWidthPx: 8 * DEFAULT_CELL_SIZE, targetHeightPx: 8 * DEFAULT_CELL_SIZE },
-  medium_square: { targetWidthPx: 12 * DEFAULT_CELL_SIZE, targetHeightPx: 12 * DEFAULT_CELL_SIZE },
-  large_square: { targetWidthPx: 16 * DEFAULT_CELL_SIZE, targetHeightPx: 16 * DEFAULT_CELL_SIZE },
-  xlarge_square: { targetWidthPx: 20 * DEFAULT_CELL_SIZE, targetHeightPx: 20 * DEFAULT_CELL_SIZE },
-  small_wide: { targetWidthPx: 12 * DEFAULT_CELL_SIZE, targetHeightPx: 6 * DEFAULT_CELL_SIZE },
-  medium_wide: { targetWidthPx: 16 * DEFAULT_CELL_SIZE, targetHeightPx: 8 * DEFAULT_CELL_SIZE },
-  large_wide: { targetWidthPx: 24 * DEFAULT_CELL_SIZE, targetHeightPx: 10 * DEFAULT_CELL_SIZE },
-  small_tall: { targetWidthPx: 6 * DEFAULT_CELL_SIZE, targetHeightPx: 12 * DEFAULT_CELL_SIZE },
-  medium_tall: { targetWidthPx: 10 * DEFAULT_CELL_SIZE, targetHeightPx: 16 * DEFAULT_CELL_SIZE },
-  large_tall: { targetWidthPx: 12 * DEFAULT_CELL_SIZE, targetHeightPx: 20 * DEFAULT_CELL_SIZE },
-  content_driven_medium: { targetWidthPx: 15 * DEFAULT_CELL_SIZE, targetHeightPx: 15 * DEFAULT_CELL_SIZE },
-  content_driven_large: { targetWidthPx: 40 * DEFAULT_CELL_SIZE, targetHeightPx: 30 * DEFAULT_CELL_SIZE },
-  full_width_short: { targetWidthPx: 30 * DEFAULT_CELL_SIZE, targetHeightPx: 8 * DEFAULT_CELL_SIZE },
-  half_width_medium: { targetWidthPx: 15 * DEFAULT_CELL_SIZE, targetHeightPx: 12 * DEFAULT_CELL_SIZE },
+// Updated to use WidgetSizePresetDetails type for values
+export const WIDGET_SIZE_PRESETS: Record<WidgetSizePresetKey, WidgetSizePresetDetails> = {
+  icon: { targetWidthPx: 4 * DEFAULT_CELL_SIZE, targetHeightPx: 4 * DEFAULT_CELL_SIZE, description: "Icon size" },
+  small_square: { targetWidthPx: 8 * DEFAULT_CELL_SIZE, targetHeightPx: 8 * DEFAULT_CELL_SIZE, description: "Small Square" },
+  medium_square: { targetWidthPx: 12 * DEFAULT_CELL_SIZE, targetHeightPx: 12 * DEFAULT_CELL_SIZE, description: "Medium Square" },
+  large_square: { targetWidthPx: 16 * DEFAULT_CELL_SIZE, targetHeightPx: 16 * DEFAULT_CELL_SIZE, description: "Large Square" },
+  xlarge_square: { targetWidthPx: 20 * DEFAULT_CELL_SIZE, targetHeightPx: 20 * DEFAULT_CELL_SIZE, description: "X-Large Square" },
+  small_wide: { targetWidthPx: 12 * DEFAULT_CELL_SIZE, targetHeightPx: 6 * DEFAULT_CELL_SIZE, description: "Small Wide" },
+  medium_wide: { targetWidthPx: 16 * DEFAULT_CELL_SIZE, targetHeightPx: 8 * DEFAULT_CELL_SIZE, description: "Medium Wide" },
+  large_wide: { targetWidthPx: 24 * DEFAULT_CELL_SIZE, targetHeightPx: 10 * DEFAULT_CELL_SIZE, description: "Large Wide" },
+  small_tall: { targetWidthPx: 6 * DEFAULT_CELL_SIZE, targetHeightPx: 12 * DEFAULT_CELL_SIZE, description: "Small Tall" },
+  medium_tall: { targetWidthPx: 10 * DEFAULT_CELL_SIZE, targetHeightPx: 16 * DEFAULT_CELL_SIZE, description: "Medium Tall" },
+  large_tall: { targetWidthPx: 12 * DEFAULT_CELL_SIZE, targetHeightPx: 20 * DEFAULT_CELL_SIZE, description: "Large Tall" },
+  content_driven_medium: { targetWidthPx: 15 * DEFAULT_CELL_SIZE, targetHeightPx: 15 * DEFAULT_CELL_SIZE, description: "Content Medium" },
+  content_driven_large: { targetWidthPx: 40 * DEFAULT_CELL_SIZE, targetHeightPx: 30 * DEFAULT_CELL_SIZE, description: "Content Large" },
+  full_width_short: { targetWidthPx: 30 * DEFAULT_CELL_SIZE, targetHeightPx: 8 * DEFAULT_CELL_SIZE, description: "Full Short" },
+  half_width_medium: { targetWidthPx: 15 * DEFAULT_CELL_SIZE, targetHeightPx: 12 * DEFAULT_CELL_SIZE, description: "Half Medium" },
 };
 
 // --- Widget Types and Settings ---
@@ -96,7 +102,7 @@ export interface PageWidgetConfig {
   minColSpan: number;
   minRowSpan: number;
   settings?: AllWidgetSettings;
-  containerSettings?: WidgetContainerSettings;
+  containerSettings?: WidgetContainerSettings; // This will use the updated version from Widget.tsx
   isMinimized?: boolean;
   originalRowSpan?: number;
 }
@@ -106,7 +112,7 @@ export interface WidgetBlueprint {
   defaultTitle: string;
   displayName?: string;
   description?: string;
-  icon?: React.FC;
+  icon?: React.FC; // React.FC for functional components, or React.ComponentType for class/functional
   defaultSizePreset: WidgetSizePresetKey;
   minColSpan: number; // In grid units, absolute minimum
   minRowSpan: number; // In grid units, absolute minimum
