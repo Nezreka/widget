@@ -90,6 +90,9 @@ interface GridPointData {
   distNormalized: number;
 }
 
+// --- Constants ---
+const TWO_PI = Math.PI * 2;
+
 // --- START: Responsive Particle Configuration ---
 const MOBILE_BREAKPOINT = 768;
 const TABLET_BREAKPOINT = 1024;
@@ -160,88 +163,103 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
   const gridGlobalPulseAngle = useRef(0);
   const animationTime = useRef(0);
 
-  const [config, setConfig] = useState({
-    PARTICLE_BASE_COLOR_STR: 'hsla(260, 80%, 60%, 0.7)',
-    PARTICLE_HIGHLIGHT_COLOR_STR: 'hsla(280, 90%, 75%, 1)',
-    LINE_BASE_COLOR_STR: 'hsla(250, 60%, 35%, 0.15)',
-    LINE_HIGHLIGHT_COLOR_STR: 'hsla(270, 75%, 55%, 0.6)',
-    
-    MOUSE_INTERACTION_RADIUS: 190,
-    // MAX_PARTICLES is now initialized by getInitialMaxParticles()
-    MAX_PARTICLES: getInitialMaxParticles(),
-    CONNECT_DISTANCE: 150,
-    PARTICLE_BASE_SPEED_MIN: 0.07,
-    PARTICLE_BASE_SPEED_MAX: 0.22,
-    MIN_RADIUS: 0.5,
-    MAX_RADIUS: 1.7,
-    HIGHLIGHT_FADE_SPEED: 0.07,
-    CONNECTION_RADIUS_BONUS: 0.07,
-    MAX_CONNECTION_BONUS_RADIUS: 1.2,
-    MASTER_HUE_CYCLE_SPEED: 0.010,
-    CLICK_REPEL_STRENGTH: 65,
-    CLICK_EFFECT_RADIUS: 210,
-    CLICK_EFFECT_DURATION: 32,
-    MOUSE_RADIUS_MULTIPLIER: 1.65,
-    RADIUS_LERP_SPEED: 0.11,
-    
-    GRID_REVEAL_RADIUS: 150,
-    GRID_LINE_BASE_COLOR_STR: 'hsla(270, 40%, 25%, 0.08)',
-    GRID_LINE_HIGHLIGHT_COLOR_STR: 'hsla(285, 65%, 55%, 0.75)',
-    GRID_LINE_WIDTH_BASE: 0.15,
-    GRID_LINE_WIDTH_PULSE_MAX: 1.0,
-    GRID_PULSE_SPEED: 0.028,
-    GRID_PULSE_WAVELENGTH_FACTOR: Math.PI * 2.1,
-    GRID_OPACITY_FALLOFF_POWER: 1.8,
-    GRID_MIN_PULSE_ALPHA_MODULATION: 0.2,
+  const [config, setConfig] = useState(() => {
+    const initialMouseInteractionRadius = 190;
+    const initialConnectDistance = 150;
+    const initialGridRevealRadius = 150;
+    // Detect Firefox
+    const isFirefox = typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('firefox');
 
-    COSMIC_DUST_COUNT: 80,
-    COSMIC_DUST_MAX_SIZE: 0.7,
-    COSMIC_DUST_MIN_SIZE: 0.1,
-    COSMIC_DUST_SPEED_FACTOR: 0.025,
-    COSMIC_DUST_BASE_SATURATION: 50,
-    COSMIC_DUST_BASE_LIGHTNESS: 30,
-    COSMIC_DUST_BASE_ALPHA: 0.20,
-    COSMIC_DUST_HUE_SPREAD: 70,
 
-    NEBULA_CLOUD_COUNT: 5,
-    NEBULA_MAX_SIZE_FACTOR_W: 0.9,
-    NEBULA_MIN_SIZE_FACTOR_W: 0.5,
-    NEBULA_MAX_SIZE_FACTOR_H: 0.7,
-    NEBULA_MIN_SIZE_FACTOR_H: 0.3,
-    NEBULA_BASE_SATURATION_MIN: 60,
-    NEBULA_BASE_SATURATION_MAX: 85,
-    NEBULA_LUMINOSITY_INNER_MIN: 5, 
-    NEBULA_LUMINOSITY_INNER_MAX: 12,
-    NEBULA_LUMINOSITY_OUTER_MIN: 1,
-    NEBULA_LUMINOSITY_OUTER_MAX: 5,
-    NEBULA_BASE_OPACITY_MIN: 0.10,   
-    NEBULA_BASE_OPACITY_MAX: 0.30,
-    NEBULA_HUE_OFFSET_RANGE: 60,    
-    NEBULA_WARM_HUE_CHANCE: 0.25,   
-    NEBULA_WARM_HUE_PRIMARY: 15,    
-    NEBULA_WARM_HUE_SECONDARY: 340,  
-    NEBULA_DRIFT_SPEED_MAX: 0.00025,
-    NEBULA_PULSE_SPEED_SIZE: 0.0007,
-    NEBULA_PULSE_AMPLITUDE_SIZE: 0.12, 
-    NEBULA_PULSE_SPEED_OPACITY: 0.0009,
-    NEBULA_PULSE_AMPLITUDE_OPACITY: 0.35,
-    NEBULA_ELLIPSE_ROTATION_MAX: Math.PI / 4,
+    return {
+      PARTICLE_BASE_COLOR_STR: 'hsla(260, 80%, 60%, 0.7)',
+      PARTICLE_HIGHLIGHT_COLOR_STR: 'hsla(280, 90%, 75%, 1)',
+      LINE_BASE_COLOR_STR: 'hsla(250, 60%, 35%, 0.15)',
+      LINE_HIGHLIGHT_COLOR_STR: 'hsla(270, 75%, 55%, 0.6)',
+      
+      MOUSE_INTERACTION_RADIUS: initialMouseInteractionRadius,
+      MAX_PARTICLES: getInitialMaxParticles(),
+      CONNECT_DISTANCE: initialConnectDistance,
+      CONNECT_DISTANCE_SQUARED: initialConnectDistance * initialConnectDistance,
+      PARTICLE_BASE_SPEED_MIN: 0.07,
+      PARTICLE_BASE_SPEED_MAX: 0.22,
+      MIN_RADIUS: 0.5,
+      MAX_RADIUS: 1.7,
+      HIGHLIGHT_FADE_SPEED: 0.07,
+      CONNECTION_RADIUS_BONUS: 0.07,
+      MAX_CONNECTION_BONUS_RADIUS: 1.2,
+      MASTER_HUE_CYCLE_SPEED: 0.010,
+      CLICK_REPEL_STRENGTH: 65,
+      CLICK_EFFECT_RADIUS: 210,
+      CLICK_EFFECT_DURATION: 32,
+      MOUSE_RADIUS_MULTIPLIER: 1.65,
+      RADIUS_LERP_SPEED: 0.11,
+      
+      GRID_REVEAL_RADIUS: initialGridRevealRadius,
+      GRID_REVEAL_RADIUS_SQUARED: initialGridRevealRadius * initialGridRevealRadius,
+      GRID_LINE_BASE_COLOR_STR: 'hsla(270, 40%, 25%, 0.08)',
+      GRID_LINE_HIGHLIGHT_COLOR_STR: 'hsla(285, 65%, 55%, 0.75)',
+      GRID_LINE_WIDTH_BASE: 0.15,
+      GRID_LINE_WIDTH_PULSE_MAX: 1.0,
+      GRID_PULSE_SPEED: 0.028,
+      GRID_PULSE_WAVELENGTH_FACTOR: Math.PI * 2.1,
+      GRID_OPACITY_FALLOFF_POWER: 1.8,
+      GRID_MIN_PULSE_ALPHA_MODULATION: 0.2,
 
-    NEBULA_HUE_OSCILLATION_SPEED_MIN: 0.0005,
-    NEBULA_HUE_OSCILLATION_SPEED_MAX: 0.002,
-    NEBULA_HUE_OSCILLATION_AMPLITUDE_MIN: 5,
-    NEBULA_HUE_OSCILLATION_AMPLITUDE_MAX: 25,
-    NEBULA_LUMINOSITY_PULSE_SPEED_MIN: 0.0006,
-    NEBULA_LUMINOSITY_PULSE_SPEED_MAX: 0.0025,
-    NEBULA_LUMINOSITY_PULSE_AMPLITUDE_MIN: 0.1,
-    NEBULA_LUMINOSITY_PULSE_AMPLITUDE_MAX: 0.4,
+      COSMIC_DUST_COUNT: 80,
+      COSMIC_DUST_MAX_SIZE: 0.7,
+      COSMIC_DUST_MIN_SIZE: 0.1,
+      COSMIC_DUST_SPEED_FACTOR: 0.025,
+      COSMIC_DUST_BASE_SATURATION: 50,
+      COSMIC_DUST_BASE_LIGHTNESS: 30,
+      COSMIC_DUST_BASE_ALPHA: 0.20,
+      COSMIC_DUST_HUE_SPREAD: 70,
 
-    GRID_NEBULA_X_FREQ: 0.013,
-    GRID_NEBULA_Y_FREQ: 0.013,
-    GRID_NEBULA_TIME_FREQ: 0.18,
-    GRID_NEBULA_INTENSITY: 0.6,
-    
-    BASE_BACKGROUND_COLOR: 'hsla(0, 0%, 2%, 1)',
+      // Firefox-specific nebula count
+      NEBULA_CLOUD_COUNT: isFirefox ? 0 : 5, // Reduced for Firefox
+      // Optional: Firefox-specific composite operation (test this if count reduction isn't enough)
+      // NEBULA_COMPOSITE_OPERATION: isFirefox ? 'source-over' : 'lighter',
+      NEBULA_COMPOSITE_OPERATION: 'lighter', // Defaulting to lighter for now
+
+      NEBULA_MAX_SIZE_FACTOR_W: 0.9,
+      NEBULA_MIN_SIZE_FACTOR_W: 0.5,
+      NEBULA_MAX_SIZE_FACTOR_H: 0.7,
+      NEBULA_MIN_SIZE_FACTOR_H: 0.3,
+      NEBULA_BASE_SATURATION_MIN: 60,
+      NEBULA_BASE_SATURATION_MAX: 85,
+      NEBULA_LUMINOSITY_INNER_MIN: 5, 
+      NEBULA_LUMINOSITY_INNER_MAX: 12,
+      NEBULA_LUMINOSITY_OUTER_MIN: 1,
+      NEBULA_LUMINOSITY_OUTER_MAX: 5,
+      NEBULA_BASE_OPACITY_MIN: 0.10,   
+      NEBULA_BASE_OPACITY_MAX: 0.30,
+      NEBULA_HUE_OFFSET_RANGE: 60,    
+      NEBULA_WARM_HUE_CHANCE: 0.25,   
+      NEBULA_WARM_HUE_PRIMARY: 15,    
+      NEBULA_WARM_HUE_SECONDARY: 340,  
+      NEBULA_DRIFT_SPEED_MAX: 0.00025,
+      NEBULA_PULSE_SPEED_SIZE: 0.0007,
+      NEBULA_PULSE_AMPLITUDE_SIZE: 0.12, 
+      NEBULA_PULSE_SPEED_OPACITY: 0.0009,
+      NEBULA_PULSE_AMPLITUDE_OPACITY: 0.35,
+      NEBULA_ELLIPSE_ROTATION_MAX: Math.PI / 4,
+
+      NEBULA_HUE_OSCILLATION_SPEED_MIN: 0.0005,
+      NEBULA_HUE_OSCILLATION_SPEED_MAX: 0.002,
+      NEBULA_HUE_OSCILLATION_AMPLITUDE_MIN: 5,
+      NEBULA_HUE_OSCILLATION_AMPLITUDE_MAX: 25,
+      NEBULA_LUMINOSITY_PULSE_SPEED_MIN: 0.0006,
+      NEBULA_LUMINOSITY_PULSE_SPEED_MAX: 0.0025,
+      NEBULA_LUMINOSITY_PULSE_AMPLITUDE_MIN: 0.1,
+      NEBULA_LUMINOSITY_PULSE_AMPLITUDE_MAX: 0.4,
+
+      GRID_NEBULA_X_FREQ: 0.013,
+      GRID_NEBULA_Y_FREQ: 0.013,
+      GRID_NEBULA_TIME_FREQ: 0.18,
+      GRID_NEBULA_INTENSITY: 0.6,
+      
+      BASE_BACKGROUND_COLOR: 'hsla(0, 0%, 2%, 1)',
+    };
   });
 
   // Effect to update MAX_PARTICLES on window resize
@@ -257,20 +275,15 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
 
       setConfig(prevConfig => {
         if (prevConfig.MAX_PARTICLES !== newMaxParticles) {
-          // This state update will trigger a re-render.
-          // The main useEffect (which depends on `config` and `initParticles`)
-          // will then re-initialize particles with the new count.
           return { ...prevConfig, MAX_PARTICLES: newMaxParticles };
         }
-        return prevConfig; // Avoid unnecessary re-render if value is the same
+        return prevConfig;
       });
     };
 
     window.addEventListener('resize', handleResize);
-    // No need to call handleResize() here initially, as getInitialMaxParticles handles it for useState.
-    
     return () => window.removeEventListener('resize', handleResize);
-  }, []); // Empty dependency array ensures this runs once on mount and cleans up on unmount.
+  }, []);
 
   const getCssVar = useCallback((name: string, fallback: string) => {
     if (typeof window === 'undefined') return fallback;
@@ -282,19 +295,25 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
     const [initialH] = parseHsla(config.PARTICLE_BASE_COLOR_STR);
     masterHue.current = initialH;
 
-    // This effect for CSS variables can remain as is.
-    setConfig(prevConfig => ({
-      ...prevConfig,
-      MOUSE_INTERACTION_RADIUS: parseFloat(getCssVar('--mouse-interaction-radius', String(prevConfig.MOUSE_INTERACTION_RADIUS))),
-      GRID_REVEAL_RADIUS: parseFloat(getCssVar('--grid-reveal-radius', String(prevConfig.GRID_REVEAL_RADIUS))),
-    }));
-  }, [getCssVar, config.PARTICLE_BASE_COLOR_STR]); // Keep existing dependencies for this specific effect.
+    setConfig(prevConfig => {
+        const newMouseInteractionRadius = parseFloat(getCssVar('--mouse-interaction-radius', String(prevConfig.MOUSE_INTERACTION_RADIUS)));
+        const newGridRevealRadius = parseFloat(getCssVar('--grid-reveal-radius', String(prevConfig.GRID_REVEAL_RADIUS)));
+        
+        return {
+            ...prevConfig,
+            MOUSE_INTERACTION_RADIUS: newMouseInteractionRadius,
+            GRID_REVEAL_RADIUS: newGridRevealRadius,
+            GRID_REVEAL_RADIUS_SQUARED: newGridRevealRadius * newGridRevealRadius,
+        };
+    });
+  }, [getCssVar, config.PARTICLE_BASE_COLOR_STR]);
+
 
   const initParticles = useCallback((canvas: HTMLCanvasElement) => {
     particlesArray.current = [];
     const [, baseS, baseL, baseA] = parseHsla(config.PARTICLE_BASE_COLOR_STR);
     const [, , highlightL, highlightA] = parseHsla(config.PARTICLE_HIGHLIGHT_COLOR_STR);
-    // config.MAX_PARTICLES will now be the responsive value
+
     for (let i = 0; i < config.MAX_PARTICLES; i++) {
       const radius = Math.random() * (config.MAX_RADIUS - config.MIN_RADIUS) + config.MIN_RADIUS;
       particlesArray.current.push({
@@ -305,13 +324,13 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
         hueOffset: (Math.random() * 60) - 30,
         baseColorS: baseS, baseColorL: baseL, baseColorA: baseA,
         highlightColorL: highlightL, highlightColorA: highlightA, highlightIntensity: 0,
-        pulseAngle: Math.random() * Math.PI * 2,
+        pulseAngle: Math.random() * TWO_PI,
         pulseSpeed: (Math.random() * 0.02) + 0.01,
         pulseAmplitude: radius * (Math.random() * 0.3 + 0.2),
         connectionCount: 0, targetRadius: radius, currentRadius: radius,
       });
     }
-  }, [config]); // initParticles depends on the entire config object.
+  }, [config]);
 
   const initCosmicDust = useCallback((canvas: HTMLCanvasElement) => {
     cosmicDustParticles.current = [];
@@ -327,10 +346,11 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
         hueOffset: (Math.random() * config.COSMIC_DUST_HUE_SPREAD) - (config.COSMIC_DUST_HUE_SPREAD / 2),
       });
     }
-  }, [config]); // Depends on config for COSMIC_DUST_COUNT etc.
+  }, [config]);
 
   const initNebulaClouds = useCallback((canvas: HTMLCanvasElement) => {
     nebulaClouds.current = [];
+    // config.NEBULA_CLOUD_COUNT is now potentially Firefox-specific
     for (let i = 0; i < config.NEBULA_CLOUD_COUNT; i++) {
       const isWarm = Math.random() < config.NEBULA_WARM_HUE_CHANCE;
       let baseHueOffsetVal = (Math.random() * config.NEBULA_HUE_OFFSET_RANGE * 2) - config.NEBULA_HUE_OFFSET_RANGE;
@@ -375,26 +395,28 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
     if (mousePosition.current.x === null || mousePosition.current.y === null || cellSize <= 0) return;
     const mouseX = mousePosition.current.x;
     const mouseY = mousePosition.current.y;
-    const revealRadius = config.GRID_REVEAL_RADIUS;
+    
     const [, gridBaseS, gridBaseL, gridBaseInitialAlpha] = parseHsla(config.GRID_LINE_BASE_COLOR_STR);
     const [, , gridHighlightL, gridHighlightActualA] = parseHsla(config.GRID_LINE_HIGHLIGHT_COLOR_STR);
     const currentGridHue = (masterHue.current + 20) % 360;
-    gridGlobalPulseAngle.current = (gridGlobalPulseAngle.current + config.GRID_PULSE_SPEED) % (Math.PI * 2);
+    gridGlobalPulseAngle.current = (gridGlobalPulseAngle.current + config.GRID_PULSE_SPEED) % TWO_PI;
 
     const visiblePoints = new Map<string, GridPointData>();
-    const startGridX = Math.floor((mouseX - revealRadius) / cellSize) * cellSize;
-    const endGridX = Math.ceil((mouseX + revealRadius) / cellSize) * cellSize;
-    const startGridY = Math.floor((mouseY - revealRadius) / cellSize) * cellSize;
-    const endGridY = Math.ceil((mouseY + revealRadius) / cellSize) * cellSize;
+    const startGridX = Math.floor((mouseX - config.GRID_REVEAL_RADIUS) / cellSize) * cellSize;
+    const endGridX = Math.ceil((mouseX + config.GRID_REVEAL_RADIUS) / cellSize) * cellSize;
+    const startGridY = Math.floor((mouseY - config.GRID_REVEAL_RADIUS) / cellSize) * cellSize;
+    const endGridY = Math.ceil((mouseY + config.GRID_REVEAL_RADIUS) / cellSize) * cellSize;
     const timeForNebula = animationTime.current * config.GRID_NEBULA_TIME_FREQ;
 
     for (let gx = startGridX; gx <= endGridX; gx += cellSize) {
       for (let gy = startGridY; gy <= endGridY; gy += cellSize) {
         const dx = gx - mouseX;
         const dy = gy - mouseY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < revealRadius) {
-          const distNormalized = dist / revealRadius;
+        const distSq = dx * dx + dy * dy;
+
+        if (distSq < config.GRID_REVEAL_RADIUS_SQUARED) {
+          const dist = Math.sqrt(distSq);
+          const distNormalized = dist / config.GRID_REVEAL_RADIUS;
           const baseDistanceAlpha = Math.pow(1 - distNormalized, config.GRID_OPACITY_FALLOFF_POWER) * gridBaseInitialAlpha;
           const basePulse = (Math.sin(gridGlobalPulseAngle.current - distNormalized * config.GRID_PULSE_WAVELENGTH_FACTOR) + 1) / 2;
           const nebulaXTerm = gx * config.GRID_NEBULA_X_FREQ;
@@ -441,7 +463,8 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
     if (masterHue.current >= 360) masterHue.current -= 360;
     if (masterHue.current < 0) masterHue.current += 360;
 
-    ctx.globalCompositeOperation = 'lighter'; 
+    // Use configured composite operation
+    ctx.globalCompositeOperation = config.NEBULA_COMPOSITE_OPERATION as GlobalCompositeOperation; 
     nebulaClouds.current.forEach(cloud => {
       cloud.x += cloud.driftXFactor * canvas.width * 0.01; 
       cloud.y += cloud.driftYFactor * canvas.height * 0.01;
@@ -470,19 +493,18 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
       const currentLuminosityOuter = cloud.luminosityOuter * luminosityMultiplier;
 
       const cloudGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(cloud.radiusX, cloud.radiusY) * currentSizeFactor);
+      
+      // Simplified gradient with 4 color stops
       const colorCore = getHarmonizedHsla(masterHue.current, dynamicHueOffset, cloud.saturation, currentLuminosityInner, finalOpacity, true);
-      const colorInnerMid = getHarmonizedHsla(masterHue.current, dynamicHueOffset + 5, cloud.saturation * 0.95, currentLuminosityInner * 0.6, finalOpacity * 0.85, true);
-      const colorDarkBand = getHarmonizedHsla(masterHue.current, dynamicHueOffset - 10, cloud.saturation * 0.8, currentLuminosityInner * 0.15, finalOpacity * 0.7, true);
-      const colorOuterMid = getHarmonizedHsla(masterHue.current, dynamicHueOffset + 15, cloud.saturation * 1.1, currentLuminosityOuter * 1.2, finalOpacity * 0.5, true);
+      const colorMid = getHarmonizedHsla(masterHue.current, dynamicHueOffset + 10, cloud.saturation * 0.85, (currentLuminosityInner + currentLuminosityOuter) / 2.5, finalOpacity * 0.60, true);
+      const colorOuter = getHarmonizedHsla(masterHue.current, dynamicHueOffset - 5, cloud.saturation * 0.9, currentLuminosityOuter * 0.8, finalOpacity * 0.25, true);
       const colorEdge = getHarmonizedHsla(masterHue.current, dynamicHueOffset, cloud.saturation * 0.9, currentLuminosityOuter, 0, true);
 
       cloudGrad.addColorStop(0, colorCore);
-      cloudGrad.addColorStop(0.2, colorCore);
-      cloudGrad.addColorStop(0.35, colorInnerMid);
-      cloudGrad.addColorStop(0.5, colorDarkBand);
-      cloudGrad.addColorStop(0.7, colorOuterMid);
-      cloudGrad.addColorStop(0.85, colorDarkBand);
+      cloudGrad.addColorStop(0.35, colorMid); // Adjusted stop
+      cloudGrad.addColorStop(0.75, colorOuter); // Adjusted stop
       cloudGrad.addColorStop(1, colorEdge);
+
 
       ctx.save();
       ctx.translate(cloud.x + cloud.initialOffsetX, cloud.y + cloud.initialOffsetY);
@@ -490,7 +512,7 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
       ctx.scale(currentSizeFactor, currentSizeFactor * (cloud.radiusY / cloud.radiusX)); 
       
       ctx.beginPath();
-      ctx.arc(0,0, cloud.radiusX, 0, Math.PI * 2); 
+      ctx.arc(0,0, cloud.radiusX, 0, TWO_PI);
       ctx.fillStyle = cloudGrad;
       ctx.fill();
       ctx.restore();
@@ -504,7 +526,7 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
       if (dust.y > canvas.height + dust.radius) dust.y = -dust.radius; else if (dust.y < -dust.radius) dust.y = canvas.height + dust.radius;
       const twinkle = (Math.sin(animationTime.current * 0.3 + dust.id) + 1) / 2 * 0.5 + 0.5;
       ctx.fillStyle = getHarmonizedHsla(masterHue.current, dust.hueOffset, config.COSMIC_DUST_BASE_SATURATION, config.COSMIC_DUST_BASE_LIGHTNESS, dust.baseAlpha * twinkle, true);
-      ctx.beginPath(); ctx.arc(dust.x, dust.y, dust.radius, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(dust.x, dust.y, dust.radius, 0, TWO_PI); ctx.fill();
     });
 
     drawRevealedGrid(canvas, ctx);
@@ -519,8 +541,11 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
     for (let i = 0; i < particlesArray.current.length; i++) {
       for (let j = i + 1; j < particlesArray.current.length; j++) {
         const p1 = particlesArray.current[i]; const p2 = particlesArray.current[j];
-        const dx = p1.x - p2.x; const dy = p1.y - p2.y; const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < config.CONNECT_DISTANCE) {
+        const dx = p1.x - p2.x; const dy = p1.y - p2.y; 
+        const distSq = dx * dx + dy * dy;
+
+        if (distSq < config.CONNECT_DISTANCE_SQUARED) {
+          const dist = Math.sqrt(distSq);
           p1.connectionCount++; p2.connectionCount++;
           const intensity = Math.max(p1.highlightIntensity, p2.highlightIntensity);
           const L = lerp(lineBaseL, lineHighlightL, intensity);
@@ -536,22 +561,28 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
     
     particlesArray.current.forEach(p => {
       clickEffects.current.forEach(effect => {
-        const dx = p.x - effect.x; const dy = p.y - effect.y; const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < effect.maxRadius && dist > 0) {
-          const force = (1 - dist / effect.maxRadius) * (effect.strength / dist) * (effect.life / config.CLICK_EFFECT_DURATION);
-          p.vx += dx * force * 0.03; p.vy += dy * force * 0.03;
+        const dx = p.x - effect.x; const dy = p.y - effect.y; 
+        const distSq = dx * dx + dy * dy;
+        if (distSq < effect.maxRadius * effect.maxRadius) {
+            const dist = Math.sqrt(distSq); 
+            if (dist > 0) { 
+                 const force = (1 - dist / effect.maxRadius) * (effect.strength / dist) * (effect.life / config.CLICK_EFFECT_DURATION);
+                 p.vx += dx * force * 0.03; p.vy += dy * force * 0.03;
+            }
         }
       });
       let targetHI = 0; p.targetRadius = p.radius;
       if (mousePosition.current.x !== null && mousePosition.current.y !== null) {
-        const dxM = p.x - mousePosition.current.x; const dyM = p.y - mousePosition.current.y; const distM = Math.sqrt(dxM * dxM + dyM * dyM);
-        if (distM < config.MOUSE_INTERACTION_RADIUS) {
-          targetHI = 1 - (distM / config.MOUSE_INTERACTION_RADIUS);
-          p.targetRadius = p.radius * (1 + (config.MOUSE_RADIUS_MULTIPLIER - 1) * targetHI);
-          if (distM < p.currentRadius * 1.5 && distM > 0.1) {
-            const push = (1 - distM / (config.MOUSE_INTERACTION_RADIUS * 0.7)) * 0.02;
-            p.vx += (dxM / distM) * push; p.vy += (dyM / distM) * push;
-          }
+        const dxM = p.x - mousePosition.current.x; const dyM = p.y - mousePosition.current.y; 
+        const distMSq = dxM * dxM + dyM * dyM;
+        if (distMSq < config.MOUSE_INTERACTION_RADIUS * config.MOUSE_INTERACTION_RADIUS) {
+            const distM = Math.sqrt(distMSq);
+            targetHI = 1 - (distM / config.MOUSE_INTERACTION_RADIUS);
+            p.targetRadius = p.radius * (1 + (config.MOUSE_RADIUS_MULTIPLIER - 1) * targetHI);
+            if (distM < p.currentRadius * 1.5 && distM > 0.1) {
+                const push = (1 - distM / (config.MOUSE_INTERACTION_RADIUS * 0.7)) * 0.02;
+                p.vx += (dxM / distM) * push; p.vy += (dyM / distM) * push;
+            }
         }
       }
       p.highlightIntensity = lerp(p.highlightIntensity, targetHI, config.HIGHLIGHT_FADE_SPEED);
@@ -559,13 +590,13 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
       p.x += p.vx; p.y += p.vy;
       if (p.x + p.currentRadius > canvas.width || p.x - p.currentRadius < 0) { p.vx *= -1; p.x = Math.max(p.currentRadius, Math.min(p.x, canvas.width - p.currentRadius)); }
       if (p.y + p.currentRadius > canvas.height || p.y - p.currentRadius < 0) { p.vy *= -1; p.y = Math.max(p.currentRadius, Math.min(p.y, canvas.height - p.currentRadius)); }
-      p.pulseAngle = (p.pulseAngle + p.pulseSpeed) % (Math.PI * 2);
+      p.pulseAngle = (p.pulseAngle + p.pulseSpeed) % TWO_PI;
       const pulseF = (Math.sin(p.pulseAngle) + 1) / 2;
       let dRadius = p.currentRadius + pulseF * p.pulseAmplitude * (p.currentRadius / p.radius) + Math.min(p.connectionCount * config.CONNECTION_RADIUS_BONUS, config.MAX_CONNECTION_BONUS_RADIUS);
       dRadius = Math.max(config.MIN_RADIUS * 0.3, dRadius);
       const L = lerp(p.baseColorL, p.highlightColorL, p.highlightIntensity);
       const A = lerp(p.baseColorA, p.highlightColorA, p.highlightIntensity) * (0.55 + pulseF * 0.45);
-      ctx.beginPath(); ctx.arc(p.x, p.y, dRadius, 0, Math.PI * 2);
+      ctx.beginPath(); ctx.arc(p.x, p.y, dRadius, 0, TWO_PI);
       ctx.fillStyle = getHarmonizedHsla(masterHue.current, p.hueOffset, p.baseColorS, L, A, true);
       ctx.fill();
     });
@@ -592,9 +623,6 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
         canvas.style.width = `${rect.width}px`;
         canvas.style.height = `${rect.height}px`;
         
-        // initParticles will be called here. Because `config.MAX_PARTICLES`
-        // would have been updated by the other useEffect for resize,
-        // initParticles (which depends on config) will use the new count.
         initParticles(canvas); 
         initCosmicDust(canvas);
         initNebulaClouds(canvas); 
@@ -616,8 +644,6 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
 
     resizeCanvas(); 
     
-    // This event listener for 'resize' is for canvas dimensions.
-    // The separate useEffect handles MAX_PARTICLES update on resize.
     window.addEventListener('resize', resizeCanvas); 
     window.addEventListener('mousemove', handleMouseMove); 
     canvas.addEventListener('mouseleave', handleMouseLeave); 
@@ -628,7 +654,7 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
     }
 
     return () => {
-      window.removeEventListener('resize', resizeCanvas); // This is for canvas dimension resize
+      window.removeEventListener('resize', resizeCanvas);
       window.removeEventListener('mousemove', handleMouseMove);
       canvas.removeEventListener('mouseleave', handleMouseLeave);
       canvas.removeEventListener('mousedown', handleMouseDown);
@@ -637,10 +663,6 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
         animationFrameId.current = null;
       }
     };
-  // Dependencies for the main setup/animation effect.
-  // `config` is included because many animation parameters depend on it.
-  // `initParticles`, `initCosmicDust`, `initNebulaClouds`, `animate` are callbacks
-  // that might change if their own dependencies (like `config`) change.
   }, [initParticles, initCosmicDust, initNebulaClouds, animate, config, cellSize]); 
 
   return (
