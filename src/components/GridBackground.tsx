@@ -69,14 +69,12 @@ interface NebulaCloud {
   timeOffsetSize: number;
   initialOffsetX: number;
   initialOffsetY: number;
-
-  // New properties for enhanced animation
   hueOscillationSpeed: number;
   hueOscillationAmplitude: number;
-  timeOffsetHue: number; // For hue oscillation phase
+  timeOffsetHue: number;
   luminosityPulseSpeed: number;
   luminosityPulseAmplitude: number;
-  timeOffsetLuminosity: number; // For luminosity pulse phase
+  timeOffsetLuminosity: number;
 }
 
 
@@ -91,6 +89,28 @@ interface GridPointData {
   pulseFactor: number;
   distNormalized: number;
 }
+
+// --- START: Responsive Particle Configuration ---
+const MOBILE_BREAKPOINT = 768;
+const TABLET_BREAKPOINT = 1024;
+
+const DESKTOP_PARTICLES = 500;
+const TABLET_PARTICLES = 200;
+const MOBILE_PARTICLES = 100;
+
+const getInitialMaxParticles = (): number => {
+  if (typeof window === 'undefined') {
+    return DESKTOP_PARTICLES; // Default for SSR or before window is available
+  }
+  const width = window.innerWidth;
+  if (width < MOBILE_BREAKPOINT) {
+    return MOBILE_PARTICLES;
+  } else if (width < TABLET_BREAKPOINT) {
+    return TABLET_PARTICLES;
+  }
+  return DESKTOP_PARTICLES;
+};
+// --- END: Responsive Particle Configuration ---
 
 const parseHsla = (hslaString: string): [number, number, number, number] => {
   const match = hslaString.match(/hsla\((\d+),\s*([\d.]+)%,\s*([\d.]+)%,\s*([\d.]+)\)/);
@@ -120,7 +140,6 @@ const getHarmonizedHsla = (
   hue = hue % 360;
   if (hue < 0) hue += 360;
 
-  // Clamp values to prevent issues
   const satClamped = Math.max(0, Math.min(100, saturation));
   const ligClamped = Math.max(0, Math.min(100, lightness));
   const alpClamped = Math.max(0, Math.min(1, alpha));
@@ -148,7 +167,8 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
     LINE_HIGHLIGHT_COLOR_STR: 'hsla(270, 75%, 55%, 0.6)',
     
     MOUSE_INTERACTION_RADIUS: 190,
-    MAX_PARTICLES: 500, // Reduced slightly for performance with more complex nebulas
+    // MAX_PARTICLES is now initialized by getInitialMaxParticles()
+    MAX_PARTICLES: getInitialMaxParticles(),
     CONNECT_DISTANCE: 150,
     PARTICLE_BASE_SPEED_MIN: 0.07,
     PARTICLE_BASE_SPEED_MAX: 0.22,
@@ -157,7 +177,7 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
     HIGHLIGHT_FADE_SPEED: 0.07,
     CONNECTION_RADIUS_BONUS: 0.07,
     MAX_CONNECTION_BONUS_RADIUS: 1.2,
-    MASTER_HUE_CYCLE_SPEED: 0.010, // Slightly slower global hue cycle
+    MASTER_HUE_CYCLE_SPEED: 0.010,
     CLICK_REPEL_STRENGTH: 65,
     CLICK_EFFECT_RADIUS: 210,
     CLICK_EFFECT_DURATION: 32,
@@ -174,21 +194,21 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
     GRID_OPACITY_FALLOFF_POWER: 1.8,
     GRID_MIN_PULSE_ALPHA_MODULATION: 0.2,
 
-    COSMIC_DUST_COUNT: 80, // Reduced slightly
+    COSMIC_DUST_COUNT: 80,
     COSMIC_DUST_MAX_SIZE: 0.7,
     COSMIC_DUST_MIN_SIZE: 0.1,
     COSMIC_DUST_SPEED_FACTOR: 0.025,
     COSMIC_DUST_BASE_SATURATION: 50,
     COSMIC_DUST_BASE_LIGHTNESS: 30,
-    COSMIC_DUST_BASE_ALPHA: 0.20, // Slightly more transparent
+    COSMIC_DUST_BASE_ALPHA: 0.20,
     COSMIC_DUST_HUE_SPREAD: 70,
 
-    NEBULA_CLOUD_COUNT: 5, // Can have a few more with varied looks
+    NEBULA_CLOUD_COUNT: 5,
     NEBULA_MAX_SIZE_FACTOR_W: 0.9,
     NEBULA_MIN_SIZE_FACTOR_W: 0.5,
     NEBULA_MAX_SIZE_FACTOR_H: 0.7,
     NEBULA_MIN_SIZE_FACTOR_H: 0.3,
-    NEBULA_BASE_SATURATION_MIN: 60, // Adjusted ranges
+    NEBULA_BASE_SATURATION_MIN: 60,
     NEBULA_BASE_SATURATION_MAX: 85,
     NEBULA_LUMINOSITY_INNER_MIN: 5, 
     NEBULA_LUMINOSITY_INNER_MAX: 12,
@@ -200,21 +220,20 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
     NEBULA_WARM_HUE_CHANCE: 0.25,   
     NEBULA_WARM_HUE_PRIMARY: 15,    
     NEBULA_WARM_HUE_SECONDARY: 340,  
-    NEBULA_DRIFT_SPEED_MAX: 0.00025, // Slightly slower drift
+    NEBULA_DRIFT_SPEED_MAX: 0.00025,
     NEBULA_PULSE_SPEED_SIZE: 0.0007,
     NEBULA_PULSE_AMPLITUDE_SIZE: 0.12, 
     NEBULA_PULSE_SPEED_OPACITY: 0.0009,
     NEBULA_PULSE_AMPLITUDE_OPACITY: 0.35,
     NEBULA_ELLIPSE_ROTATION_MAX: Math.PI / 4,
 
-    // New: Nebula animation enhancements
     NEBULA_HUE_OSCILLATION_SPEED_MIN: 0.0005,
     NEBULA_HUE_OSCILLATION_SPEED_MAX: 0.002,
-    NEBULA_HUE_OSCILLATION_AMPLITUDE_MIN: 5,  // Hue degrees
+    NEBULA_HUE_OSCILLATION_AMPLITUDE_MIN: 5,
     NEBULA_HUE_OSCILLATION_AMPLITUDE_MAX: 25,
     NEBULA_LUMINOSITY_PULSE_SPEED_MIN: 0.0006,
     NEBULA_LUMINOSITY_PULSE_SPEED_MAX: 0.0025,
-    NEBULA_LUMINOSITY_PULSE_AMPLITUDE_MIN: 0.1, // Factor (e.g., 10% change)
+    NEBULA_LUMINOSITY_PULSE_AMPLITUDE_MIN: 0.1,
     NEBULA_LUMINOSITY_PULSE_AMPLITUDE_MAX: 0.4,
 
     GRID_NEBULA_X_FREQ: 0.013,
@@ -222,8 +241,36 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
     GRID_NEBULA_TIME_FREQ: 0.18,
     GRID_NEBULA_INTENSITY: 0.6,
     
-    BASE_BACKGROUND_COLOR: 'hsla(0, 0%, 2%, 1)', // Even darker base
+    BASE_BACKGROUND_COLOR: 'hsla(0, 0%, 2%, 1)',
   });
+
+  // Effect to update MAX_PARTICLES on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      let newMaxParticles = DESKTOP_PARTICLES;
+      if (width < MOBILE_BREAKPOINT) {
+        newMaxParticles = MOBILE_PARTICLES;
+      } else if (width < TABLET_BREAKPOINT) {
+        newMaxParticles = TABLET_PARTICLES;
+      }
+
+      setConfig(prevConfig => {
+        if (prevConfig.MAX_PARTICLES !== newMaxParticles) {
+          // This state update will trigger a re-render.
+          // The main useEffect (which depends on `config` and `initParticles`)
+          // will then re-initialize particles with the new count.
+          return { ...prevConfig, MAX_PARTICLES: newMaxParticles };
+        }
+        return prevConfig; // Avoid unnecessary re-render if value is the same
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+    // No need to call handleResize() here initially, as getInitialMaxParticles handles it for useState.
+    
+    return () => window.removeEventListener('resize', handleResize);
+  }, []); // Empty dependency array ensures this runs once on mount and cleans up on unmount.
 
   const getCssVar = useCallback((name: string, fallback: string) => {
     if (typeof window === 'undefined') return fallback;
@@ -235,17 +282,19 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
     const [initialH] = parseHsla(config.PARTICLE_BASE_COLOR_STR);
     masterHue.current = initialH;
 
+    // This effect for CSS variables can remain as is.
     setConfig(prevConfig => ({
       ...prevConfig,
       MOUSE_INTERACTION_RADIUS: parseFloat(getCssVar('--mouse-interaction-radius', String(prevConfig.MOUSE_INTERACTION_RADIUS))),
       GRID_REVEAL_RADIUS: parseFloat(getCssVar('--grid-reveal-radius', String(prevConfig.GRID_REVEAL_RADIUS))),
     }));
-  }, [getCssVar, config.PARTICLE_BASE_COLOR_STR]);
+  }, [getCssVar, config.PARTICLE_BASE_COLOR_STR]); // Keep existing dependencies for this specific effect.
 
   const initParticles = useCallback((canvas: HTMLCanvasElement) => {
     particlesArray.current = [];
     const [, baseS, baseL, baseA] = parseHsla(config.PARTICLE_BASE_COLOR_STR);
     const [, , highlightL, highlightA] = parseHsla(config.PARTICLE_HIGHLIGHT_COLOR_STR);
+    // config.MAX_PARTICLES will now be the responsive value
     for (let i = 0; i < config.MAX_PARTICLES; i++) {
       const radius = Math.random() * (config.MAX_RADIUS - config.MIN_RADIUS) + config.MIN_RADIUS;
       particlesArray.current.push({
@@ -262,7 +311,7 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
         connectionCount: 0, targetRadius: radius, currentRadius: radius,
       });
     }
-  }, [config]);
+  }, [config]); // initParticles depends on the entire config object.
 
   const initCosmicDust = useCallback((canvas: HTMLCanvasElement) => {
     cosmicDustParticles.current = [];
@@ -278,7 +327,7 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
         hueOffset: (Math.random() * config.COSMIC_DUST_HUE_SPREAD) - (config.COSMIC_DUST_HUE_SPREAD / 2),
       });
     }
-  }, [config]);
+  }, [config]); // Depends on config for COSMIC_DUST_COUNT etc.
 
   const initNebulaClouds = useCallback((canvas: HTMLCanvasElement) => {
     nebulaClouds.current = [];
@@ -312,8 +361,6 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
         timeOffsetSize: Math.random() * 1000,
         initialOffsetX: (Math.random() - 0.5) * canvas.width * 0.4,
         initialOffsetY: (Math.random() - 0.5) * canvas.height * 0.4,
-
-        // Initialize new properties
         hueOscillationSpeed: (Math.random() * (config.NEBULA_HUE_OSCILLATION_SPEED_MAX - config.NEBULA_HUE_OSCILLATION_SPEED_MIN) + config.NEBULA_HUE_OSCILLATION_SPEED_MIN),
         hueOscillationAmplitude: (Math.random() * (config.NEBULA_HUE_OSCILLATION_AMPLITUDE_MAX - config.NEBULA_HUE_OSCILLATION_AMPLITUDE_MIN) + config.NEBULA_HUE_OSCILLATION_AMPLITUDE_MIN),
         timeOffsetHue: Math.random() * 1000,
@@ -322,8 +369,7 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
         timeOffsetLuminosity: Math.random() * 1000,
       });
     }
-  }, [config, masterHue]); // masterHue is a ref, its .current is used. If masterHue object itself could change, it's needed. Typically it's stable.
-
+  }, [config, masterHue]);
 
   const drawRevealedGrid = useCallback((canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
     if (mousePosition.current.x === null || mousePosition.current.y === null || cellSize <= 0) return;
@@ -383,7 +429,7 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
         }
       });
     });
-  }, [config, cellSize, masterHue, animationTime]); // masterHue, animationTime are refs. If their .current is used, they usually don't need to be deps.
+  }, [config, cellSize, masterHue, animationTime]);
 
   const animate = useCallback((canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
     animationTime.current += 0.016; 
@@ -395,7 +441,6 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
     if (masterHue.current >= 360) masterHue.current -= 360;
     if (masterHue.current < 0) masterHue.current += 360;
 
-    // 1. Draw Nebula Clouds
     ctx.globalCompositeOperation = 'lighter'; 
     nebulaClouds.current.forEach(cloud => {
       cloud.x += cloud.driftXFactor * canvas.width * 0.01; 
@@ -409,49 +454,39 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
       if (cloud.y + visualRadiusY < 0) cloud.y = canvas.height + visualRadiusY;
       
       const time = animationTime.current;
-      
-      // Size Pulse
       const sizePulse = (Math.sin(time * cloud.sizePulseSpeed + cloud.timeOffsetSize) + 1) / 2; 
       const currentSizeFactor = 1 + (sizePulse * config.NEBULA_PULSE_AMPLITUDE_SIZE - config.NEBULA_PULSE_AMPLITUDE_SIZE / 2);
-      
-      // Opacity Pulse
       const opacityPulse = (Math.sin(time * cloud.opacityPulseSpeed + cloud.timeOffsetOpacity) + 1) / 2; 
       const currentOpacityFactor = 1 + (opacityPulse * config.NEBULA_PULSE_AMPLITUDE_OPACITY - config.NEBULA_PULSE_AMPLITUDE_OPACITY / 2);
       const finalOpacity = cloud.baseOpacity * currentOpacityFactor;
 
-      if (finalOpacity < 0.005) return; // Skip rendering if too transparent
+      if (finalOpacity < 0.005) return;
 
-      // Hue Oscillation
       const hueWave = Math.sin(time * cloud.hueOscillationSpeed + cloud.timeOffsetHue);
       const dynamicHueOffset = cloud.baseHueOffset + hueWave * cloud.hueOscillationAmplitude;
-
-      // Luminosity Pulse
-      const luminosityWave = (Math.sin(time * cloud.luminosityPulseSpeed + cloud.timeOffsetLuminosity) + 1) / 2; // 0 to 1
+      const luminosityWave = (Math.sin(time * cloud.luminosityPulseSpeed + cloud.timeOffsetLuminosity) + 1) / 2;
       const luminosityMultiplier = 1 + (luminosityWave * cloud.luminosityPulseAmplitude - cloud.luminosityPulseAmplitude / 2);
       const currentLuminosityInner = cloud.luminosityInner * luminosityMultiplier;
       const currentLuminosityOuter = cloud.luminosityOuter * luminosityMultiplier;
 
       const cloudGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(cloud.radiusX, cloud.radiusY) * currentSizeFactor);
-      
-      // Define colors for the textured gradient
       const colorCore = getHarmonizedHsla(masterHue.current, dynamicHueOffset, cloud.saturation, currentLuminosityInner, finalOpacity, true);
       const colorInnerMid = getHarmonizedHsla(masterHue.current, dynamicHueOffset + 5, cloud.saturation * 0.95, currentLuminosityInner * 0.6, finalOpacity * 0.85, true);
-      const colorDarkBand = getHarmonizedHsla(masterHue.current, dynamicHueOffset - 10, cloud.saturation * 0.8, currentLuminosityInner * 0.15, finalOpacity * 0.7, true); // Darker spot
+      const colorDarkBand = getHarmonizedHsla(masterHue.current, dynamicHueOffset - 10, cloud.saturation * 0.8, currentLuminosityInner * 0.15, finalOpacity * 0.7, true);
       const colorOuterMid = getHarmonizedHsla(masterHue.current, dynamicHueOffset + 15, cloud.saturation * 1.1, currentLuminosityOuter * 1.2, finalOpacity * 0.5, true);
-      const colorEdge = getHarmonizedHsla(masterHue.current, dynamicHueOffset, cloud.saturation * 0.9, currentLuminosityOuter, 0, true); // Fade to transparent alpha
+      const colorEdge = getHarmonizedHsla(masterHue.current, dynamicHueOffset, cloud.saturation * 0.9, currentLuminosityOuter, 0, true);
 
-      // Gradient stops for texture and "dark spots"
-      cloudGrad.addColorStop(0, colorCore);         // Brightest core
-      cloudGrad.addColorStop(0.2, colorCore);       // Hold core brightness
-      cloudGrad.addColorStop(0.35, colorInnerMid);  // Transition
-      cloudGrad.addColorStop(0.5, colorDarkBand);   // Darker band
-      cloudGrad.addColorStop(0.7, colorOuterMid);   // Brighter outer region
-      cloudGrad.addColorStop(0.85, colorDarkBand);  // Another darker section
-      cloudGrad.addColorStop(1, colorEdge);         // Fade to transparent
+      cloudGrad.addColorStop(0, colorCore);
+      cloudGrad.addColorStop(0.2, colorCore);
+      cloudGrad.addColorStop(0.35, colorInnerMid);
+      cloudGrad.addColorStop(0.5, colorDarkBand);
+      cloudGrad.addColorStop(0.7, colorOuterMid);
+      cloudGrad.addColorStop(0.85, colorDarkBand);
+      cloudGrad.addColorStop(1, colorEdge);
 
       ctx.save();
       ctx.translate(cloud.x + cloud.initialOffsetX, cloud.y + cloud.initialOffsetY);
-      ctx.rotate(cloud.angle + Math.sin(time * 0.0005 + cloud.id) * 0.05 * (cloud.id % 2 === 0 ? 1 : -1) ); // Varied slow wobble
+      ctx.rotate(cloud.angle + Math.sin(time * 0.0005 + cloud.id) * 0.05 * (cloud.id % 2 === 0 ? 1 : -1) );
       ctx.scale(currentSizeFactor, currentSizeFactor * (cloud.radiusY / cloud.radiusX)); 
       
       ctx.beginPath();
@@ -462,7 +497,6 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
     });
     ctx.globalCompositeOperation = 'source-over'; 
 
-    // 2. Draw Cosmic Dust
     cosmicDustParticles.current.forEach(dust => {
       dust.x += dust.vx;
       dust.y += dust.vy;
@@ -473,10 +507,8 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
       ctx.beginPath(); ctx.arc(dust.x, dust.y, dust.radius, 0, Math.PI * 2); ctx.fill();
     });
 
-    // 3. Draw Revealed Grid
     drawRevealedGrid(canvas, ctx);
 
-    // 4. Process Click Effects
     clickEffects.current = clickEffects.current.filter(effect => { effect.life--; return effect.life > 0; });
 
     particlesArray.current.forEach(p => p.connectionCount = 0);
@@ -484,7 +516,6 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
     const [, , lineHighlightL, lineHighlightA] = parseHsla(config.LINE_HIGHLIGHT_COLOR_STR);
     const currentLineHue = (masterHue.current + 10) % 360;
 
-    // 5. Draw Connections
     for (let i = 0; i < particlesArray.current.length; i++) {
       for (let j = i + 1; j < particlesArray.current.length; j++) {
         const p1 = particlesArray.current[i]; const p2 = particlesArray.current[j];
@@ -503,7 +534,6 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
       }
     }
     
-    // 6. Draw and Update Main Particles
     particlesArray.current.forEach(p => {
       clickEffects.current.forEach(effect => {
         const dx = p.x - effect.x; const dy = p.y - effect.y; const dist = Math.sqrt(dx * dx + dy * dy);
@@ -541,7 +571,7 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
     });
 
     animationFrameId.current = requestAnimationFrame(() => animate(canvas, ctx));
-  }, [config, drawRevealedGrid]); // Corrected dependencies for animate
+  }, [config, drawRevealedGrid]); 
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -551,19 +581,20 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
 
     const resizeCanvas = () => {
       if (canvas) {
-        // Get device pixel ratio for sharper rendering on high DPI displays
         const dpr = window.devicePixelRatio || 1;
         const rect = canvas.getBoundingClientRect();
         
         canvas.width = rect.width * dpr;
         canvas.height = rect.height * dpr;
         
-        ctx.scale(dpr, dpr); // Scale context to account for DPR
+        ctx.scale(dpr, dpr); 
 
-        // Adjust canvas style size to fit container
         canvas.style.width = `${rect.width}px`;
         canvas.style.height = `${rect.height}px`;
         
+        // initParticles will be called here. Because `config.MAX_PARTICLES`
+        // would have been updated by the other useEffect for resize,
+        // initParticles (which depends on config) will use the new count.
         initParticles(canvas); 
         initCosmicDust(canvas);
         initNebulaClouds(canvas); 
@@ -583,23 +614,21 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
       }
     };
 
-    // Initial setup
-    resizeCanvas(); // Call resizeCanvas to set initial size and DPR scaling
+    resizeCanvas(); 
     
-    // Add event listeners
-    window.addEventListener('resize', resizeCanvas);
-    // Mouse move on window to track mouse even if it leaves canvas briefly then re-enters near edge
+    // This event listener for 'resize' is for canvas dimensions.
+    // The separate useEffect handles MAX_PARTICLES update on resize.
+    window.addEventListener('resize', resizeCanvas); 
     window.addEventListener('mousemove', handleMouseMove); 
     canvas.addEventListener('mouseleave', handleMouseLeave); 
     canvas.addEventListener('mousedown', handleMouseDown); 
 
-    // Start animation
     if (!animationFrameId.current) {
       animationFrameId.current = requestAnimationFrame(() => animate(canvas, ctx));
     }
 
     return () => {
-      window.removeEventListener('resize', resizeCanvas);
+      window.removeEventListener('resize', resizeCanvas); // This is for canvas dimension resize
       window.removeEventListener('mousemove', handleMouseMove);
       canvas.removeEventListener('mouseleave', handleMouseLeave);
       canvas.removeEventListener('mousedown', handleMouseDown);
@@ -608,7 +637,10 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
         animationFrameId.current = null;
       }
     };
-  // Ensure all dependencies that might change and affect initialization or animation are included.
+  // Dependencies for the main setup/animation effect.
+  // `config` is included because many animation parameters depend on it.
+  // `initParticles`, `initCosmicDust`, `initNebulaClouds`, `animate` are callbacks
+  // that might change if their own dependencies (like `config`) change.
   }, [initParticles, initCosmicDust, initNebulaClouds, animate, config, cellSize]); 
 
   return (
