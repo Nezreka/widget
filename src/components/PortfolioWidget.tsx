@@ -353,7 +353,7 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ settings, isMobileFul
           Ready to build something amazing?
       </p>
       <a
-          href="mailto:broque.thomas.dev@example.com"
+          href="mailto:broque.n.roll@gmail.com"
           className={`inline-block font-semibold rounded-lg text-white shadow-xl transition-all duration-300 ease-out transform hover:scale-105 hover:shadow-2xl focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-[var(--portfolio-accent-color)]
                       ${layoutMode === 'compact' ? 'px-6 py-2.5 text-sm' : 'px-8 py-3 text-md md:text-lg'}`}
           style={{
