@@ -69,7 +69,7 @@ export const WIDGET_SIZE_PRESETS: Record<WidgetSizePresetKey, WidgetSizePresetDe
   small_tall: { targetWidthPx: 6 * DEFAULT_CELL_SIZE, targetHeightPx: 12 * DEFAULT_CELL_SIZE, description: "Small Tall" },
   medium_tall: { targetWidthPx: 10 * DEFAULT_CELL_SIZE, targetHeightPx: 16 * DEFAULT_CELL_SIZE, description: "Medium Tall" },
   large_tall: { targetWidthPx: 12 * DEFAULT_CELL_SIZE, targetHeightPx: 20 * DEFAULT_CELL_SIZE, description: "Large Tall" },
-  content_driven_medium: { targetWidthPx: 15 * DEFAULT_CELL_SIZE, targetHeightPx: 15 * DEFAULT_CELL_SIZE, description: "Content Medium" },
+  content_driven_medium: { targetWidthPx: 15 * DEFAULT_CELL_SIZE, targetHeightPx: 18 * DEFAULT_CELL_SIZE, description: "Content Medium" },
   content_driven_large: { targetWidthPx: 40 * DEFAULT_CELL_SIZE, targetHeightPx: 30 * DEFAULT_CELL_SIZE, description: "Content Large" },
   full_width_short: { targetWidthPx: 30 * DEFAULT_CELL_SIZE, targetHeightPx: 8 * DEFAULT_CELL_SIZE, description: "Full Short" },
   half_width_medium: { targetWidthPx: 15 * DEFAULT_CELL_SIZE, targetHeightPx: 12 * DEFAULT_CELL_SIZE, description: "Half Medium" },
@@ -141,7 +141,7 @@ export const AVAILABLE_WIDGET_DEFINITIONS: WidgetBlueprint[] = [
   { type: 'minesweeper', defaultTitle: 'Minesweeper', displayName: 'Minesweeper', description: "Classic Minesweeper game.", icon: MinesweeperIcon, defaultSizePreset: 'content_driven_medium', minColSpan: 8, minRowSpan: 10, defaultSettings: { difficulty: 'easy' } },
   { type: 'unitConverter', defaultTitle: 'Unit Converter', displayName: 'Unit Converter', description: "Convert various units.", icon: UnitConverterIcon, defaultSizePreset: 'medium_tall', minColSpan: 6, minRowSpan: 8, defaultSettings: { defaultCategory: 'Length', precision: 4 } as UnitConverterWidgetSettings },
   { type: 'countdownStopwatch', defaultTitle: 'Timer / Stopwatch', displayName: 'Timer/Stopwatch', description: "Countdown timer and stopwatch.", icon: CountdownStopwatchIcon, defaultSizePreset: 'medium_square', minColSpan: 6, minRowSpan: 6, defaultSettings: { defaultCountdownMinutes: 5, playSoundOnFinish: true } as CountdownStopwatchWidgetSettings },
-  { type: 'photo', defaultTitle: 'Photo Viewer', displayName: 'Photo Viewer', description: "Display an image from URL or upload.", icon: PhotoIcon, defaultSizePreset: 'medium_square', minColSpan: 6, minRowSpan: 6, defaultSettings: PHOTO_WIDGET_DEFAULT_INSTANCE_SETTINGS },
+  { type: 'photo', defaultTitle: 'Photo Viewer', displayName: 'Photo Viewer', description: "Display an image from URL or upload.", icon: PhotoIcon, defaultSizePreset: 'content_driven_medium', minColSpan: 6, minRowSpan: 6, defaultSettings: PHOTO_WIDGET_DEFAULT_INSTANCE_SETTINGS },
   { type: 'portfolio', defaultTitle: "Broque's Portfolio", displayName: 'My Portfolio', description: "A showcase of my work and experience.", icon: PortfolioIcon, defaultSizePreset: 'content_driven_large', minColSpan: 18, minRowSpan: 16, defaultSettings: PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS },
   { type: 'geminiChat', defaultTitle: 'AI Chat', displayName: 'Gemini AI Chat', description: "Chat with a Gemini-powered AI assistant.", icon: GeminiChatIcon, defaultSizePreset: 'content_driven_medium', minColSpan: 8, minRowSpan: 10, defaultSettings: GEMINI_CHAT_WIDGET_DEFAULT_INSTANCE_SETTINGS },
 ];
