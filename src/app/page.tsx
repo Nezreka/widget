@@ -955,20 +955,17 @@ export default function Home() {
     if (maximizedWidgetId || (isMobileView && widgetType !== 'portfolio')) {
         if(isMobileView && widgetType !== 'portfolio') {
             alert("Adding new widgets is disabled in mobile full-portfolio view, except for the initial portfolio widget.");
-            speakText("Adding new widgets is disabled in mobile view.");
         }
         return;
     }
     const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(def => def.type === widgetType);
     if (!blueprint) {
         alert(`Widget type "${widgetType}" is not available.`);
-        speakText(`Widget type "${widgetType}" is not available.`);
         setIsAddWidgetMenuOpen(false); setIsAddWidgetContextMenuOpen(false); return;
     }
 
     if (widgetContainerCols === 0 || widgetContainerRows === 0) {
       alert("Grid not fully initialized. Please wait a moment and try again.");
-      speakText("Grid not fully initialized. Please wait a moment and try again.");
       setIsAddWidgetMenuOpen(false); setIsAddWidgetContextMenuOpen(false);
       return;
     }
@@ -1044,14 +1041,12 @@ export default function Home() {
 
     if (!targetWidget || !blueprint) {
         alert("Error: Could not find widget data to apply preset.");
-        speakText("Error: Could not find widget data to apply preset.");
         return;
     }
 
     const presetSizeTargets = WIDGET_SIZE_PRESETS[presetKey];
     if (!presetSizeTargets) {
         alert("Error: Invalid size preset selected.");
-        speakText("Error: Invalid size preset selected.");
         return;
     }
 
@@ -1084,10 +1079,8 @@ export default function Home() {
         updateWidgetsAndPushToHistory(finalLayout, `apply_preset_${presetKey}_to_${widgetId}`);
         setActiveWidgetId(widgetId);
         setIsContainerSettingsModalOpen(false);
-        speakText(`Applied size preset ${presetKey.replace("_", " ")} to ${targetWidget.title}.`);
     } else {
         alert(`Could not apply size preset "${presetKey}". There isn't enough space, even after trying to rearrange. Please try a different preset or make more room manually.`);
-        speakText(`Could not apply size preset ${presetKey.replace("_", " ")}.`);
     }
   }, [widgets, maximizedWidgetId, cellSize, findNextAvailablePosition, performAutoSort, updateWidgetsAndPushToHistory, canPlaceWidget, isMobileView]);
 
@@ -1190,7 +1183,6 @@ export default function Home() {
         updateWidgetsAndPushToHistory(scaledWidgets, `grid_density_change_scaled_only_${newCellSize}`);
         if (!isMobileView) {
              alert("Grid density changed. Some widgets may need manual readjustment or use the 'Sort Grid' button.");
-             speakText("Grid density changed. Some widgets may need manual readjustment or use the 'Sort Grid' button.");
         }
     }
     setIsDensityMenuOpen(false);
@@ -1250,23 +1242,13 @@ export default function Home() {
 
   // --- AI Integration Functions ---
 
-  const speakText = (text: string) => {
-    if (typeof window !== 'undefined' && window.speechSynthesis && window.SpeechSynthesisUtterance) {
-      window.speechSynthesis.cancel();
-      const utterance = new window.SpeechSynthesisUtterance(text);
-      utterance.lang = 'en-US';
-      utterance.rate = 1;
-      utterance.pitch = 1;
-      window.speechSynthesis.speak(utterance);
-    }
-  };
+ 
 
   const startListening = () => {
     if (typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)) {
       const SpeechRecognitionImpl = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognitionImpl) {
         setAiError("Speech recognition is not supported by your browser.");
-        speakText("Speech recognition is not supported by your browser.");
         return;
       }
       if (speechRecognitionRef.current && aiIsListening) {
@@ -1310,7 +1292,6 @@ export default function Home() {
         else if (event.error === 'not-allowed') errorMsg = "Microphone access denied. Please enable it in browser settings.";
         setAiError(errorMsg);
         setAiLastFeedback(errorMsg);
-        speakText(errorMsg);
         setAiIsListening(false); 
       };
 
@@ -1323,7 +1304,6 @@ export default function Home() {
       const errorMsg = "Speech recognition not available in this browser.";
       setAiError(errorMsg);
       setAiLastFeedback(errorMsg);
-      speakText(errorMsg);
     }
   };
 
@@ -1333,7 +1313,6 @@ export default function Home() {
     setAiIsProcessing(true);
     setAiLastFeedback(`Processing: "${commandText}"`);
     setAiError(null);
-    speakText(`Processing: ${commandText.substring(0, 50)}`);
 
     const systemPrompt = getGeminiSystemPrompt(widgets);
     const fullPrompt = systemPrompt + "\nUser Command: " + commandText; 
@@ -1380,7 +1359,7 @@ export default function Home() {
         const parsedCommand = JSON.parse(rawJsonText) as ParsedAiCommand;
 
         setAiLastFeedback(parsedCommand.feedbackToUser || "Command received.");
-        if (parsedCommand.feedbackToUser) speakText(parsedCommand.feedbackToUser);
+        
 
         dispatchAiCommand(parsedCommand);
 
@@ -1394,7 +1373,7 @@ export default function Home() {
       const errorMsg = err instanceof Error ? err.message : "An unknown error occurred with AI.";
       setAiError(`AI Error: ${errorMsg}`);
       setAiLastFeedback(`Error: ${errorMsg}`);
-      speakText(`Error: ${errorMsg}`);
+     
     } finally {
       setAiIsProcessing(false);
       setAiInputValue('');
@@ -1458,7 +1437,6 @@ export default function Home() {
                 console.error("Error parsing initialSettings JSON for addWidget:", e);
                 feedbackMessage = "Error applying initial settings due to invalid format.";
                 setAiLastFeedback(feedbackMessage);
-                speakText(feedbackMessage);
                 break;
             }
         } else if (typeof addCmd.initialSettings === 'object') {
@@ -1781,7 +1759,6 @@ export default function Home() {
 
     if (feedbackMessage) { 
         setAiLastFeedback(feedbackMessage);
-        speakText(feedbackMessage);
     }
   };
 
