@@ -1984,11 +1984,26 @@ export default function Home() {
   };
 
   const handleWheelScroll = (event: React.WheelEvent<HTMLDivElement>) => {
-    if (event.shiftKey && dashboardAreaRef.current) { // Check if Shift is pressed
-      event.preventDefault(); // Prevent default vertical scroll or other shift+wheel actions
-      dashboardAreaRef.current.scrollLeft += event.deltaY; // Use deltaY for horizontal scroll with Shift
+    // If the dashboardAreaRef has a ref and is current
+    if (dashboardAreaRef.current) {
+      const { deltaX, deltaY } = event; // Get horizontal and vertical scroll delta
+      
+      // Prioritize deltaX if it's non-zero (e.g., from a tilt-wheel mouse or touchpad gesture)
+      // Otherwise, use deltaY for horizontal scrolling.
+      const scrollAmount = deltaX !== 0 ? deltaX : deltaY;
+
+      // Check if there's actually horizontal overflow to scroll
+      if (dashboardAreaRef.current.scrollWidth > dashboardAreaRef.current.clientWidth) {
+        // If there's a non-zero scroll amount (either horizontal or vertical from wheel)
+        if (scrollAmount !== 0) {
+          event.preventDefault(); // Prevent default browser scroll behavior (e.g., vertical page scroll)
+          dashboardAreaRef.current.scrollLeft += scrollAmount; // Apply the scroll amount horizontally
+        }
+      }
+      // If there's no horizontal overflow, or if both deltas are zero,
+      // the browser's default behavior for the wheel event will proceed.
+      // Since overflow-y is hidden on dashboardAreaRef, vertical scroll on this specific element is not an issue.
     }
-    // If Shift is not pressed, normal vertical scrolling will occur on the dashboardAreaRef if its content overflows vertically.
   };
 
 
