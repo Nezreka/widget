@@ -208,6 +208,7 @@ const GLOBAL_PHOTO_HISTORY_STORAGE_KEY = 'dashboardGlobalPhotoHistory_v1';
 const DATA_SAVE_DEBOUNCE_MS = 700;
 const WIDGET_DESELECT_TIMEOUT_MS = 3000;
 const MOBILE_BREAKPOINT_PX = 768; // Mobile breakpoint
+const SMOOTH_SCROLL_DURATION_MS = 1000; // For widget centering
 
 const DEFAULT_WIDGET_CONTAINER_SETTINGS: WidgetContainerSettings = {
     alwaysShowTitleBar: false,
@@ -405,6 +406,31 @@ const getGeminiSystemPrompt = (widgets: PageWidgetConfig[]): string => {
   promptLines.push("--- End YouTube Widget Specific Instructions ---");
 
   return promptLines.join('\n');
+};
+
+// Helper function for smooth scrolling with duration
+const smoothScrollTo = (element: HTMLElement, to: number, duration: number, axis: 'left' | 'top') => {
+  const start = axis === 'left' ? element.scrollLeft : element.scrollTop;
+  const change = to - start;
+  const startTime = performance.now();
+
+  const animateScroll = (currentTime: number) => {
+    const elapsedTime = currentTime - startTime;
+    const progress = Math.min(elapsedTime / duration, 1);
+    // Cubic ease-out: starts fast, decelerates
+    const easedProgress = 1 - Math.pow(1 - progress, 3);
+
+    if (axis === 'left') {
+      element.scrollLeft = start + change * easedProgress;
+    } else {
+      element.scrollTop = start + change * easedProgress;
+    }
+
+    if (elapsedTime < duration) {
+      requestAnimationFrame(animateScroll);
+    }
+  };
+  requestAnimationFrame(animateScroll);
 };
 
 
@@ -659,7 +685,24 @@ export default function Home() {
   useEffect(() => { if (typeof window !== 'undefined') { const sPH = localStorage.getItem(GLOBAL_PHOTO_HISTORY_STORAGE_KEY); if (sPH) { try { const lPH = JSON.parse(sPH) as HistoricImage[]; setSharedPhotoHistory(Array.isArray(lPH) ? lPH : []); } catch (e) { console.error("Err parse photo hist:", e); setSharedPhotoHistory([]); } } else { setSharedPhotoHistory([]); } } }, []);
   useEffect(() => { if (typeof window !== 'undefined') { if (photoHistorySaveTimeoutRef.current) clearTimeout(photoHistorySaveTimeoutRef.current); photoHistorySaveTimeoutRef.current = setTimeout(() => { try { localStorage.setItem(GLOBAL_PHOTO_HISTORY_STORAGE_KEY, JSON.stringify(sharedPhotoHistory)); } catch (e) { console.error("Err save photo hist:", e); } }, DATA_SAVE_DEBOUNCE_MS); return () => { if (photoHistorySaveTimeoutRef.current) clearTimeout(photoHistorySaveTimeoutRef.current); }; } }, [sharedPhotoHistory]);
 
-  useEffect(() => { if (deselectTimerRef.current) { clearTimeout(deselectTimerRef.current); deselectTimerRef.current = null; } if (activeWidgetId && !maximizedWidgetId) { deselectTimerRef.current = setTimeout(() => { setActiveWidgetId(null); }, WIDGET_DESELECT_TIMEOUT_MS); } return () => { if (deselectTimerRef.current) { clearTimeout(deselectTimerRef.current); deselectTimerRef.current = null; } }; }, [activeWidgetId, maximizedWidgetId]);
+  useEffect(() => { 
+    if (deselectTimerRef.current) { 
+        clearTimeout(deselectTimerRef.current); 
+        deselectTimerRef.current = null; 
+    } 
+    if (activeWidgetId && !maximizedWidgetId) { 
+        deselectTimerRef.current = setTimeout(() => { 
+            setActiveWidgetId(null); 
+        }, WIDGET_DESELECT_TIMEOUT_MS); 
+    } 
+    return () => { 
+        if (deselectTimerRef.current) { 
+            clearTimeout(deselectTimerRef.current); 
+            deselectTimerRef.current = null; 
+        } 
+    }; 
+  }, [activeWidgetId, maximizedWidgetId]);
+
   useEffect(() => { const handleClickOutside = (e: MouseEvent) => { if (addWidgetMenuRef.current && !addWidgetMenuRef.current.contains(e.target as Node)) { setIsAddWidgetMenuOpen(false); } if (densityMenuRef.current && !densityMenuRef.current.contains(e.target as Node)) { setIsDensityMenuOpen(false); }}; if (isAddWidgetMenuOpen || isDensityMenuOpen) { document.addEventListener('mousedown', handleClickOutside); } else { document.removeEventListener('mousedown', handleClickOutside); } return () => { document.removeEventListener('mousedown', handleClickOutside); }; }, [isAddWidgetMenuOpen, isDensityMenuOpen]);
 
 
@@ -1187,7 +1230,7 @@ export default function Home() {
       setWidgets(finalLayout); 
       updateWidgetsAndPushToHistory(finalLayout, `add_widget_${widgetType}`);
       const addedWidgetInLayout = finalLayout.find(w => w.id === newWidgetConfigProcessed.id);
-      if (addedWidgetInLayout) setActiveWidgetId(addedWidgetInLayout.id);
+      if (addedWidgetInLayout) setActiveWidgetId(addedWidgetInLayout.id); // This will also trigger centering
       else setActiveWidgetId(null);
     } else {
       alert("No available space to add this widget, even after attempting to sort, expand grid, and shrink existing widgets. Please make more room manually or try a smaller widget.");
@@ -1255,7 +1298,7 @@ export default function Home() {
 
         setWidgets(finalLayout);
         updateWidgetsAndPushToHistory(finalLayout, `apply_preset_${presetKey}_to_${widgetId}`);
-        setActiveWidgetId(widgetId);
+        setActiveWidgetId(widgetId); // This will also trigger centering
         setIsContainerSettingsModalOpen(false);
     } else {
         alert(`Could not apply size preset "${presetKey}". There isn't enough space, even after trying to rearrange. Please try a different preset or make more room manually.`);
@@ -1354,7 +1397,7 @@ export default function Home() {
         updateWidgetsAndPushToHistory(updatedWidgets, `resize_end_${id}`); 
         return updatedWidgets; 
     }); 
-    setActiveWidgetId(id); 
+    setActiveWidgetId(id); // This will also trigger centering
   };
 
   const handleWidgetMove = (id: string, newPosition: WidgetMoveDataType) => { 
@@ -1378,7 +1421,7 @@ export default function Home() {
             return updatedWidgets; 
         }); 
     } 
-    setActiveWidgetId(id); 
+    setActiveWidgetId(id); // This will also trigger centering
   };
   
   const handleWidgetDelete = (idToDelete: string) => { 
@@ -1402,7 +1445,26 @@ export default function Home() {
     if (activeWidgetId === idToDelete) setActiveWidgetId(null); 
   };
 
-  const handleWidgetFocus = (id: string) => { if (maximizedWidgetId && maximizedWidgetId !== id) return; setActiveWidgetId(id); };
+  const handleWidgetFocus = (id: string) => { 
+    if (maximizedWidgetId && maximizedWidgetId !== id) return; 
+    setActiveWidgetId(id); 
+    
+    // Center the widget smoothly
+    const widgetConfig = widgets.find(w => w.id === id);
+    if (widgetConfig && dashboardAreaRef.current && !isMobileView) { // Assuming centering is not for mobile view or when maximized
+      const widgetLeft = (widgetConfig.colStart - 1) * cellSize;
+      const widgetWidth = widgetConfig.colSpan * cellSize;
+      const widgetCenterX = widgetLeft + widgetWidth / 2;
+
+      const viewportWidth = dashboardAreaRef.current.clientWidth;
+      let targetScrollLeft = widgetCenterX - viewportWidth / 2;
+
+      // Clamp scrollLeft to be within valid bounds
+      targetScrollLeft = Math.max(0, Math.min(targetScrollLeft, dashboardAreaRef.current.scrollWidth - viewportWidth));
+      
+      smoothScrollTo(dashboardAreaRef.current, targetScrollLeft, SMOOTH_SCROLL_DURATION_MS, 'left');
+    }
+  };
   const handleOpenWidgetSettings = (widgetId: string) => { if (maximizedWidgetId && maximizedWidgetId !== widgetId) return; const widgetToEdit = widgets.find(w => w.id === widgetId); if (widgetToEdit) { setActiveWidgetId(widgetId); setSelectedWidgetForSettings(widgetToEdit); setIsSettingsModalOpen(true); } };
   const handleCloseSettingsModal = () => { setIsSettingsModalOpen(false); setSelectedWidgetForSettings(null); };
   const handleSaveWidgetInstanceSettings = useCallback((widgetId: string, newInstanceSettings: AllWidgetSettings) => { setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.map(w => w.id === widgetId ? { ...w, settings: { ...(w.settings || {}), ...newInstanceSettings } } : w); updateWidgetsAndPushToHistory(updatedWidgets, `save_settings_${widgetId}`); return updatedWidgets; }); setActiveWidgetId(widgetId); }, [updateWidgetsAndPushToHistory]);
@@ -1879,7 +1941,7 @@ export default function Home() {
         }
 
         if (targetWidget) { 
-            setActiveWidgetId(targetWidget.id);
+            setActiveWidgetId(targetWidget.id); // This will also trigger centering via handleWidgetFocus
 
             if (maximizedWidgetId && maximizedWidgetId !== targetWidget.id) {
                 const maximizedOriginal = widgets.find(w => w.id === maximizedWidgetId);
@@ -1984,26 +2046,30 @@ export default function Home() {
   };
 
   const handleWheelScroll = (event: React.WheelEvent<HTMLDivElement>) => {
-    // If the dashboardAreaRef has a ref and is current
-    if (dashboardAreaRef.current) {
-      const { deltaX, deltaY } = event; // Get horizontal and vertical scroll delta
-      
-      // Prioritize deltaX if it's non-zero (e.g., from a tilt-wheel mouse or touchpad gesture)
-      // Otherwise, use deltaY for horizontal scrolling.
-      const scrollAmount = deltaX !== 0 ? deltaX : deltaY;
-
-      // Check if there's actually horizontal overflow to scroll
-      if (dashboardAreaRef.current.scrollWidth > dashboardAreaRef.current.clientWidth) {
-        // If there's a non-zero scroll amount (either horizontal or vertical from wheel)
-        if (scrollAmount !== 0) {
-          event.preventDefault(); // Prevent default browser scroll behavior (e.g., vertical page scroll)
-          dashboardAreaRef.current.scrollLeft += scrollAmount; // Apply the scroll amount horizontally
-        }
-      }
-      // If there's no horizontal overflow, or if both deltas are zero,
-      // the browser's default behavior for the wheel event will proceed.
-      // Since overflow-y is hidden on dashboardAreaRef, vertical scroll on this specific element is not an issue.
+    // If a widget is active, or the dashboardAreaRef is not available,
+    // do nothing here. This allows the browser's default scroll behavior
+    // to take over (e.g., scrolling content within the active widget).
+    if (activeWidgetId || !dashboardAreaRef.current) {
+      return;
     }
+  
+    // Grid scroll logic (only if no widget is active)
+    const { deltaX, deltaY } = event;
+    // Prioritize deltaX for horizontal scroll, otherwise use deltaY if deltaX is 0.
+    // This supports mice with tilt-wheels or touchpad horizontal scroll gestures.
+    const scrollAmount = deltaX !== 0 ? deltaX : deltaY;
+  
+    // Check if there's actually horizontal overflow to scroll
+    if (dashboardAreaRef.current.scrollWidth > dashboardAreaRef.current.clientWidth) {
+      if (scrollAmount !== 0) {
+        // Prevent default page scroll only if we are actively scrolling the grid horizontally.
+        // This is important to allow vertical scrolling on the page if the grid isn't meant to scroll.
+        event.preventDefault();
+        dashboardAreaRef.current.scrollLeft += scrollAmount;
+      }
+    }
+    // If there's no horizontal overflow, or scrollAmount is 0, the event proceeds normally.
+    // Since overflow-y is hidden on dashboardAreaRef, default vertical scroll on this element is not an issue.
   };
 
 
@@ -2074,9 +2140,12 @@ export default function Home() {
   return (
     <main className="w-full h-screen bg-page-background text-page-foreground overflow-hidden relative flex flex-col"
       onClick={(e) => {
+        // If the click is directly on the <main> element (the ultimate background)
+        // and not on the context menu or while a widget is maximized, deselect the active widget.
         if (e.target === e.currentTarget && !maximizedWidgetId && !isAddWidgetContextMenuOpen) {
             setActiveWidgetId(null);
         }
+        // If the context menu is open and the click is on the <main> element, close the context menu.
         if (isAddWidgetContextMenuOpen && e.target === e.currentTarget) {
             handleCloseContextMenu();
         }
@@ -2156,6 +2225,16 @@ export default function Home() {
         ref={dashboardAreaRef} 
         className={`flex-grow relative overflow-x-auto overflow-y-hidden ${maximizedWidgetId && !isMobileView ? 'pointer-events-none' : ''}`}
         onWheel={handleWheelScroll} // Added wheel scroll handler
+        onClick={(e) => {
+          // If the click is on the dashboardArea itself (or its direct children like gridWrapperRef if not a widget)
+          // and not on a widget or interactive element within a widget, deselect.
+          const targetIsWidget = widgets.some(widget => (e.target as HTMLElement).closest(`#${CSS.escape(widget.id)}`));
+          const isDashboardAreaClick = e.target === dashboardAreaRef.current || e.target === gridWrapperRef.current;
+
+          if (isDashboardAreaClick && !targetIsWidget && !maximizedWidgetId && !isAddWidgetContextMenuOpen) {
+            setActiveWidgetId(null);
+          }
+        }}
       >
         {/* gridWrapperRef controls the actual width of the content, allowing it to exceed viewport */}
         <div 
@@ -2204,7 +2283,7 @@ export default function Home() {
                     key={widgetConfig.id} id={widgetConfig.id} title={widgetConfig.title}
                     colStart={currentWidgetState.colStart} rowStart={currentWidgetState.rowStart} colSpan={currentWidgetState.colSpan} rowSpan={currentWidgetState.rowSpan}
                     onResize={handleWidgetResizeLive} onResizeEnd={handleWidgetResizeEnd} onMove={handleWidgetMove}
-                    onDelete={handleWidgetDelete} onFocus={handleWidgetFocus}
+                    onDelete={handleWidgetDelete} onFocus={handleWidgetFocus} // handleWidgetFocus now also triggers centering
                     onOpenSettings={handleOpenWidgetSettings}
                     onOpenContainerSettings={handleOpenContainerSettingsModal}
                     containerSettings={widgetConfig.containerSettings}
