@@ -8,11 +8,12 @@ import { type WidgetType } from '@/definitions/widgetConfig';
 import {
     WeatherIcon, ClockIcon, CalculatorIcon, TodoIcon, NotesIcon, YoutubeIcon,
     MinesweeperIcon, UnitConverterIcon, CountdownStopwatchIcon, PhotoIcon,
-    PortfolioIcon, GeminiChatIcon
+    PortfolioIcon, GeminiChatIcon,
+    // Import the new GoogleServicesHubIcon
+    GoogleServicesHubIcon,
 } from '@/components/Icons';
 
-// Augment React's CSSProperties to allow custom properties used in this component.
-// Ideally, this should be in a global .d.ts file (e.g., global.d.ts or react.d.ts).
+
 declare module 'react' {
   interface CSSProperties {
     '--mouse-x'?: string | number;
@@ -22,22 +23,19 @@ declare module 'react' {
   }
 }
 
-// Interface for individual widget blueprint in the context menu
 export interface WidgetBlueprintContextMenuItem {
   type: WidgetType;
   displayName: string;
   description?: string;
-  icon?: React.FC; // Icon component
+  icon?: React.FC<{ className?: string }>; // Allow className for icons
 }
 
-// Interface for the input blueprint object for mapping
 interface WidgetBlueprintFromConfig {
   type: WidgetType;
   displayName?: string;
   defaultTitle: string;
   description?: string;
-  // Add other properties from AVAILABLE_WIDGET_DEFINITIONS if they were used here,
-  // but based on current usage, these are sufficient.
+  icon?: React.FC<{ className?: string }>; // Ensure icon is part of this interface
 }
 
 
@@ -53,7 +51,6 @@ interface AddWidgetContextMenuProps {
   headerHeight?: number;
 }
 
-// Extend HTMLButtonElement to include custom listener properties
 interface HTMLButtonElementWithListeners extends HTMLButtonElement {
   _mouseMoveListener?: (e: MouseEvent) => void;
   _mouseEnterListener?: () => void;
@@ -163,9 +160,9 @@ const AddWidgetContextMenu: React.FC<AddWidgetContextMenuProps> = ({
   };
 
   const menuWidth = 300;
-  const menuItemHeight = 60;
-  const menuPaddingAndHeader = 40;
-  const maxMenuHeight = 420;
+  const menuItemHeight = 60; // Approximate height including padding/margin for each item
+  const menuPaddingAndHeader = 40; // Approximate height for menu header and overall padding
+  const maxMenuHeight = 420; // Max height before scrolling
   const calculatedMenuHeight = Math.min(maxMenuHeight, availableWidgets.length * menuItemHeight + menuPaddingAndHeader);
 
   let top = position.y;
@@ -174,13 +171,13 @@ const AddWidgetContextMenu: React.FC<AddWidgetContextMenuProps> = ({
   if (typeof window !== 'undefined') {
     const screenWidth = window.innerWidth;
     const screenHeight = window.innerHeight;
-    const currentHeaderHeight = headerHeight || 60;
-    const buffer = 15;
+    const currentHeaderHeight = headerHeight || 60; // Default header height if not provided
+    const buffer = 15; // Buffer from screen edges
 
     if (left + menuWidth > screenWidth - buffer) left = screenWidth - menuWidth - buffer;
     if (top + calculatedMenuHeight > screenHeight - buffer) top = screenHeight - calculatedMenuHeight - buffer;
     if (left < buffer) left = buffer;
-    if (top < currentHeaderHeight + buffer) top = currentHeaderHeight + buffer;
+    if (top < currentHeaderHeight + buffer) top = currentHeaderHeight + buffer; // Ensure it's below the header
   }
 
   return (
@@ -207,12 +204,11 @@ const AddWidgetContextMenu: React.FC<AddWidgetContextMenuProps> = ({
               className="group relative flex items-center w-full text-left px-3 py-2.5 text-sm text-slate-100 dark:text-slate-50 focus:outline-none rounded-lg transition-all duration-200 ease-in-out animate-menuItemAppear fancy-hover-item"
               style={{
                 animationDelay: `${index * 40}ms`,
-                // No longer need @ts-ignore or @ts-expect-error due to CSSProperties augmentation
                 '--mouse-x': '50%',
                 '--mouse-y': '50%',
                 '--opacity-glow': '0',
                 '--opacity-border': '0',
-              }}
+              } as React.CSSProperties}
               role="menuitem"
             >
               <div className="absolute inset-0 rounded-lg overflow-hidden z-0">
@@ -223,7 +219,8 @@ const AddWidgetContextMenu: React.FC<AddWidgetContextMenuProps> = ({
               <div className="relative z-10 flex items-center w-full">
                 {IconComponent && (
                   <div className="mr-3 p-1.5 bg-slate-700/50 dark:bg-slate-800/60 rounded-md shadow-sm group-hover:bg-sky-500/20 dark:group-hover:bg-sky-400/25 transition-all duration-200 group-hover:scale-105">
-                    <IconComponent />
+                    {/* Pass a default className if the icon component expects it */}
+                    <IconComponent className="w-5 h-5" />
                   </div>
                 )}
                 <div className="flex-grow">
@@ -310,20 +307,27 @@ const AddWidgetContextMenu: React.FC<AddWidgetContextMenuProps> = ({
 
 export const mapBlueprintToContextMenuItem = (blueprint: WidgetBlueprintFromConfig): WidgetBlueprintContextMenuItem => {
   let iconComponent;
-  switch (blueprint.type) {
-    case 'weather': iconComponent = WeatherIcon; break;
-    case 'clock': iconComponent = ClockIcon; break;
-    case 'calculator': iconComponent = CalculatorIcon; break;
-    case 'todo': iconComponent = TodoIcon; break;
-    case 'notes': iconComponent = NotesIcon; break;
-    case 'youtube': iconComponent = YoutubeIcon; break;
-    case 'minesweeper': iconComponent = MinesweeperIcon; break;
-    case 'unitConverter': iconComponent = UnitConverterIcon; break;
-    case 'countdownStopwatch': iconComponent = CountdownStopwatchIcon; break;
-    case 'photo': iconComponent = PhotoIcon; break;
-    case 'portfolio': iconComponent = PortfolioIcon; break;
-    case 'geminiChat': iconComponent = GeminiChatIcon; break;
-    default: iconComponent = undefined;
+  // The blueprint itself should ideally already have the icon component assigned from widgetConfig.ts
+  if (blueprint.icon) {
+    iconComponent = blueprint.icon;
+  } else {
+    // Fallback logic if blueprint.icon is not directly provided (less ideal)
+    switch (blueprint.type) {
+      case 'weather': iconComponent = WeatherIcon; break;
+      case 'clock': iconComponent = ClockIcon; break;
+      case 'calculator': iconComponent = CalculatorIcon; break;
+      case 'todo': iconComponent = TodoIcon; break;
+      case 'notes': iconComponent = NotesIcon; break;
+      case 'youtube': iconComponent = YoutubeIcon; break;
+      case 'minesweeper': iconComponent = MinesweeperIcon; break;
+      case 'unitConverter': iconComponent = UnitConverterIcon; break;
+      case 'countdownStopwatch': iconComponent = CountdownStopwatchIcon; break;
+      case 'photo': iconComponent = PhotoIcon; break;
+      case 'portfolio': iconComponent = PortfolioIcon; break;
+      case 'geminiChat': iconComponent = GeminiChatIcon; break;
+      case 'googleServicesHub': iconComponent = GoogleServicesHubIcon; break; // Added new hub
+      default: iconComponent = undefined;
+    }
   }
   return {
     type: blueprint.type,

@@ -14,7 +14,9 @@ import {
   CountdownStopwatchIcon,
   PhotoIcon,
   PortfolioIcon,
-  GeminiChatIcon
+  GeminiChatIcon,
+  // Import the new GoogleServicesHubIcon (assuming it will be created in Icons.tsx)
+  GoogleServicesHubIcon,
 } from '@/components/Icons'; // Assuming Icons.tsx is in @/components/
 
 // Import specific widget settings types from their respective component files
@@ -31,6 +33,8 @@ import { type CountdownStopwatchWidgetSettings } from "@/components/CountdownSto
 import { type PhotoWidgetSettings } from "@/components/PhotoWidget";
 import { type PortfolioWidgetSettings } from "@/components/PortfolioWidget";
 import { type GeminiChatWidgetSettings } from "@/components/GeminiChatWidget";
+import { type GoogleServicesHubWidgetSettings } from "@/components/GoogleServicesHubWidget";
+
 
 // Import WidgetContainerSettings from Widget.tsx as it's used by PageWidgetConfig
 import { type WidgetContainerSettings } from '@/components/Widget';
@@ -40,7 +44,6 @@ export const DEFAULT_CELL_SIZE = 30; // Base cell size for defining target pixel
 
 // --- Widget Size Presets ---
 
-// NEW: Explicitly define WidgetSizePresetDetails
 export interface WidgetSizePresetDetails {
   targetWidthPx: number;
   targetHeightPx: number;
@@ -54,7 +57,8 @@ export type WidgetSizePresetKey =
   | 'content_driven_medium'
   | 'content_driven_large'
   | 'full_width_short'
-  | 'half_width_medium';
+  | 'half_width_medium'
+  | 'hub_default_size'; // New preset for the hub
 
 // Updated to use WidgetSizePresetDetails type for values
 export const WIDGET_SIZE_PRESETS: Record<WidgetSizePresetKey, WidgetSizePresetDetails> = {
@@ -73,6 +77,7 @@ export const WIDGET_SIZE_PRESETS: Record<WidgetSizePresetKey, WidgetSizePresetDe
   content_driven_large: { targetWidthPx: 40 * DEFAULT_CELL_SIZE, targetHeightPx: 30 * DEFAULT_CELL_SIZE, description: "Content Large" },
   full_width_short: { targetWidthPx: 30 * DEFAULT_CELL_SIZE, targetHeightPx: 8 * DEFAULT_CELL_SIZE, description: "Full Short" },
   half_width_medium: { targetWidthPx: 15 * DEFAULT_CELL_SIZE, targetHeightPx: 12 * DEFAULT_CELL_SIZE, description: "Half Medium" },
+  hub_default_size: { targetWidthPx: 25 * DEFAULT_CELL_SIZE, targetHeightPx: 25 * DEFAULT_CELL_SIZE, description: "Google Hub Size" }, // Adjusted size
 };
 
 // --- Widget Types and Settings ---
@@ -83,12 +88,15 @@ export type AllWidgetSettings =
     WeatherWidgetSettings | TodoWidgetSettings | ClockWidgetSettings | CalculatorWidgetSettings |
     PageInstanceNotesSettings | YoutubeWidgetSettings | MinesweeperWidgetSettings | UnitConverterWidgetSettings |
     CountdownStopwatchWidgetSettings | PhotoWidgetSettings | PortfolioWidgetSettings | GeminiChatWidgetSettings |
+    GoogleServicesHubWidgetSettings | // Add new settings type
     Record<string, unknown>; // Fallback for generic or unknown settings
 
 export type WidgetType =
     'weather' | 'todo' | 'clock' | 'calculator' | 'notes' | 'youtube' |
     'minesweeper' | 'unitConverter' | 'countdownStopwatch' | 'photo' | 'portfolio' |
-    'geminiChat' | 'generic';
+    'geminiChat' |
+    'googleServicesHub' | // Add new widget type
+    'generic';
 
 // --- Widget Configuration Interfaces ---
 export interface PageWidgetConfig {
@@ -129,6 +137,11 @@ export const PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS: PortfolioWidgetSettings
 export const GEMINI_CHAT_WIDGET_DEFAULT_INSTANCE_SETTINGS: GeminiChatWidgetSettings = {
     customSystemPrompt: '',
 };
+// Define default settings for the new hub widget
+export const GOOGLE_SERVICES_HUB_DEFAULT_INSTANCE_SETTINGS: GoogleServicesHubWidgetSettings = {
+    animationSpeed: 'normal',
+};
+
 
 // --- Available Widget Definitions ---
 export const AVAILABLE_WIDGET_DEFINITIONS: WidgetBlueprint[] = [
@@ -144,4 +157,16 @@ export const AVAILABLE_WIDGET_DEFINITIONS: WidgetBlueprint[] = [
   { type: 'photo', defaultTitle: 'Photo Viewer', displayName: 'Photo Viewer', description: "Display an image from URL or upload.", icon: PhotoIcon, defaultSizePreset: 'content_driven_medium', minColSpan: 6, minRowSpan: 6, defaultSettings: PHOTO_WIDGET_DEFAULT_INSTANCE_SETTINGS },
   { type: 'portfolio', defaultTitle: "Broque's Portfolio", displayName: 'My Portfolio', description: "A showcase of my work and experience.", icon: PortfolioIcon, defaultSizePreset: 'content_driven_large', minColSpan: 18, minRowSpan: 16, defaultSettings: PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS },
   { type: 'geminiChat', defaultTitle: 'AI Chat', displayName: 'Gemini AI Chat', description: "Chat with a Gemini-powered AI assistant.", icon: GeminiChatIcon, defaultSizePreset: 'content_driven_medium', minColSpan: 8, minRowSpan: 10, defaultSettings: GEMINI_CHAT_WIDGET_DEFAULT_INSTANCE_SETTINGS },
+  // Add the new Google Services Hub blueprint
+  {
+    type: 'googleServicesHub',
+    defaultTitle: 'Google Services',
+    displayName: 'Google Hub',
+    description: "Access various Google services.",
+    icon: GoogleServicesHubIcon, // This icon needs to be created in Icons.tsx
+    defaultSizePreset: 'hub_default_size', // Use the new preset
+    minColSpan: 15, // Adjusted for better visual appeal of the hub
+    minRowSpan: 15,  // Adjusted
+    defaultSettings: GOOGLE_SERVICES_HUB_DEFAULT_INSTANCE_SETTINGS,
+  },
 ];

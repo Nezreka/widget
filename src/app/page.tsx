@@ -23,6 +23,10 @@ import CountdownStopwatchWidget, { CountdownStopwatchSettingsPanel, type Countdo
 import PhotoWidget, { PhotoSettingsPanel, type PhotoWidgetSettings, type HistoricImage } from "@/components/PhotoWidget";
 import PortfolioWidget, { PortfolioSettingsPanel, type PortfolioWidgetSettings } from "@/components/PortfolioWidget";
 import GeminiChatWidget, { GeminiChatSettingsPanel, type GeminiChatWidgetSettings } from "@/components/GeminiChatWidget";
+// Import the new GoogleServicesHubWidget and its settings panel
+import GoogleServicesHubWidget, { GoogleServicesHubSettingsPanel, type GoogleServicesHubWidgetSettings, type GoogleServiceActionKey } from "@/components/GoogleServicesHubWidget";
+
+
 import AddWidgetContextMenu, { mapBlueprintToContextMenuItem, type WidgetBlueprintContextMenuItem } from '@/components/AddWidgetContextMenu';
 
 import {
@@ -49,6 +53,8 @@ import {
   PHOTO_WIDGET_DEFAULT_INSTANCE_SETTINGS,
   PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS,
   GEMINI_CHAT_WIDGET_DEFAULT_INSTANCE_SETTINGS,
+  // Import the new default settings for the hub
+  GOOGLE_SERVICES_HUB_DEFAULT_INSTANCE_SETTINGS,
   type WidgetSizePresetKey,
   type AllWidgetSettings,
   type WidgetType,
@@ -191,7 +197,7 @@ const CELL_SIZE_OPTIONS = [
 
 const MAX_HISTORY_LENGTH = 50;
 const MINIMIZED_WIDGET_ROW_SPAN = 2;
-const DASHBOARD_LAYOUT_STORAGE_KEY = 'dashboardLayoutV3.22_AI';
+const DASHBOARD_LAYOUT_STORAGE_KEY = 'dashboardLayoutV3.22_AI_GoogleHub'; // Updated version
 const GLOBAL_NOTES_STORAGE_KEY = 'dashboardGlobalNotesCollection_v1';
 const GLOBAL_TODOS_STORAGE_KEY = 'dashboardGlobalSingleTodoList_v1';
 const GLOBAL_PHOTO_HISTORY_STORAGE_KEY = 'dashboardGlobalPhotoHistory_v1';
@@ -216,6 +222,7 @@ const initialDesktopWidgetsLayout: Omit<PageWidgetConfig, 'colSpan' | 'rowSpan' 
     settings: PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS, isMinimized: false,
     containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS, innerPadding: 'px-3.5 py-3' }
   },
+  
 ];
 
 const initialMobileWidgetLayout: Omit<PageWidgetConfig, 'colSpan' | 'rowSpan' | 'minColSpan' | 'minRowSpan'>[] = [
@@ -238,6 +245,13 @@ const ensurePhotoWidgetInstanceSettings = (settings: AllWidgetSettings | undefin
         isSidebarOpen: typeof currentPhotoSettings?.isSidebarOpen === 'boolean'
             ? currentPhotoSettings.isSidebarOpen
             : photoInstanceDefaults.isSidebarOpen,
+        // Ensure all slideshow settings are included
+        isSlideshowActive: currentPhotoSettings?.isSlideshowActive || photoInstanceDefaults.isSlideshowActive,
+        slideshowMode: currentPhotoSettings?.slideshowMode || photoInstanceDefaults.slideshowMode,
+        slideshowInterval: currentPhotoSettings?.slideshowInterval || photoInstanceDefaults.slideshowInterval,
+        slideshowKeyword: currentPhotoSettings?.slideshowKeyword || photoInstanceDefaults.slideshowKeyword,
+        slideshowProvider: currentPhotoSettings?.slideshowProvider || photoInstanceDefaults.slideshowProvider,
+        slideshowTransitionEffect: currentPhotoSettings?.slideshowTransitionEffect || photoInstanceDefaults.slideshowTransitionEffect,
     };
 };
 const ensurePortfolioWidgetInstanceSettings = (settings: AllWidgetSettings | undefined): PortfolioWidgetSettings => {
@@ -257,6 +271,14 @@ const ensureGeminiChatWidgetInstanceSettings = (settings: AllWidgetSettings | un
         customSystemPrompt: currentGeminiChatSettings?.customSystemPrompt || geminiChatInstanceDefaults.customSystemPrompt,
     };
 };
+// Add ensure function for GoogleServicesHubWidget
+const ensureGoogleServicesHubInstanceSettings = (settings: AllWidgetSettings | undefined): GoogleServicesHubWidgetSettings => {
+    const hubInstanceDefaults = GOOGLE_SERVICES_HUB_DEFAULT_INSTANCE_SETTINGS;
+    const currentHubSettings = settings as GoogleServicesHubWidgetSettings | undefined;
+    return {
+        animationSpeed: currentHubSettings?.animationSpeed || hubInstanceDefaults.animationSpeed,
+    };
+};
 
 const processWidgetConfig = (
     widgetData: Partial<PageWidgetConfig>,
@@ -272,7 +294,7 @@ const processWidgetConfig = (
         return {
             id: widgetData.id || `generic-${Date.now()}`,
             title: widgetData.title || "Untitled Widget",
-            type: widgetData.type || 'generic', 
+            type: widgetData.type || 'generic',
             colStart: widgetData.colStart || 1,
             rowStart: widgetData.rowStart || 1,
             colSpan: widgetData.colSpan || Math.max(1, Math.round(defaultPresetFallback.targetWidthPx / currentCellSize)),
@@ -304,6 +326,8 @@ const processWidgetConfig = (
     if (widgetData.type === 'photo') finalContentSettings = ensurePhotoWidgetInstanceSettings(finalContentSettings as PhotoWidgetSettings);
     else if (widgetData.type === 'portfolio') finalContentSettings = ensurePortfolioWidgetInstanceSettings(finalContentSettings as PortfolioWidgetSettings);
     else if (widgetData.type === 'geminiChat') finalContentSettings = ensureGeminiChatWidgetInstanceSettings(finalContentSettings as GeminiChatWidgetSettings);
+    else if (widgetData.type === 'googleServicesHub') finalContentSettings = ensureGoogleServicesHubInstanceSettings(finalContentSettings as GoogleServicesHubWidgetSettings);
+
 
     const finalContainerSettings: WidgetContainerSettings = {
         ...DEFAULT_WIDGET_CONTAINER_SETTINGS,
@@ -312,6 +336,11 @@ const processWidgetConfig = (
      if (isMobileTarget && widgetData.type === 'portfolio') {
         finalContainerSettings.innerPadding = 'p-0';
     }
+    // For Google Hub, ensure no internal padding from container if it's full bleed
+    if (widgetData.type === 'googleServicesHub') {
+        finalContainerSettings.innerPadding = 'p-0';
+    }
+
 
     return {
         id: widgetData.id || `${blueprint.type}-${Date.now()}`,
@@ -340,9 +369,8 @@ interface StoredDashboardLayout {
     isMobileLayout?: boolean;
 }
 
-// MODIFICATION START: Enhanced getGeminiSystemPrompt
 const getGeminiSystemPrompt = (widgets: PageWidgetConfig[]): string => {
-  const basePrompt = getBaseGeminiSystemPrompt(widgets); 
+  const basePrompt = getBaseGeminiSystemPrompt(widgets);
   const promptLines = [basePrompt];
 
   promptLines.push("\n--- YouTube Widget Specific Instructions (CRITICAL - READ CAREFULLY) ---");
@@ -377,7 +405,6 @@ const getGeminiSystemPrompt = (widgets: PageWidgetConfig[]): string => {
 
   return promptLines.join('\n');
 };
-// MODIFICATION END: Enhanced getGeminiSystemPrompt
 
 
 export default function Home() {
@@ -444,7 +471,7 @@ export default function Home() {
                              console.log(`[page.tsx] View mode mismatch (current: ${isMobileView ? 'mobile' : 'desktop'}, saved: ${wasMobileLayoutSaved ? 'mobile' : 'desktop'}). Using default layout for current view.`);
                         }
                     } else {
-                        console.log(`[page.tsx] Storage key version mismatch. Using new initial layout.`);
+                        console.log(`[page.tsx] Storage key version mismatch. Using new initial layout. Saved: ${loadedVersion}, Current: ${currentVersion}`);
                     }
                 } else {
                     console.log(`[page.tsx] Invalid or legacy layout structure.`);
@@ -599,7 +626,7 @@ export default function Home() {
              initialLayoutIsDefaultRef.current = false;
         }
     }
-  }, [widgetContainerCols, updateWidgetsAndPushToHistory, widgets, cellSize, isMobileView]);
+  }, [widgetContainerCols, updateWidgetsAndPushToHistory, widgets, cellSize, isMobileView, isLayoutEngineReady]); // Added isLayoutEngineReady
 
 
   useEffect(() => {
@@ -1765,6 +1792,38 @@ export default function Home() {
 
   // --- End AI Integration Functions ---
 
+  // Function to handle service selection from Google Hub
+  const handleGoogleServiceSelect = (widgetId: string, serviceKey: GoogleServiceActionKey) => {
+    console.log(`Google service selected from hub ${widgetId}: ${serviceKey}`);
+    // For now, just close/minimize the hub widget
+    handleWidgetMinimizeToggle(widgetId);
+
+    // Future:
+    // 1. Determine the WidgetType based on serviceKey (e.g., 'gmail', 'googlePhotos')
+    //    Example mapping:
+    //    const serviceToWidgetType: Record<GoogleServiceActionKey, WidgetType | null> = {
+    //        gmail: 'gmail', // Assuming 'gmail' is a defined WidgetType
+    //        photos: 'googlePhotos', // Assuming 'googlePhotos' is a defined WidgetType
+    //        keep: 'googleKeep',
+    //        calendar: 'googleCalendar',
+    //        maps: 'googleMaps',
+    //        drive: 'googleDrive',
+    //        meet: 'googleMeet',
+    //    };
+    //    const targetWidgetType = serviceToWidgetType[serviceKey];
+    //
+    // 2. Call handleAddNewWidget with the determined WidgetType
+    //    if (targetWidgetType) {
+    //        handleAddNewWidget(targetWidgetType, `New ${serviceKey.charAt(0).toUpperCase() + serviceKey.slice(1)} Widget`);
+    //    } else {
+    //        alert(`Widget for ${serviceKey} is not yet implemented.`);
+    //    }
+    // 3. After adding, you might want to focus the new widget.
+
+    alert(`Selected ${serviceKey}. This would open the ${serviceKey} widget and close the hub. (Functionality to open specific widget not yet implemented)`);
+  };
+
+
   const renderWidgetContent = (widgetConfig: PageWidgetConfig) => {
     const currentWidgetSettings = widgetConfig.settings || {};
     const notesSettings = currentWidgetSettings as PageInstanceNotesSettings | undefined;
@@ -1782,6 +1841,15 @@ export default function Home() {
       case 'notes': return <NotesWidget instanceId={widgetConfig.id} settings={notesSettings} notes={sharedNotes} activeNoteId={activeSharedNoteId} onNotesChange={setSharedNotes} onActiveNoteIdChange={setActiveSharedNoteId} />;
       case 'portfolio': return <PortfolioWidget settings={currentWidgetSettings as PortfolioWidgetSettings | undefined} isMobileFullScreen={isMobileView && widgets.length === 1 && widgets[0].type === 'portfolio'} />;
       case 'geminiChat': return <GeminiChatWidget instanceId={widgetConfig.id} settings={currentWidgetSettings as GeminiChatWidgetSettings | undefined} />;
+      // Add the new Google Services Hub case
+      case 'googleServicesHub':
+        return (
+          <GoogleServicesHubWidget
+            settings={currentWidgetSettings as GoogleServicesHubWidgetSettings | undefined}
+            onRequestClose={() => handleWidgetMinimizeToggle(widgetConfig.id)}
+            onSelectService={(serviceKey) => handleGoogleServiceSelect(widgetConfig.id, serviceKey)}
+          />
+        );
       default: return <p className="text-xs text-secondary italic">Generic widget content for type: {widgetConfig.type}.</p>;
     }
   };
@@ -1805,6 +1873,15 @@ export default function Home() {
       case 'todo': return <TodoSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as TodoWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} onClearAllTasks={() => { handleSharedTodosChange([]); alert(`The global to-do list has been cleared.`); }} />;
       case 'portfolio': return <PortfolioSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as PortfolioWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} />;
       case 'geminiChat': return <GeminiChatSettingsPanel widgetInstanceId={widgetConfig.id} currentSettings={currentContentSettings as GeminiChatWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} />;
+      // Add settings panel for Google Services Hub
+      case 'googleServicesHub':
+        return (
+          <GoogleServicesHubSettingsPanel
+            widgetId={widgetConfig.id}
+            currentSettings={currentContentSettings as GoogleServicesHubWidgetSettings | undefined}
+            onSave={boundSaveInstanceContentSettings}
+          />
+        );
       default: return <p className="text-sm text-secondary">No specific content settings available for this widget type.</p>;
     }
   };
@@ -2038,6 +2115,7 @@ export default function Home() {
   );
 }
 
+// Styles
 const styles = `
   .control-button { display:flex; align-items:center; justify-content:center; padding:0.5rem; background-color:var(--dark-accent-primary); border-radius:0.375rem; color:var(--dark-text-on-accent); transition:background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out; box-shadow:0 1px 2px 0 rgba(0,0,0,0.05); }
   .control-button:hover { background-color:var(--dark-accent-primary-hover); box-shadow:0 2px 4px 0 rgba(0,0,0,0.1); }
@@ -2054,4 +2132,5 @@ if (typeof window !== 'undefined' && !document.getElementById('custom-dashboard-
   styleSheet.innerText = styles;
   document.head.appendChild(styleSheet);
 }
+
 
