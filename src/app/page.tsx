@@ -132,6 +132,7 @@ interface SpeechGrammarList {
 interface SpeechRecognitionStatic {
   new (): SpeechRecognition;
 }
+
 interface SpeechRecognition extends EventTarget {
   grammars: SpeechGrammarList;
   lang: string;
@@ -140,6 +141,12 @@ interface SpeechRecognition extends EventTarget {
   maxAlternatives: number;
   serviceURI?: string;
 
+  // Methods
+  abort(): void;
+  start(): void;
+  stop(): void; // Add this line
+
+  // Event handlers
   onaudiostart: ((this: SpeechRecognition, ev: Event) => void) | null;
   onaudioend: ((this: SpeechRecognition, ev: Event) => void) | null;
   onend: ((this: SpeechRecognition, ev: Event) => void) | null;
@@ -152,10 +159,7 @@ interface SpeechRecognition extends EventTarget {
   onspeechend: ((this: SpeechRecognition, ev: Event) => void) | null;
   onstart: ((this: SpeechRecognition, ev: Event) => void) | null;
 
-  abort(): void;
-  start(): void;
-  stop(): void;
-
+  // Event listener methods
   addEventListener<K extends keyof SpeechRecognitionEventMap>(type: K, listener: (this: SpeechRecognition, ev: SpeechRecognitionEventMap[K]) => void, options?: boolean | AddEventListenerOptions): void;
   addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
   removeEventListener<K extends keyof SpeechRecognitionEventMap>(type: K, listener: (this: SpeechRecognition, ev: SpeechRecognitionEventMap[K]) => void, options?: boolean | EventListenerOptions): void;
@@ -188,7 +192,7 @@ declare global {
 
 // --- Page-Specific Constants ---
 const CELL_SIZE_OPTIONS = [
-    { label: 'Micro', value: 15 },
+    { label: 'Micro', value: 10 },
     { label: 'Compact', value: 20 },
     { label: 'Default', value: DEFAULT_CELL_SIZE },
     { label: 'Spacious', value: 40 },
@@ -197,13 +201,13 @@ const CELL_SIZE_OPTIONS = [
 
 const MAX_HISTORY_LENGTH = 50;
 const MINIMIZED_WIDGET_ROW_SPAN = 2;
-const DASHBOARD_LAYOUT_STORAGE_KEY = 'dashboardLayoutV3.22_AI_GoogleHub'; // Updated version
+const DASHBOARD_LAYOUT_STORAGE_KEY = 'dashboardLayoutV3.23_AI_GoogleHub_Scroll'; // Updated version
 const GLOBAL_NOTES_STORAGE_KEY = 'dashboardGlobalNotesCollection_v1';
 const GLOBAL_TODOS_STORAGE_KEY = 'dashboardGlobalSingleTodoList_v1';
 const GLOBAL_PHOTO_HISTORY_STORAGE_KEY = 'dashboardGlobalPhotoHistory_v1';
 const DATA_SAVE_DEBOUNCE_MS = 700;
 const WIDGET_DESELECT_TIMEOUT_MS = 3000;
-const MOBILE_BREAKPOINT_PX = 768;
+const MOBILE_BREAKPOINT_PX = 768; // Mobile breakpoint
 
 const DEFAULT_WIDGET_CONTAINER_SETTINGS: WidgetContainerSettings = {
     alwaysShowTitleBar: false,
@@ -222,7 +226,6 @@ const initialDesktopWidgetsLayout: Omit<PageWidgetConfig, 'colSpan' | 'rowSpan' 
     settings: PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS, isMinimized: false,
     containerSettings: { ...DEFAULT_WIDGET_CONTAINER_SETTINGS, innerPadding: 'px-3.5 py-3' }
   },
-  
 ];
 
 const initialMobileWidgetLayout: Omit<PageWidgetConfig, 'colSpan' | 'rowSpan' | 'minColSpan' | 'minRowSpan'>[] = [
@@ -245,7 +248,6 @@ const ensurePhotoWidgetInstanceSettings = (settings: AllWidgetSettings | undefin
         isSidebarOpen: typeof currentPhotoSettings?.isSidebarOpen === 'boolean'
             ? currentPhotoSettings.isSidebarOpen
             : photoInstanceDefaults.isSidebarOpen,
-        // Ensure all slideshow settings are included
         isSlideshowActive: currentPhotoSettings?.isSlideshowActive || photoInstanceDefaults.isSlideshowActive,
         slideshowMode: currentPhotoSettings?.slideshowMode || photoInstanceDefaults.slideshowMode,
         slideshowInterval: currentPhotoSettings?.slideshowInterval || photoInstanceDefaults.slideshowInterval,
@@ -271,7 +273,6 @@ const ensureGeminiChatWidgetInstanceSettings = (settings: AllWidgetSettings | un
         customSystemPrompt: currentGeminiChatSettings?.customSystemPrompt || geminiChatInstanceDefaults.customSystemPrompt,
     };
 };
-// Add ensure function for GoogleServicesHubWidget
 const ensureGoogleServicesHubInstanceSettings = (settings: AllWidgetSettings | undefined): GoogleServicesHubWidgetSettings => {
     const hubInstanceDefaults = GOOGLE_SERVICES_HUB_DEFAULT_INSTANCE_SETTINGS;
     const currentHubSettings = settings as GoogleServicesHubWidgetSettings | undefined;
@@ -336,7 +337,6 @@ const processWidgetConfig = (
      if (isMobileTarget && widgetData.type === 'portfolio') {
         finalContainerSettings.innerPadding = 'p-0';
     }
-    // For Google Hub, ensure no internal padding from container if it's full bleed
     if (widgetData.type === 'googleServicesHub') {
         finalContainerSettings.innerPadding = 'p-0';
     }
@@ -367,6 +367,7 @@ interface StoredDashboardLayout {
     sharedGlobalTodos?: TodoItem[];
     sharedGlobalPhotoHistory?: HistoricImage[];
     isMobileLayout?: boolean;
+    actualGridPixelWidth?: number; // Added for scrollable grid
 }
 
 const getGeminiSystemPrompt = (widgets: PageWidgetConfig[]): string => {
@@ -413,6 +414,7 @@ export default function Home() {
   const [widgetContainerCols, setWidgetContainerCols] = useState(0);
   const [widgetContainerRows, setWidgetContainerRows] = useState(0);
   const [activeWidgetId, setActiveWidgetId] = useState<string | null>(null);
+  const [actualGridPixelWidth, setActualGridPixelWidth] = useState(0); // For dynamic grid width
 
   const initialLayoutIsDefaultRef = useRef(false);
   const initialCenteringDoneRef = useRef(false);
@@ -430,17 +432,21 @@ export default function Home() {
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobileView(window.innerWidth < MOBILE_BREAKPOINT_PX);
+      const newIsMobileView = window.innerWidth < MOBILE_BREAKPOINT_PX;
+      if (newIsMobileView !== isMobileView) { // Only update if it changes
+          setIsMobileView(newIsMobileView);
+      }
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  }, [isMobileView]); // Re-run if isMobileView itself changes (e.g. due to import)
 
  useEffect(() => {
     let loadedCellSize = DEFAULT_CELL_SIZE;
     let loadedWidgets: PageWidgetConfig[] | null = null;
     let wasMobileLayoutSaved = false;
+    let loadedGridPixelWidth: number | undefined = undefined;
 
     if (typeof window !== 'undefined') {
         const savedLayoutJSON = window.localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY);
@@ -457,18 +463,21 @@ export default function Home() {
                             if (validOption) loadedCellSize = validOption.value;
                         }
                         wasMobileLayoutSaved = savedData.isMobileLayout || false;
+                        loadedGridPixelWidth = savedData.actualGridPixelWidth;
+
 
                         if (isMobileView === wasMobileLayoutSaved && Array.isArray(savedData.widgets)) {
+                            const tempContainerWidth = loadedGridPixelWidth || window.innerWidth;
                             loadedWidgets = savedData.widgets.map(w => processWidgetConfig(
                                 w as Partial<PageWidgetConfig>,
                                 loadedCellSize,
                                 isMobileView,
-                                isMobileView ? Math.floor(window.innerWidth / loadedCellSize) : undefined,
+                                isMobileView ? Math.floor(tempContainerWidth / loadedCellSize) : undefined,
                                 isMobileView ? Math.floor((window.innerHeight - (headerRef.current?.offsetHeight || 60)) / loadedCellSize) : undefined
                             ));
                             initialLayoutIsDefaultRef.current = false;
                         } else {
-                             console.log(`[page.tsx] View mode mismatch (current: ${isMobileView ? 'mobile' : 'desktop'}, saved: ${wasMobileLayoutSaved ? 'mobile' : 'desktop'}). Using default layout for current view.`);
+                             console.log(`[page.tsx] View mode mismatch or missing widgets. Using default layout for current view.`);
                         }
                     } else {
                         console.log(`[page.tsx] Storage key version mismatch. Using new initial layout. Saved: ${loadedVersion}, Current: ${currentVersion}`);
@@ -482,12 +491,14 @@ export default function Home() {
         }
     }
     setCellSize(loadedCellSize);
+    setActualGridPixelWidth(loadedGridPixelWidth || window.innerWidth);
+
 
     if (loadedWidgets) {
         setWidgets(loadedWidgets);
     } else {
         const baseLayout = isMobileView ? initialMobileWidgetLayout : initialDesktopWidgetsLayout;
-        const tempCols = Math.floor(window.innerWidth / loadedCellSize);
+        const tempCols = Math.floor((loadedGridPixelWidth || window.innerWidth) / loadedCellSize);
         const tempRows = Math.floor((window.innerHeight - (headerRef.current?.offsetHeight || 60)) / loadedCellSize);
 
         setWidgets(baseLayout.map(w => processWidgetConfig(
@@ -518,7 +529,8 @@ export default function Home() {
   const isPerformingUndoRedo = useRef(false);
   const headerRef = useRef<HTMLElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const dashboardAreaRef = useRef<HTMLDivElement>(null);
+  const dashboardAreaRef = useRef<HTMLDivElement>(null); // Will be the scroll container
+  const gridWrapperRef = useRef<HTMLDivElement>(null); // Wraps the actual grid for width control
   const densityMenuRef = useRef<HTMLDivElement>(null);
 
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -571,12 +583,13 @@ export default function Home() {
             dashboardVersion: DASHBOARD_LAYOUT_STORAGE_KEY.replace('dashboardLayoutV','v'),
             widgets: widgets,
             cellSize: cellSize,
-            isMobileLayout: isMobileView
+            isMobileLayout: isMobileView,
+            actualGridPixelWidth: actualGridPixelWidth, // Save the grid width
         };
         window.localStorage.setItem(DASHBOARD_LAYOUT_STORAGE_KEY, JSON.stringify(dataToSave));
       } catch (error) { console.error("Error saving dashboard layout to localStorage:", error); }
     }
-  }, [widgets, cellSize, isMobileView, isLayoutEngineReady]);
+  }, [widgets, cellSize, isMobileView, isLayoutEngineReady, actualGridPixelWidth]);
 
   useEffect(() => {
     if (widgetContainerCols > 0 && initialLayoutIsDefaultRef.current && !initialCenteringDoneRef.current && widgets.length > 0 && !isMobileView) {
@@ -626,7 +639,7 @@ export default function Home() {
              initialLayoutIsDefaultRef.current = false;
         }
     }
-  }, [widgetContainerCols, updateWidgetsAndPushToHistory, widgets, cellSize, isMobileView, isLayoutEngineReady]); // Added isLayoutEngineReady
+  }, [widgetContainerCols, updateWidgetsAndPushToHistory, widgets, cellSize, isMobileView, isLayoutEngineReady]);
 
 
   useEffect(() => {
@@ -652,16 +665,33 @@ export default function Home() {
 
   useEffect(() => {
     const determineWidgetContainerGridSize = () => {
-      const screenWidth = window.innerWidth; const screenHeight = window.innerHeight;
+      const screenWidth = window.innerWidth; 
+      const screenHeight = window.innerHeight;
       const currentHeaderHeight = headerRef.current?.offsetHeight || 60;
       const aiCommandBarHeight = showAiCommandBar ? (document.getElementById('ai-command-bar')?.offsetHeight || 70) : 0;
       const mainContentHeight = screenHeight - currentHeaderHeight - aiCommandBarHeight;
 
-      const newCols = Math.max(1, Math.floor(screenWidth / cellSize));
+      let maxColOccupied = 0;
+      if (widgets && widgets.length > 0) {
+          widgets.forEach(w => {
+              maxColOccupied = Math.max(maxColOccupied, w.colStart + w.colSpan -1);
+          });
+      }
+      
+      // Calculate the minimum width required by widgets in pixels
+      const minRequiredWidgetPixelWidth = maxColOccupied * cellSize;
+      // The actual grid width should be at least the viewport width, or wider if widgets demand it
+      const calculatedGridPixelWidth = Math.max(screenWidth, minRequiredWidgetPixelWidth);
+      setActualGridPixelWidth(calculatedGridPixelWidth);
+
+
+      const newCols = Math.max(1, Math.floor(calculatedGridPixelWidth / cellSize));
       const newRows = Math.max(1, Math.floor(mainContentHeight / cellSize));
+      
       setWidgetContainerCols(newCols);
       setWidgetContainerRows(newRows);
 
+      // Special handling for mobile full-screen portfolio
       if (isMobileView && widgets.length === 1 && widgets[0].type === 'portfolio') {
         setWidgets(currentWidgets => currentWidgets.map(w => {
           if (w.type === 'portfolio') {
@@ -669,7 +699,7 @@ export default function Home() {
               ...w,
               colStart: 1,
               rowStart: 1,
-              colSpan: newCols,
+              colSpan: newCols, // Use newCols based on actualGridPixelWidth (which is screenWidth for mobile)
               rowSpan: newRows > 1 ? newRows -1 : 1,
             };
           }
@@ -677,10 +707,11 @@ export default function Home() {
         }));
       }
     };
-    determineWidgetContainerGridSize(); const timeoutId = setTimeout(determineWidgetContainerGridSize, 100);
+    determineWidgetContainerGridSize(); 
+    const timeoutId = setTimeout(determineWidgetContainerGridSize, 100); // Recalculate shortly after initial load
     window.addEventListener('resize', determineWidgetContainerGridSize);
     return () => { clearTimeout(timeoutId); window.removeEventListener('resize', determineWidgetContainerGridSize); };
-  }, [cellSize, isMobileView, widgets, showAiCommandBar]); 
+  }, [cellSize, widgets, showAiCommandBar, isMobileView]); // isMobileView added as widgets might change based on it.
 
   useEffect(() => {
     setContextMenuAvailableWidgets(
@@ -691,10 +722,150 @@ export default function Home() {
   const handleExportLayout = () => {
     if (typeof window === 'undefined') return;
     try {
-      const layoutToExport: StoredDashboardLayout = { dashboardVersion: DASHBOARD_LAYOUT_STORAGE_KEY.replace('dashboardLayoutV','v'), widgets: widgets, cellSize: cellSize, notesCollection: { notes: sharedNotes, activeNoteId: activeSharedNoteId }, sharedGlobalTodos: sharedTodos, sharedGlobalPhotoHistory: sharedPhotoHistory, isMobileLayout: isMobileView };
+      const layoutToExport: StoredDashboardLayout = { 
+          dashboardVersion: DASHBOARD_LAYOUT_STORAGE_KEY.replace('dashboardLayoutV','v'), 
+          widgets: widgets, 
+          cellSize: cellSize, 
+          notesCollection: { notes: sharedNotes, activeNoteId: activeSharedNoteId }, 
+          sharedGlobalTodos: sharedTodos, 
+          sharedGlobalPhotoHistory: sharedPhotoHistory, 
+          isMobileLayout: isMobileView,
+          actualGridPixelWidth: actualGridPixelWidth // Export current grid width
+      };
       const jsonString = JSON.stringify(layoutToExport, null, 2); const blob = new Blob([jsonString],{type:'application/json'}); const href = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = href; link.download = `dashboard-layout-${layoutToExport.dashboardVersion}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(href);
     } catch (error) { console.error("Error exporting layout:", error); alert("Error exporting layout."); }
   };
+
+  const doRectanglesOverlap = useCallback((
+    r1C: number, r1R: number, r1CS: number, r1RS: number,
+    r2C: number, r2R: number, r2CS: number, r2RS: number,
+    buffer: number = 0,
+    overrideTotalCols?: number, 
+    overrideTotalRows?: number 
+  ): boolean => {
+    const totalCols = overrideTotalCols !== undefined ? overrideTotalCols : widgetContainerCols;
+    const totalRows = overrideTotalRows !== undefined ? overrideTotalRows : widgetContainerRows;
+
+    const r2BufferedColStart = Math.max(1, r2C - buffer);
+    const r2BufferedRowStart = Math.max(1, r2R - buffer);
+    const r2BufferedColEnd = Math.min(totalCols > 0 ? totalCols : Infinity, r2C + r2CS - 1 + buffer);
+    const r2BufferedRowEnd = Math.min(totalRows > 0 ? totalRows : Infinity, r2R + r2RS - 1 + buffer);
+
+    const r1ColEnd = r1C + r1CS - 1;
+    const r1RowEnd = r1R + r1RS - 1;
+    const overlapX = r1C <= r2BufferedColEnd && r1ColEnd >= r2BufferedColStart;
+    const overlapY = r1R <= r2BufferedRowEnd && r1RowEnd >= r2BufferedRowStart;
+
+    return overlapX && overlapY;
+  }, [widgetContainerCols, widgetContainerRows]);
+
+  const canPlaceWidget = useCallback((
+    widgetToPlace: PageWidgetConfig,
+    targetCol: number,
+    targetRow: number,
+    currentLayout: PageWidgetConfig[],
+    overrideTotalCols?: number,
+    overrideTotalRows?: number
+  ): boolean => {
+    const totalCols = overrideTotalCols !== undefined ? overrideTotalCols : widgetContainerCols;
+    const totalRows = overrideTotalRows !== undefined ? overrideTotalRows : widgetContainerRows;
+
+    if (totalCols === 0 || totalRows === 0) return false; 
+    if (targetCol < 1 || targetRow < 1 ||
+        targetCol + widgetToPlace.colSpan - 1 > totalCols ||
+        targetRow + widgetToPlace.rowSpan - 1 > totalRows) {
+      return false; 
+    }
+    for (const existingWidget of currentLayout) {
+      if (existingWidget.id === widgetToPlace.id) continue;
+      if (doRectanglesOverlap(
+        targetCol, targetRow, widgetToPlace.colSpan, widgetToPlace.rowSpan,
+        existingWidget.colStart, existingWidget.rowStart, existingWidget.colSpan, existingWidget.rowSpan,
+        0, 
+        totalCols, 
+        totalRows  
+      )) {
+        return false; 
+      }
+    }
+    return true;
+  }, [widgetContainerCols, widgetContainerRows, doRectanglesOverlap]);
+
+
+  const performAutoSort = useCallback((widgetsToSort: PageWidgetConfig[]): PageWidgetConfig[] | null => {
+    if (widgetContainerCols === 0 || widgetContainerRows === 0) return null;
+
+    const sortedWidgets = [...widgetsToSort].sort((a, b) => {
+        if (a.rowStart !== b.rowStart) return a.rowStart - b.rowStart;
+        if (a.colStart !== b.colStart) return a.colStart - b.colStart;
+        return a.id.localeCompare(b.id);
+    });
+
+    const newLayout: PageWidgetConfig[] = [];
+    for (const widget of sortedWidgets) {
+        let placed = false;
+        for (let r = 1; r <= widgetContainerRows; r++) {
+            for (let c = 1; c <= widgetContainerCols; c++) {
+                const checkWidget = {
+                    ...widget,
+                    colSpan: Math.max(widget.colSpan, widget.minColSpan),
+                    rowSpan: Math.max(widget.rowSpan, widget.minRowSpan),
+                };
+                // Here, canPlaceWidget uses the state widgetContainerCols/Rows by default
+                if (canPlaceWidget(checkWidget, c, r, newLayout)) { 
+                    newLayout.push({ ...widget, colStart: c, rowStart: r });
+                    placed = true;
+                    break;
+                }
+            }
+            if (placed) break;
+        }
+        if (!placed) {
+             console.warn(`[performAutoSort] Could not place widget: ${widget.id} (${widget.title}). Grid might be too full or too narrow with current dimensions: ${widgetContainerCols}x${widgetContainerRows}.`);
+            return null;
+        }
+    }
+    return newLayout;
+  }, [widgetContainerCols, widgetContainerRows, canPlaceWidget]);
+
+  const performAutoSortWithGivenGrid = useCallback((
+    widgetsToSort: PageWidgetConfig[], 
+    newCols: number, 
+    newRows: number
+  ): PageWidgetConfig[] | null => {
+    if (newCols === 0 || newRows === 0) return null;
+
+    const sortedWidgets = [...widgetsToSort].sort((a, b) => {
+        if (a.rowStart !== b.rowStart) return a.rowStart - b.rowStart;
+        if (a.colStart !== b.colStart) return a.colStart - b.colStart;
+        return a.id.localeCompare(b.id);
+    });
+
+    const newLayout: PageWidgetConfig[] = [];
+    for (const widget of sortedWidgets) {
+        let placed = false;
+        for (let r = 1; r <= newRows; r++) { 
+            for (let c = 1; c <= newCols; c++) { 
+                const checkWidget = {
+                    ...widget,
+                    colSpan: Math.max(widget.colSpan, widget.minColSpan),
+                    rowSpan: Math.max(widget.rowSpan, widget.minRowSpan),
+                };
+                if (canPlaceWidget(checkWidget, c, r, newLayout, newCols, newRows)) {
+                    newLayout.push({ ...widget, colStart: c, rowStart: r });
+                    placed = true;
+                    break;
+                }
+            }
+            if (placed) break;
+        }
+        if (!placed) {
+             console.warn(`[performAutoSortWithGivenGrid] Could not place widget: ${widget.id} within ${newCols}x${newRows} grid.`);
+            return null;
+        }
+    }
+    return newLayout;
+  }, [canPlaceWidget]); // Removed doRectanglesOverlap as it's used via canPlaceWidget
 
   const handleImportLayout = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (typeof window === 'undefined') return;
@@ -716,18 +887,21 @@ export default function Home() {
             let photoHistoryToSet = sharedPhotoHistory;
             let alertMessage = "";
             let importedIsMobileLayout = false;
+            let importedGridPixelWidth = window.innerWidth;
 
 
             if (typeof parsedJson === 'object' && parsedJson !== null && !Array.isArray(parsedJson) && 'dashboardVersion' in parsedJson && 'widgets' in parsedJson) {
                 const modernData = parsedJson as StoredDashboardLayout; 
                 importedIsMobileLayout = modernData.isMobileLayout || false;
+                importedGridPixelWidth = modernData.actualGridPixelWidth || window.innerWidth;
+
 
                 if (typeof modernData.cellSize === 'number') {
                     const validOption = CELL_SIZE_OPTIONS.find(opt => opt.value === modernData.cellSize);
                     if (validOption) finalCellSize = validOption.value;
                 }
 
-                const tempCols = Math.floor(window.innerWidth / finalCellSize);
+                const tempCols = Math.floor(importedGridPixelWidth / finalCellSize);
                 const tempRows = Math.floor((window.innerHeight - (headerRef.current?.offsetHeight || 60)) / finalCellSize);
 
                 if (isMobileView !== importedIsMobileLayout) {
@@ -740,6 +914,8 @@ export default function Home() {
                         isMobileView ? tempCols : undefined,
                         isMobileView ? tempRows : undefined
                     ));
+                    // For view mismatch, reset grid width to current viewport width
+                    importedGridPixelWidth = window.innerWidth; 
                 } else {
                      finalWidgetsToSet = (modernData.widgets || []).map(w => processWidgetConfig(
                         w as Partial<PageWidgetConfig>,
@@ -759,8 +935,9 @@ export default function Home() {
 
             } else if (Array.isArray(parsedJson)) { 
                 alertMessage = "Dashboard layout (legacy format) imported. Adapting to current view. Global data and settings will use defaults or existing data.";
-                const tempCols = Math.floor(window.innerWidth / cellSize);
+                const tempCols = Math.floor(window.innerWidth / cellSize); // Use current viewport for legacy
                 const tempRows = Math.floor((window.innerHeight - (headerRef.current?.offsetHeight || 60)) / cellSize);
+                importedGridPixelWidth = window.innerWidth; // Reset for legacy
 
                 if (isMobileView) {
                     const baseLayout = initialMobileWidgetLayout;
@@ -781,7 +958,11 @@ export default function Home() {
             alert(alertMessage);
 
             setCellSize(finalCellSize);
-            setWidgets(finalWidgetsToSet);
+            setActualGridPixelWidth(importedGridPixelWidth); // Set the imported or reset width
+            setWidgets(finalWidgetsToSet); // Set widgets first
+            // Then trigger a re-calculation of cols/rows based on new width and cell size
+            // This will be handled by the useEffect for [cellSize, widgets, ...]
+
             setSharedNotes(notesToSet);
             setActiveSharedNoteId(activeNoteIdToSet);
             setSharedTodos(todosToSet);
@@ -809,85 +990,6 @@ export default function Home() {
   };
 
   const triggerImportFileSelect = () => { if (fileInputRef.current) fileInputRef.current.click(); };
-
-  const doRectanglesOverlap = useCallback((
-    r1C: number, r1R: number, r1CS: number, r1RS: number,
-    r2C: number, r2R: number, r2CS: number, r2RS: number,
-    buffer: number = 0
-  ): boolean => {
-    const r2BufferedColStart = Math.max(1, r2C - buffer);
-    const r2BufferedRowStart = Math.max(1, r2R - buffer);
-    const r2BufferedColEnd = Math.min(widgetContainerCols > 0 ? widgetContainerCols : Infinity, r2C + r2CS - 1 + buffer);
-    const r2BufferedRowEnd = Math.min(widgetContainerRows > 0 ? widgetContainerRows : Infinity, r2R + r2RS - 1 + buffer);
-
-    const r1ColEnd = r1C + r1CS - 1;
-    const r1RowEnd = r1R + r1RS - 1;
-    const overlapX = r1C <= r2BufferedColEnd && r1ColEnd >= r2BufferedColStart;
-    const overlapY = r1R <= r2BufferedRowEnd && r1RowEnd >= r2BufferedRowStart;
-
-    return overlapX && overlapY;
-  }, [widgetContainerCols, widgetContainerRows]);
-
-  const canPlaceWidget = useCallback((
-    widgetToPlace: PageWidgetConfig,
-    targetCol: number,
-    targetRow: number,
-    currentLayout: PageWidgetConfig[]
-  ): boolean => {
-    if (widgetContainerCols === 0 || widgetContainerRows === 0) return false;
-    if (targetCol < 1 || targetRow < 1 ||
-        targetCol + widgetToPlace.colSpan - 1 > widgetContainerCols ||
-        targetRow + widgetToPlace.rowSpan - 1 > widgetContainerRows) {
-      return false;
-    }
-    for (const existingWidget of currentLayout) {
-      if (existingWidget.id === widgetToPlace.id) continue;
-      if (doRectanglesOverlap(
-        targetCol, targetRow, widgetToPlace.colSpan, widgetToPlace.rowSpan,
-        existingWidget.colStart, existingWidget.rowStart, existingWidget.colSpan, existingWidget.rowSpan
-      )) {
-        return false;
-      }
-    }
-    return true;
-  }, [widgetContainerCols, widgetContainerRows, doRectanglesOverlap]);
-
-
-  const performAutoSort = useCallback((widgetsToSort: PageWidgetConfig[]): PageWidgetConfig[] | null => {
-    if (widgetContainerCols === 0 || widgetContainerRows === 0) return null;
-
-    const sortedWidgets = [...widgetsToSort].sort((a, b) => {
-        if (a.rowStart !== b.rowStart) return a.rowStart - b.rowStart;
-        if (a.colStart !== b.colStart) return a.colStart - b.colStart;
-        return a.id.localeCompare(b.id);
-    });
-
-    const newLayout: PageWidgetConfig[] = [];
-    for (const widget of sortedWidgets) {
-        let placed = false;
-        for (let r = 1; r <= widgetContainerRows; r++) {
-            for (let c = 1; c <= widgetContainerCols; c++) {
-                const checkWidget = {
-                    ...widget,
-                    colSpan: Math.max(widget.colSpan, widget.minColSpan),
-                    rowSpan: Math.max(widget.rowSpan, widget.minRowSpan),
-                };
-                if (canPlaceWidget(checkWidget, c, r, newLayout)) {
-                    newLayout.push({ ...widget, colStart: c, rowStart: r });
-                    placed = true;
-                    break;
-                }
-            }
-            if (placed) break;
-        }
-        if (!placed) {
-             console.warn(`[performAutoSort] Could not place widget: ${widget.id} (${widget.title}) with size ${widget.colSpan}x${widget.rowSpan}. Min size ${widget.minColSpan}x${widget.minRowSpan}. Grid might be too full.`);
-            return null;
-        }
-    }
-    return newLayout;
-  }, [widgetContainerCols, widgetContainerRows, canPlaceWidget]);
-
   const handleAutoSortButtonClick = () => {
     if (maximizedWidgetId || isMobileView) return;
     const currentLayout = widgets.map(w => ({...w}));
@@ -898,7 +1000,7 @@ export default function Home() {
       setActiveWidgetId(null);
     } else {
       console.error("[handleAutoSortButtonClick] Failed to sort existing widgets.");
-      alert("Could not fully sort the grid. Some widgets might be unplaceable or the grid is too full.");
+      alert("Could not fully sort the grid. Some widgets might be unplaceable or the grid is too full/narrow.");
     }
   };
 
@@ -1036,28 +1138,68 @@ export default function Home() {
         if (initialPosition) {
             finalLayout = [...currentWidgetsCopy, { ...newWidgetConfigProcessed, colStart: initialPosition.colStart, rowStart: initialPosition.rowStart, colSpan: finalColSpan, rowSpan: finalRowSpan }];
         } else {
-            finalLayout = performAutoSort([...currentWidgetsCopy, { ...newWidgetConfigProcessed, colSpan: finalColSpan, rowSpan: finalRowSpan }]);
-            if (!finalLayout) {
+            const attemptLayout = [...currentWidgetsCopy, { ...newWidgetConfigProcessed, colSpan: finalColSpan, rowSpan: finalRowSpan }];
+            
+            const sumOfColSpansInAttempt = attemptLayout.reduce((sum, w) => sum + w.colSpan, 0);
+            const gaps = attemptLayout.length > 1 ? attemptLayout.length - 1 : 0; 
+            const requiredColsIfSingleRow = sumOfColSpansInAttempt + gaps;
+    
+            const currentColsBasedOnActualWidth = Math.floor(actualGridPixelWidth / cellSize);
+            const targetSortColsPotential = Math.max(widgetContainerCols, requiredColsIfSingleRow, currentColsBasedOnActualWidth);
+            
+            const newPotentialActualGridPixelWidth = Math.max(actualGridPixelWidth, targetSortColsPotential * cellSize, window.innerWidth);
+            const finalTargetSortCols = Math.floor(newPotentialActualGridPixelWidth / cellSize);
+        
+            console.log(`[handleAddNewWidget] Initial placement failed. Attempting sort with expanded cols: ${finalTargetSortCols} (current: ${widgetContainerCols}, requiredIfSingleRow: ${requiredColsIfSingleRow}, currentActualWidthImplies: ${currentColsBasedOnActualWidth})`);
+    
+            const tempSortedLayout = performAutoSortWithGivenGrid(attemptLayout, finalTargetSortCols, widgetContainerRows);
+    
+            if (tempSortedLayout) {
+                finalLayout = tempSortedLayout;
+                let actualMaxColUsedInLayout = 0;
+                finalLayout.forEach(w => {
+                    actualMaxColUsedInLayout = Math.max(actualMaxColUsedInLayout, w.colStart + w.colSpan - 1);
+                });
+                const finalRequiredPixelWidthByLayout = actualMaxColUsedInLayout * cellSize;
+                const newActualGridWidthToSet = Math.max(window.innerWidth, finalRequiredPixelWidthByLayout);
+                
+                console.log(`[handleAddNewWidget] Sort with expansion successful. Layout needs ${actualMaxColUsedInLayout} cols. Setting actualGridPixelWidth to ${newActualGridWidthToSet}`);
+                setActualGridPixelWidth(newActualGridWidthToSet);
+        
+            } else {
+                console.log(`[handleAddNewWidget] Sort with expansion to ${finalTargetSortCols} cols failed. Attempting shrinking.`);
                 finalLayout = attemptPlaceWidgetWithShrinking(currentWidgetsCopy, { ...newWidgetConfigProcessed, colSpan: finalColSpan, rowSpan: finalRowSpan });
+                 if (finalLayout) {
+                    console.log("[handleAddNewWidget] Placement successful after shrinking existing widgets.");
+                    let maxColAfterShrink = 0;
+                    finalLayout.forEach(w => { maxColAfterShrink = Math.max(maxColAfterShrink, w.colStart + w.colSpan - 1);});
+                    const requiredWidthAfterShrink = maxColAfterShrink * cellSize;
+                    setActualGridPixelWidth(Math.max(window.innerWidth, requiredWidthAfterShrink));
+                } else {
+                    console.log("[handleAddNewWidget] Shrinking also failed.");
+                }
             }
         }
     }
 
 
     if (finalLayout) {
-      setWidgets(finalLayout);
+      setWidgets(finalLayout); 
       updateWidgetsAndPushToHistory(finalLayout, `add_widget_${widgetType}`);
       const addedWidgetInLayout = finalLayout.find(w => w.id === newWidgetConfigProcessed.id);
       if (addedWidgetInLayout) setActiveWidgetId(addedWidgetInLayout.id);
       else setActiveWidgetId(null);
-      //speakText(`${widgetType} widget added.`);
     } else {
-      alert("No available space to add this widget, even after attempting to sort and shrink. Please make more room manually or try a smaller widget.");
-      //speakText("No available space to add this widget.");
+      alert("No available space to add this widget, even after attempting to sort, expand grid, and shrink existing widgets. Please make more room manually or try a smaller widget.");
     }
     setIsAddWidgetMenuOpen(false);
     setIsAddWidgetContextMenuOpen(false);
-  }, [maximizedWidgetId, widgetContainerCols, widgetContainerRows, widgets, cellSize, findNextAvailablePosition, performAutoSort, attemptPlaceWidgetWithShrinking, updateWidgetsAndPushToHistory, isMobileView, canPlaceWidget]);
+  }, [
+    maximizedWidgetId, widgetContainerCols, widgetContainerRows, widgets, cellSize, 
+    findNextAvailablePosition, performAutoSort, attemptPlaceWidgetWithShrinking, 
+    updateWidgetsAndPushToHistory, isMobileView, canPlaceWidget, actualGridPixelWidth, 
+    performAutoSortWithGivenGrid 
+  ]);
 
 
   const handleApplyWidgetSizePreset = useCallback((widgetId: string, presetKey: WidgetSizePresetKey) => {
@@ -1097,11 +1239,20 @@ export default function Home() {
             finalLayout = [...otherWidgets, { ...updatedWidgetConfig, colStart: newPosition.colStart, rowStart: newPosition.rowStart }];
         } else {
             const widgetsToTrySort = widgets.map(w => w.id === widgetId ? updatedWidgetConfig : {...w});
-            finalLayout = performAutoSort(widgetsToTrySort);
+            finalLayout = performAutoSort(widgetsToTrySort); 
         }
     }
 
     if (finalLayout) {
+        let maxColRequired = 0;
+        finalLayout.forEach(w => {maxColRequired = Math.max(maxColRequired, w.colStart + w.colSpan - 1);});
+        const newRequiredPixelWidth = maxColRequired * cellSize;
+        const newActualGridWidthToSet = Math.max(window.innerWidth, newRequiredPixelWidth);
+        
+        if (newActualGridWidthToSet !== actualGridPixelWidth) {
+            setActualGridPixelWidth(newActualGridWidthToSet);
+        }
+
         setWidgets(finalLayout);
         updateWidgetsAndPushToHistory(finalLayout, `apply_preset_${presetKey}_to_${widgetId}`);
         setActiveWidgetId(widgetId);
@@ -1109,58 +1260,18 @@ export default function Home() {
     } else {
         alert(`Could not apply size preset "${presetKey}". There isn't enough space, even after trying to rearrange. Please try a different preset or make more room manually.`);
     }
-  }, [widgets, maximizedWidgetId, cellSize, findNextAvailablePosition, performAutoSort, updateWidgetsAndPushToHistory, canPlaceWidget, isMobileView]);
-
-  const performAutoSortWithGivenGrid = useCallback((widgetsToSort: PageWidgetConfig[], newCols: number, newRows: number): PageWidgetConfig[] | null => {
-    if (newCols === 0 || newRows === 0) return null;
-
-    const sortedWidgets = [...widgetsToSort].sort((a, b) => {
-        if (a.rowStart !== b.rowStart) return a.rowStart - b.rowStart;
-        if (a.colStart !== b.colStart) return a.colStart - b.colStart;
-        return a.id.localeCompare(b.id);
-    });
-
-    const newLayout: PageWidgetConfig[] = [];
-    for (const widget of sortedWidgets) {
-        let placed = false;
-        for (let r = 1; r <= newRows; r++) {
-            for (let c = 1; c <= newCols; c++) {
-                const checkWidget = {
-                    ...widget,
-                    colSpan: Math.max(widget.colSpan, widget.minColSpan),
-                    rowSpan: Math.max(widget.rowSpan, widget.minRowSpan),
-                };
-                const canPlaceCustom = (
-                    wtp: PageWidgetConfig, tC: number, tR: number, cL: PageWidgetConfig[], cols: number, rows: number
-                ): boolean => {
-                    if (cols === 0 || rows === 0) return false;
-                    if (tC < 1 || tR < 1 || tC + wtp.colSpan - 1 > cols || tR + wtp.rowSpan - 1 > rows) return false;
-                    for (const ew of cL) { if (ew.id === wtp.id) continue; if (doRectanglesOverlap(tC, tR, wtp.colSpan, wtp.rowSpan, ew.colStart, ew.rowStart, ew.colSpan, ew.rowSpan)) return false; }
-                    return true;
-                };
-
-                if (canPlaceCustom(checkWidget, c, r, newLayout, newCols, newRows)) {
-                    newLayout.push({ ...widget, colStart: c, rowStart: r });
-                    placed = true;
-                    break;
-                }
-            }
-            if (placed) break;
-        }
-        if (!placed) {
-             console.warn(`[performAutoSortWithGivenGrid] Could not place widget: ${widget.id}`);
-            return null;
-        }
-    }
-    return newLayout;
-  }, [doRectanglesOverlap]);
-
+  }, [widgets, maximizedWidgetId, cellSize, findNextAvailablePosition, performAutoSort, updateWidgetsAndPushToHistory, canPlaceWidget, isMobileView, actualGridPixelWidth]);
 
   const handleChangeCellSize = useCallback((newCellSize: number) => {
     if (newCellSize === cellSize || maximizedWidgetId) return;
 
     const oldCellSize = cellSize;
     console.log(`[Grid Density] Changing from ${oldCellSize}px to ${newCellSize}px`);
+
+    let maxColOccupiedOld = 0;
+    widgets.forEach(w => { maxColOccupiedOld = Math.max(maxColOccupiedOld, w.colStart + w.colSpan - 1); });
+    const currentContentPixelWidth = maxColOccupiedOld * oldCellSize;
+    const newTargetGridPixelWidth = Math.max(window.innerWidth, currentContentPixelWidth); 
 
     const scaledWidgets = widgets.map(w => {
         const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(b => b.type === w.type);
@@ -1177,10 +1288,10 @@ export default function Home() {
         let newRowStart = Math.max(1, Math.round(currentPixelY / newCellSize) + 1);
 
         if (isMobileView && w.type === 'portfolio' && widgets.length === 1) {
-            const tempNewCols = Math.floor(window.innerWidth / newCellSize);
-            const tempNewRows = Math.floor((window.innerHeight - (headerRef.current?.offsetHeight || 60)) / newCellSize);
-            newColSpan = tempNewCols;
-            newRowSpan = tempNewRows > 1 ? tempNewRows -1 : 1;
+            const tempNewColsForMobile = Math.floor(window.innerWidth / newCellSize); 
+            const tempNewRowsForMobile = Math.floor((window.innerHeight - (headerRef.current?.offsetHeight || 60)) / newCellSize);
+            newColSpan = tempNewColsForMobile;
+            newRowSpan = tempNewRowsForMobile > 1 ? tempNewRowsForMobile -1 : 1;
             newColStart = 1;
             newRowStart = 1;
         }
@@ -1193,34 +1304,104 @@ export default function Home() {
             rowStart: newRowStart,
         };
     });
+    
+    setActualGridPixelWidth(newTargetGridPixelWidth); 
+    setCellSize(newCellSize); 
 
-    setCellSize(newCellSize);
+    requestAnimationFrame(() => {
+        const newColsAfterUpdate = Math.floor(newTargetGridPixelWidth / newCellSize);
+        const currentHeaderHeight = headerRef.current?.offsetHeight || 60;
+        const aiCommandBarHeight = showAiCommandBar ? (document.getElementById('ai-command-bar')?.offsetHeight || 70) : 0;
+        const mainContentHeight = window.innerHeight - currentHeaderHeight - aiCommandBarHeight;
+        const newRowsAfterUpdate = Math.max(1, Math.floor(mainContentHeight / newCellSize));
+        
+        const sortedLayout = performAutoSortWithGivenGrid(scaledWidgets, newColsAfterUpdate, newRowsAfterUpdate);
 
-    const tempNewCols = Math.floor(window.innerWidth / newCellSize);
-    const tempNewRows = Math.floor((window.innerHeight - (headerRef.current?.offsetHeight || 60)) / newCellSize);
-
-    const sortedLayout = performAutoSortWithGivenGrid(scaledWidgets, tempNewCols, tempNewRows);
-
-    if (sortedLayout) {
-        setWidgets(sortedLayout);
-        updateWidgetsAndPushToHistory(sortedLayout, `grid_density_change_${newCellSize}`);
-    } else {
-        console.warn("[Grid Density] Auto-sort after scaling failed. Layout might need manual adjustment.");
-        setWidgets(scaledWidgets);
-        updateWidgetsAndPushToHistory(scaledWidgets, `grid_density_change_scaled_only_${newCellSize}`);
-        if (!isMobileView) {
-             alert("Grid density changed. Some widgets may need manual readjustment or use the 'Sort Grid' button.");
+        if (sortedLayout) {
+            setWidgets(sortedLayout);
+            updateWidgetsAndPushToHistory(sortedLayout, `grid_density_change_${newCellSize}`);
+        } else {
+            console.warn("[Grid Density] Auto-sort after scaling failed. Layout might need manual adjustment.");
+            setWidgets(scaledWidgets); 
+            updateWidgetsAndPushToHistory(scaledWidgets, `grid_density_change_scaled_only_${newCellSize}`);
+            if (!isMobileView) {
+                 alert("Grid density changed. Some widgets may need manual readjustment or use the 'Sort Grid' button.");
+            }
         }
-    }
+    });
+
     setIsDensityMenuOpen(false);
 
-  }, [cellSize, widgets, maximizedWidgetId, updateWidgetsAndPushToHistory, performAutoSortWithGivenGrid, isMobileView]);
+  }, [cellSize, widgets, maximizedWidgetId, updateWidgetsAndPushToHistory, performAutoSortWithGivenGrid, isMobileView, actualGridPixelWidth, showAiCommandBar]);
 
 
   const handleWidgetResizeLive = (id: string, newGeometry: WidgetResizeDataType) => { if (isPerformingUndoRedo.current || maximizedWidgetId || isMobileView) return; setWidgets(currentWidgets => currentWidgets.map(w => w.id === id ? { ...w, ...newGeometry, isMinimized: false } : w)); };
-  const handleWidgetResizeEnd = (id: string, finalGeometry: WidgetResizeDataType) => { if (maximizedWidgetId || isMobileView) return; setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.map(w => w.id === id ? { ...w, ...finalGeometry, isMinimized: false, originalRowSpan: undefined } : w); updateWidgetsAndPushToHistory(updatedWidgets, `resize_end_${id}`); return updatedWidgets; }); setActiveWidgetId(id); };
-  const handleWidgetMove = (id: string, newPosition: WidgetMoveDataType) => { if (maximizedWidgetId || isMobileView) return; const currentWidget = widgets.find(w => w.id === id); if (!currentWidget) return; if (currentWidget.colStart !== newPosition.colStart || currentWidget.rowStart !== newPosition.rowStart) { setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.map(w => w.id === id ? { ...w, ...newPosition } : w); updateWidgetsAndPushToHistory(updatedWidgets, `move_${id}`); return updatedWidgets; }); } setActiveWidgetId(id); };
-  const handleWidgetDelete = (idToDelete: string) => { if (isMobileView && widgets.find(w=>w.id === idToDelete)?.type === 'portfolio') return; if (maximizedWidgetId === idToDelete) { setMaximizedWidgetId(null); setMaximizedWidgetOriginalState(null); } setWidgets(currentWidgets => { const updatedWidgets = currentWidgets.filter(widget => widget.id !== idToDelete); updateWidgetsAndPushToHistory(updatedWidgets, `delete_${idToDelete}`); return updatedWidgets; }); if (activeWidgetId === idToDelete) setActiveWidgetId(null); };
+  
+  const handleWidgetResizeEnd = (id: string, finalGeometry: WidgetResizeDataType) => { 
+    if (maximizedWidgetId || isMobileView) return; 
+    setWidgets(currentWidgets => { 
+        const updatedWidgets = currentWidgets.map(w => w.id === id ? { ...w, ...finalGeometry, isMinimized: false, originalRowSpan: undefined } : w); 
+        
+        let maxColRequired = 0;
+        updatedWidgets.forEach(w => {maxColRequired = Math.max(maxColRequired, w.colStart + w.colSpan - 1);});
+        const newRequiredPixelWidth = maxColRequired * cellSize;
+        const newActualGridWidthToSet = Math.max(window.innerWidth, newRequiredPixelWidth);
+        
+        if (newActualGridWidthToSet !== actualGridPixelWidth) {
+            setActualGridPixelWidth(newActualGridWidthToSet);
+        }
+        
+        updateWidgetsAndPushToHistory(updatedWidgets, `resize_end_${id}`); 
+        return updatedWidgets; 
+    }); 
+    setActiveWidgetId(id); 
+  };
+
+  const handleWidgetMove = (id: string, newPosition: WidgetMoveDataType) => { 
+    if (maximizedWidgetId || isMobileView) return; 
+    const currentWidget = widgets.find(w => w.id === id); 
+    if (!currentWidget) return; 
+    if (currentWidget.colStart !== newPosition.colStart || currentWidget.rowStart !== newPosition.rowStart) { 
+        setWidgets(currentWidgets => { 
+            const updatedWidgets = currentWidgets.map(w => w.id === id ? { ...w, ...newPosition } : w); 
+            
+            let maxColRequired = 0;
+            updatedWidgets.forEach(w => {maxColRequired = Math.max(maxColRequired, w.colStart + w.colSpan - 1);});
+            const newRequiredPixelWidth = maxColRequired * cellSize;
+            const newActualGridWidthToSet = Math.max(window.innerWidth, newRequiredPixelWidth);
+
+            if (newActualGridWidthToSet !== actualGridPixelWidth) {
+                setActualGridPixelWidth(newActualGridWidthToSet);
+            }
+
+            updateWidgetsAndPushToHistory(updatedWidgets, `move_${id}`); 
+            return updatedWidgets; 
+        }); 
+    } 
+    setActiveWidgetId(id); 
+  };
+  
+  const handleWidgetDelete = (idToDelete: string) => { 
+    if (isMobileView && widgets.find(w=>w.id === idToDelete)?.type === 'portfolio') return; 
+    if (maximizedWidgetId === idToDelete) { setMaximizedWidgetId(null); setMaximizedWidgetOriginalState(null); } 
+    setWidgets(currentWidgets => { 
+        const updatedWidgets = currentWidgets.filter(widget => widget.id !== idToDelete); 
+        
+        let maxColRequired = 0;
+        updatedWidgets.forEach(w => {maxColRequired = Math.max(maxColRequired, w.colStart + w.colSpan - 1);});
+        const newRequiredPixelWidth = maxColRequired * cellSize;
+        const newActualGridWidthToSet = Math.max(window.innerWidth, newRequiredPixelWidth); 
+
+        if (newActualGridWidthToSet !== actualGridPixelWidth) {
+            setActualGridPixelWidth(newActualGridWidthToSet);
+        }
+
+        updateWidgetsAndPushToHistory(updatedWidgets, `delete_${idToDelete}`); 
+        return updatedWidgets; 
+    }); 
+    if (activeWidgetId === idToDelete) setActiveWidgetId(null); 
+  };
+
   const handleWidgetFocus = (id: string) => { if (maximizedWidgetId && maximizedWidgetId !== id) return; setActiveWidgetId(id); };
   const handleOpenWidgetSettings = (widgetId: string) => { if (maximizedWidgetId && maximizedWidgetId !== widgetId) return; const widgetToEdit = widgets.find(w => w.id === widgetId); if (widgetToEdit) { setActiveWidgetId(widgetId); setSelectedWidgetForSettings(widgetToEdit); setIsSettingsModalOpen(true); } };
   const handleCloseSettingsModal = () => { setIsSettingsModalOpen(false); setSelectedWidgetForSettings(null); };
@@ -1240,6 +1421,13 @@ export default function Home() {
     if (isMobileView) return;
     const target = event.target as HTMLElement;
     let clickedOnWidgetOrInteractiveContent = false;
+    // Check if click is on the scrollbar of dashboardAreaRef
+    if (dashboardAreaRef.current && 
+        (event.clientX >= dashboardAreaRef.current.clientWidth || event.clientY >= dashboardAreaRef.current.clientHeight)) {
+        // Click is likely on a scrollbar, don't open context menu
+        return;
+    }
+
     for (const widget of widgets) {
         if (target.closest(`#${CSS.escape(widget.id)}`)) {
             clickedOnWidgetOrInteractiveContent = true;
@@ -1247,14 +1435,14 @@ export default function Home() {
         }
     }
     if (target.closest('button, a, input, select, textarea, [role="button"], [role="link"], [contenteditable="true"]')) {
-        if (target !== dashboardAreaRef.current && target.id !== 'widget-grid-container' && !target.closest('.grid-background-svg')) {
+        if (target !== dashboardAreaRef.current && target.id !== 'widget-grid-container' && !target.closest('.grid-background-svg') && target.id !== 'grid-content-wrapper') {
             clickedOnWidgetOrInteractiveContent = true;
         }
     }
 
     if (clickedOnWidgetOrInteractiveContent) { return; }
 
-    if ( target === dashboardAreaRef.current || target.id === 'widget-grid-container' || target.closest('.grid-background-svg') ) {
+    if ( target === dashboardAreaRef.current || target.id === 'widget-grid-container' || target.closest('.grid-background-svg') || target.id === 'grid-content-wrapper' ) {
         event.preventDefault();
         setIsAddWidgetMenuOpen(false);
         setContextMenuPosition({ x: event.clientX, y: event.clientY });
@@ -1268,8 +1456,6 @@ export default function Home() {
   };
 
   // --- AI Integration Functions ---
-
- 
 
   const startListening = () => {
     if (typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)) {
@@ -1387,7 +1573,6 @@ export default function Home() {
 
         setAiLastFeedback(parsedCommand.feedbackToUser || "Command received.");
         
-
         dispatchAiCommand(parsedCommand);
 
       } else {
@@ -1448,7 +1633,7 @@ export default function Home() {
 
 
   const dispatchAiCommand = (command: ParsedAiCommand) => {
-    console.log("Dispatching AI Command:", command); // Keep this log to see the command *before* processing
+    console.log("Dispatching AI Command:", command); 
     setActiveWidgetId(null); 
 
     let feedbackMessage = command.feedbackToUser || ""; 
@@ -1792,35 +1977,18 @@ export default function Home() {
 
   // --- End AI Integration Functions ---
 
-  // Function to handle service selection from Google Hub
   const handleGoogleServiceSelect = (widgetId: string, serviceKey: GoogleServiceActionKey) => {
     console.log(`Google service selected from hub ${widgetId}: ${serviceKey}`);
-    // For now, just close/minimize the hub widget
     handleWidgetMinimizeToggle(widgetId);
-
-    // Future:
-    // 1. Determine the WidgetType based on serviceKey (e.g., 'gmail', 'googlePhotos')
-    //    Example mapping:
-    //    const serviceToWidgetType: Record<GoogleServiceActionKey, WidgetType | null> = {
-    //        gmail: 'gmail', // Assuming 'gmail' is a defined WidgetType
-    //        photos: 'googlePhotos', // Assuming 'googlePhotos' is a defined WidgetType
-    //        keep: 'googleKeep',
-    //        calendar: 'googleCalendar',
-    //        maps: 'googleMaps',
-    //        drive: 'googleDrive',
-    //        meet: 'googleMeet',
-    //    };
-    //    const targetWidgetType = serviceToWidgetType[serviceKey];
-    //
-    // 2. Call handleAddNewWidget with the determined WidgetType
-    //    if (targetWidgetType) {
-    //        handleAddNewWidget(targetWidgetType, `New ${serviceKey.charAt(0).toUpperCase() + serviceKey.slice(1)} Widget`);
-    //    } else {
-    //        alert(`Widget for ${serviceKey} is not yet implemented.`);
-    //    }
-    // 3. After adding, you might want to focus the new widget.
-
     alert(`Selected ${serviceKey}. This would open the ${serviceKey} widget and close the hub. (Functionality to open specific widget not yet implemented)`);
+  };
+
+  const handleWheelScroll = (event: React.WheelEvent<HTMLDivElement>) => {
+    if (event.shiftKey && dashboardAreaRef.current) { // Check if Shift is pressed
+      event.preventDefault(); // Prevent default vertical scroll or other shift+wheel actions
+      dashboardAreaRef.current.scrollLeft += event.deltaY; // Use deltaY for horizontal scroll with Shift
+    }
+    // If Shift is not pressed, normal vertical scrolling will occur on the dashboardAreaRef if its content overflows vertically.
   };
 
 
@@ -1841,7 +2009,6 @@ export default function Home() {
       case 'notes': return <NotesWidget instanceId={widgetConfig.id} settings={notesSettings} notes={sharedNotes} activeNoteId={activeSharedNoteId} onNotesChange={setSharedNotes} onActiveNoteIdChange={setActiveSharedNoteId} />;
       case 'portfolio': return <PortfolioWidget settings={currentWidgetSettings as PortfolioWidgetSettings | undefined} isMobileFullScreen={isMobileView && widgets.length === 1 && widgets[0].type === 'portfolio'} />;
       case 'geminiChat': return <GeminiChatWidget instanceId={widgetConfig.id} settings={currentWidgetSettings as GeminiChatWidgetSettings | undefined} />;
-      // Add the new Google Services Hub case
       case 'googleServicesHub':
         return (
           <GoogleServicesHubWidget
@@ -1873,7 +2040,6 @@ export default function Home() {
       case 'todo': return <TodoSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as TodoWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} onClearAllTasks={() => { handleSharedTodosChange([]); alert(`The global to-do list has been cleared.`); }} />;
       case 'portfolio': return <PortfolioSettingsPanel widgetId={widgetConfig.id} currentSettings={currentContentSettings as PortfolioWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} />;
       case 'geminiChat': return <GeminiChatSettingsPanel widgetInstanceId={widgetConfig.id} currentSettings={currentContentSettings as GeminiChatWidgetSettings | undefined} onSave={boundSaveInstanceContentSettings} />;
-      // Add settings panel for Google Services Hub
       case 'googleServicesHub':
         return (
           <GoogleServicesHubSettingsPanel
@@ -1970,60 +2136,76 @@ export default function Home() {
 
       {maximizedWidgetId && !isMobileView && ( <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[45]" onClick={() => maximizedWidgetId && handleWidgetMaximizeToggle(maximizedWidgetId)} /> )}
 
-      <div ref={dashboardAreaRef} className={`flex-grow relative ${maximizedWidgetId && !isMobileView ? 'pointer-events-none' : ''}`}>
-        <GridBackground cellSize={cellSize} />
-        <div
-            id="widget-grid-container"
-            className="absolute inset-0 grid gap-0"
-            style={{
-                gridTemplateColumns: `repeat(${widgetContainerCols}, ${cellSize}px)`,
-                gridTemplateRows: `repeat(${widgetContainerRows}, ${cellSize}px)`,
-                alignContent: 'start'
-            }}
+      {/* dashboardAreaRef is now the scroll container */}
+      <div 
+        ref={dashboardAreaRef} 
+        className={`flex-grow relative overflow-x-auto overflow-y-hidden ${maximizedWidgetId && !isMobileView ? 'pointer-events-none' : ''}`}
+        onWheel={handleWheelScroll} // Added wheel scroll handler
+      >
+        {/* gridWrapperRef controls the actual width of the content, allowing it to exceed viewport */}
+        <div 
+            id="grid-content-wrapper"
+            ref={gridWrapperRef}
+            className="relative h-full" // Height is 100% of dashboardAreaRef
+            style={{ width: `${actualGridPixelWidth}px` }} 
         >
-          {widgets.map((widgetConfig) => {
-            if (maximizedWidgetId && maximizedWidgetId !== widgetConfig.id && !isMobileView) return null;
+            <GridBackground cellSize={cellSize} gridWidth={actualGridPixelWidth} /> 
+            <div
+                id="widget-grid-container"
+                className="absolute inset-0 grid gap-0" // Positioned within the grid-content-wrapper
+                style={{
+                    gridTemplateColumns: `repeat(${widgetContainerCols}, ${cellSize}px)`,
+                    gridTemplateRows: `repeat(${widgetContainerRows}, ${cellSize}px)`,
+                    alignContent: 'start',
+                    width: `${actualGridPixelWidth}px`, // Ensure this also has the full width
+                    height: '100%', // And full height of its parent
+                }}
+            >
+            {widgets.map((widgetConfig) => {
+                if (maximizedWidgetId && maximizedWidgetId !== widgetConfig.id && !isMobileView) return null;
 
-            const currentWidgetState = maximizedWidgetId === widgetConfig.id && maximizedWidgetOriginalState && !isMobileView
-                ? {
-                    ...maximizedWidgetOriginalState,
-                    colStart: 1,
-                    rowStart: 1,
-                    colSpan: widgetContainerCols > 2 ? widgetContainerCols - 1 : widgetContainerCols,
-                    rowSpan: widgetContainerRows > 2 ? widgetContainerRows - 1 : widgetContainerRows,
-                    isMinimized: false,
-                  }
-                : widgetConfig;
+                const currentWidgetState = maximizedWidgetId === widgetConfig.id && maximizedWidgetOriginalState && !isMobileView
+                    ? {
+                        ...maximizedWidgetOriginalState,
+                        colStart: 1,
+                        rowStart: 1,
+                        // Maximize within the scrollable viewport, not the entire actualGridPixelWidth
+                        colSpan: Math.floor(window.innerWidth / cellSize) > 2 ? Math.floor(window.innerWidth / cellSize) -1 : Math.floor(window.innerWidth / cellSize),
+                        rowSpan: widgetContainerRows > 2 ? widgetContainerRows - 1 : widgetContainerRows,
+                        isMinimized: false,
+                    }
+                    : widgetConfig;
 
-            let minCol = widgetConfig.minColSpan;
-            let minRow = widgetConfig.minRowSpan;
+                let minCol = widgetConfig.minColSpan;
+                let minRow = widgetConfig.minRowSpan;
 
-            if (widgetConfig.isMinimized && maximizedWidgetId !== widgetConfig.id && !isMobileView) {
-                minCol = widgetConfig.colSpan;
-                minRow = MINIMIZED_WIDGET_ROW_SPAN;
-            }
+                if (widgetConfig.isMinimized && maximizedWidgetId !== widgetConfig.id && !isMobileView) {
+                    minCol = widgetConfig.colSpan;
+                    minRow = MINIMIZED_WIDGET_ROW_SPAN;
+                }
 
-            return (
-              <Widget
-                key={widgetConfig.id} id={widgetConfig.id} title={widgetConfig.title}
-                colStart={currentWidgetState.colStart} rowStart={currentWidgetState.rowStart} colSpan={currentWidgetState.colSpan} rowSpan={currentWidgetState.rowSpan}
-                onResize={handleWidgetResizeLive} onResizeEnd={handleWidgetResizeEnd} onMove={handleWidgetMove}
-                onDelete={handleWidgetDelete} onFocus={handleWidgetFocus}
-                onOpenSettings={handleOpenWidgetSettings}
-                onOpenContainerSettings={handleOpenContainerSettingsModal}
-                containerSettings={widgetConfig.containerSettings}
-                isActive={widgetConfig.id === activeWidgetId && !maximizedWidgetId} CELL_SIZE={cellSize}
-                minColSpan={minCol} minRowSpan={minRow}
-                totalGridCols={widgetContainerCols} totalGridRows={widgetContainerRows}
-                isMinimized={widgetConfig.isMinimized && maximizedWidgetId !== widgetConfig.id && !isMobileView} onMinimizeToggle={() => handleWidgetMinimizeToggle(widgetConfig.id)}
-                isMaximized={maximizedWidgetId === widgetConfig.id && !isMobileView} onMaximizeToggle={() => handleWidgetMaximizeToggle(widgetConfig.id)}
-                isDraggable={!isMobileView || widgets.length > 1}
-                isResizable={!isMobileView || widgets.length > 1}
-              >
-                {renderWidgetContent(widgetConfig)}
-              </Widget>
-            );
-          })}
+                return (
+                <Widget
+                    key={widgetConfig.id} id={widgetConfig.id} title={widgetConfig.title}
+                    colStart={currentWidgetState.colStart} rowStart={currentWidgetState.rowStart} colSpan={currentWidgetState.colSpan} rowSpan={currentWidgetState.rowSpan}
+                    onResize={handleWidgetResizeLive} onResizeEnd={handleWidgetResizeEnd} onMove={handleWidgetMove}
+                    onDelete={handleWidgetDelete} onFocus={handleWidgetFocus}
+                    onOpenSettings={handleOpenWidgetSettings}
+                    onOpenContainerSettings={handleOpenContainerSettingsModal}
+                    containerSettings={widgetConfig.containerSettings}
+                    isActive={widgetConfig.id === activeWidgetId && !maximizedWidgetId} CELL_SIZE={cellSize}
+                    minColSpan={minCol} minRowSpan={minRow}
+                    totalGridCols={widgetContainerCols} totalGridRows={widgetContainerRows}
+                    isMinimized={widgetConfig.isMinimized && maximizedWidgetId !== widgetConfig.id && !isMobileView} onMinimizeToggle={() => handleWidgetMinimizeToggle(widgetConfig.id)}
+                    isMaximized={maximizedWidgetId === widgetConfig.id && !isMobileView} onMaximizeToggle={() => handleWidgetMaximizeToggle(widgetConfig.id)}
+                    isDraggable={!isMobileView || widgets.length > 1}
+                    isResizable={!isMobileView || widgets.length > 1}
+                >
+                    {renderWidgetContent(widgetConfig)}
+                </Widget>
+                );
+            })}
+            </div>
         </div>
       </div>
 
@@ -2132,5 +2314,3 @@ if (typeof window !== 'undefined' && !document.getElementById('custom-dashboard-
   styleSheet.innerText = styles;
   document.head.appendChild(styleSheet);
 }
-
-

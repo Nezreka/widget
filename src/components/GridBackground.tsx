@@ -10,6 +10,8 @@ interface Particle {
   radius: number;
   vx: number;
   vy: number;
+  originalVx: number; // Added to store initial velocity
+  originalVy: number; // Added to store initial velocity
   hueOffset: number;
   baseColorS: number;
   baseColorL: number;
@@ -80,6 +82,7 @@ interface NebulaCloud {
 
 interface GridBackgroundProps {
   cellSize: number;
+  gridWidth: number; // This is the full CSS width of the grid content
 }
 
 interface GridPointData {
@@ -150,8 +153,9 @@ const getHarmonizedHsla = (
   return `hsla(${hue.toFixed(0)}, ${satClamped.toFixed(1)}%, ${ligClamped.toFixed(1)}%, ${alpClamped.toFixed(3)})`;
 };
 
-const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
+const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize, gridWidth }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasCssHeightRef = useRef<number>(0); // Stores CSS height of the canvas
   const particlesArray = useRef<Particle[]>([]);
   const cosmicDustParticles = useRef<CosmicDustParticle[]>([]);
   const nebulaClouds = useRef<NebulaCloud[]>([]);
@@ -167,9 +171,7 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
     const initialMouseInteractionRadius = 190;
     const initialConnectDistance = 150;
     const initialGridRevealRadius = 150;
-    // Detect Firefox
     const isFirefox = typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('firefox');
-
 
     return {
       PARTICLE_BASE_COLOR_STR: 'hsla(260, 80%, 60%, 0.7)',
@@ -183,13 +185,14 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
       CONNECT_DISTANCE_SQUARED: initialConnectDistance * initialConnectDistance,
       PARTICLE_BASE_SPEED_MIN: 0.07,
       PARTICLE_BASE_SPEED_MAX: 0.22,
+      PARTICLE_RETURN_LERP_AMOUNT: 0.05, // How quickly particles return to original speed
       MIN_RADIUS: 0.5,
       MAX_RADIUS: 1.7,
       HIGHLIGHT_FADE_SPEED: 0.07,
       CONNECTION_RADIUS_BONUS: 0.07,
       MAX_CONNECTION_BONUS_RADIUS: 1.2,
       MASTER_HUE_CYCLE_SPEED: 0.010,
-      CLICK_REPEL_STRENGTH: 65,
+      CLICK_REPEL_STRENGTH: 45, 
       CLICK_EFFECT_RADIUS: 210,
       CLICK_EFFECT_DURATION: 32,
       MOUSE_RADIUS_MULTIPLIER: 1.65,
@@ -215,11 +218,8 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
       COSMIC_DUST_BASE_ALPHA: 0.20,
       COSMIC_DUST_HUE_SPREAD: 70,
 
-      // Firefox-specific nebula count
-      NEBULA_CLOUD_COUNT: isFirefox ? 0 : 5, // Reduced for Firefox
-      // Optional: Firefox-specific composite operation (test this if count reduction isn't enough)
-      // NEBULA_COMPOSITE_OPERATION: isFirefox ? 'source-over' : 'lighter',
-      NEBULA_COMPOSITE_OPERATION: 'lighter', // Defaulting to lighter for now
+      NEBULA_CLOUD_COUNT: isFirefox ? 0 : 5,
+      NEBULA_COMPOSITE_OPERATION: 'lighter',
 
       NEBULA_MAX_SIZE_FACTOR_W: 0.9,
       NEBULA_MIN_SIZE_FACTOR_W: 0.5,
@@ -262,9 +262,8 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
     };
   });
 
-  // Effect to update MAX_PARTICLES on window resize
   useEffect(() => {
-    const handleResize = () => {
+    const handleResizeConfig = () => {
       const width = window.innerWidth;
       let newMaxParticles = DESKTOP_PARTICLES;
       if (width < MOBILE_BREAKPOINT) {
@@ -281,8 +280,8 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
       });
     };
 
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('resize', handleResizeConfig);
+    return () => window.removeEventListener('resize', handleResizeConfig);
   }, []);
 
   const getCssVar = useCallback((name: string, fallback: string) => {
@@ -309,18 +308,27 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
   }, [getCssVar, config.PARTICLE_BASE_COLOR_STR]);
 
 
-  const initParticles = useCallback((canvas: HTMLCanvasElement) => {
+  const initParticles = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || canvasCssHeightRef.current === 0) return; // Ensure CSS height is known
+
     particlesArray.current = [];
     const [, baseS, baseL, baseA] = parseHsla(config.PARTICLE_BASE_COLOR_STR);
     const [, , highlightL, highlightA] = parseHsla(config.PARTICLE_HIGHLIGHT_COLOR_STR);
+    const currentCssHeight = canvasCssHeightRef.current;
 
     for (let i = 0; i < config.MAX_PARTICLES; i++) {
       const radius = Math.random() * (config.MAX_RADIUS - config.MIN_RADIUS) + config.MIN_RADIUS;
+      const initialVx = (Math.random() - 0.5) * config.PARTICLE_BASE_SPEED_MAX * 2;
+      const initialVy = (Math.random() - 0.5) * config.PARTICLE_BASE_SPEED_MAX * 2;
       particlesArray.current.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        radius, vx: (Math.random() - 0.5) * config.PARTICLE_BASE_SPEED_MAX * 2,
-        vy: (Math.random() - 0.5) * config.PARTICLE_BASE_SPEED_MAX * 2,
+        x: Math.random() * gridWidth, // Use CSS width
+        y: Math.random() * currentCssHeight, // Use CSS height
+        radius, 
+        vx: initialVx,
+        vy: initialVy,
+        originalVx: initialVx, // Store original velocity
+        originalVy: initialVy, // Store original velocity
         hueOffset: (Math.random() * 60) - 30,
         baseColorS: baseS, baseColorL: baseL, baseColorA: baseA,
         highlightColorL: highlightL, highlightColorA: highlightA, highlightIntensity: 0,
@@ -330,15 +338,19 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
         connectionCount: 0, targetRadius: radius, currentRadius: radius,
       });
     }
-  }, [config]);
+  }, [config, gridWidth]); // Depend on gridWidth
 
-  const initCosmicDust = useCallback((canvas: HTMLCanvasElement) => {
+  const initCosmicDust = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || canvasCssHeightRef.current === 0) return;
+    const currentCssHeight = canvasCssHeightRef.current;
+
     cosmicDustParticles.current = [];
     for (let i = 0; i < config.COSMIC_DUST_COUNT; i++) {
       cosmicDustParticles.current.push({
         id: i,
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
+        x: Math.random() * gridWidth, // Use CSS width
+        y: Math.random() * currentCssHeight, // Use CSS height
         radius: Math.random() * (config.COSMIC_DUST_MAX_SIZE - config.COSMIC_DUST_MIN_SIZE) + config.COSMIC_DUST_MIN_SIZE,
         vx: (Math.random() - 0.5) * config.COSMIC_DUST_SPEED_FACTOR,
         vy: (Math.random() - 0.5) * config.COSMIC_DUST_SPEED_FACTOR,
@@ -346,11 +358,14 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
         hueOffset: (Math.random() * config.COSMIC_DUST_HUE_SPREAD) - (config.COSMIC_DUST_HUE_SPREAD / 2),
       });
     }
-  }, [config]);
+  }, [config, gridWidth]);
 
-  const initNebulaClouds = useCallback((canvas: HTMLCanvasElement) => {
+  const initNebulaClouds = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || canvasCssHeightRef.current === 0) return;
+    const currentCssHeight = canvasCssHeightRef.current;
+
     nebulaClouds.current = [];
-    // config.NEBULA_CLOUD_COUNT is now potentially Firefox-specific
     for (let i = 0; i < config.NEBULA_CLOUD_COUNT; i++) {
       const isWarm = Math.random() < config.NEBULA_WARM_HUE_CHANCE;
       let baseHueOffsetVal = (Math.random() * config.NEBULA_HUE_OFFSET_RANGE * 2) - config.NEBULA_HUE_OFFSET_RANGE;
@@ -361,10 +376,10 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
 
       nebulaClouds.current.push({
         id: i,
-        x: canvas.width * (0.25 + Math.random() * 0.5),
-        y: canvas.height * (0.25 + Math.random() * 0.5),
-        radiusX: canvas.width * (Math.random() * (config.NEBULA_MAX_SIZE_FACTOR_W - config.NEBULA_MIN_SIZE_FACTOR_W) + config.NEBULA_MIN_SIZE_FACTOR_W),
-        radiusY: canvas.height * (Math.random() * (config.NEBULA_MAX_SIZE_FACTOR_H - config.NEBULA_MIN_SIZE_FACTOR_H) + config.NEBULA_MIN_SIZE_FACTOR_H),
+        x: gridWidth * (0.25 + Math.random() * 0.5), // Use CSS width
+        y: currentCssHeight * (0.25 + Math.random() * 0.5), // Use CSS height
+        radiusX: gridWidth * (Math.random() * (config.NEBULA_MAX_SIZE_FACTOR_W - config.NEBULA_MIN_SIZE_FACTOR_W) + config.NEBULA_MIN_SIZE_FACTOR_W),
+        radiusY: currentCssHeight * (Math.random() * (config.NEBULA_MAX_SIZE_FACTOR_H - config.NEBULA_MIN_SIZE_FACTOR_H) + config.NEBULA_MIN_SIZE_FACTOR_H),
         angle: Math.random() * config.NEBULA_ELLIPSE_ROTATION_MAX * (Math.random() < 0.5 ? 1 : -1),
         baseHueOffset: baseHueOffsetVal,
         saturation: Math.random() * (config.NEBULA_BASE_SATURATION_MAX - config.NEBULA_BASE_SATURATION_MIN) + config.NEBULA_BASE_SATURATION_MIN,
@@ -379,8 +394,8 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
         timeOffsetY: Math.random() * 1000,
         timeOffsetOpacity: Math.random() * 1000,
         timeOffsetSize: Math.random() * 1000,
-        initialOffsetX: (Math.random() - 0.5) * canvas.width * 0.4,
-        initialOffsetY: (Math.random() - 0.5) * canvas.height * 0.4,
+        initialOffsetX: (Math.random() - 0.5) * gridWidth * 0.4, // Use CSS width
+        initialOffsetY: (Math.random() - 0.5) * currentCssHeight * 0.4, // Use CSS height
         hueOscillationSpeed: (Math.random() * (config.NEBULA_HUE_OSCILLATION_SPEED_MAX - config.NEBULA_HUE_OSCILLATION_SPEED_MIN) + config.NEBULA_HUE_OSCILLATION_SPEED_MIN),
         hueOscillationAmplitude: (Math.random() * (config.NEBULA_HUE_OSCILLATION_AMPLITUDE_MAX - config.NEBULA_HUE_OSCILLATION_AMPLITUDE_MIN) + config.NEBULA_HUE_OSCILLATION_AMPLITUDE_MIN),
         timeOffsetHue: Math.random() * 1000,
@@ -389,12 +404,12 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
         timeOffsetLuminosity: Math.random() * 1000,
       });
     }
-  }, [config, masterHue]);
+  }, [config, gridWidth, masterHue]);
 
-  const drawRevealedGrid = useCallback((canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
+  const drawRevealedGrid = useCallback((ctx: CanvasRenderingContext2D) => {
     if (mousePosition.current.x === null || mousePosition.current.y === null || cellSize <= 0) return;
-    const mouseX = mousePosition.current.x;
-    const mouseY = mousePosition.current.y;
+    const mouseX = mousePosition.current.x; // Already in CSS pixels relative to full canvas
+    const mouseY = mousePosition.current.y; // Already in CSS pixels relative to full canvas
     
     const [, gridBaseS, gridBaseL, gridBaseInitialAlpha] = parseHsla(config.GRID_LINE_BASE_COLOR_STR);
     const [, , gridHighlightL, gridHighlightActualA] = parseHsla(config.GRID_LINE_HIGHLIGHT_COLOR_STR);
@@ -453,28 +468,35 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
     });
   }, [config, cellSize, masterHue, animationTime]);
 
-  const animate = useCallback((canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
+  const animate = useCallback((ctx: CanvasRenderingContext2D) => {
+    const canvas = canvasRef.current;
+    if (!canvas || canvasCssHeightRef.current === 0) { // Ensure CSS height is known
+        animationFrameId.current = requestAnimationFrame(() => animate(ctx));
+        return;
+    }
+    const currentCssWidth = gridWidth; // Prop gridWidth is the CSS width
+    const currentCssHeight = canvasCssHeightRef.current;
+
     animationTime.current += 0.016; 
 
     ctx.fillStyle = config.BASE_BACKGROUND_COLOR;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, currentCssWidth, currentCssHeight); // Clear using CSS dimensions
 
     masterHue.current = (masterHue.current + config.MASTER_HUE_CYCLE_SPEED);
     if (masterHue.current >= 360) masterHue.current -= 360;
     if (masterHue.current < 0) masterHue.current += 360;
 
-    // Use configured composite operation
     ctx.globalCompositeOperation = config.NEBULA_COMPOSITE_OPERATION as GlobalCompositeOperation; 
     nebulaClouds.current.forEach(cloud => {
-      cloud.x += cloud.driftXFactor * canvas.width * 0.01; 
-      cloud.y += cloud.driftYFactor * canvas.height * 0.01;
+      cloud.x += cloud.driftXFactor * currentCssWidth * 0.01; 
+      cloud.y += cloud.driftYFactor * currentCssHeight * 0.01;
 
       const visualRadiusX = cloud.radiusX * 1.5; 
       const visualRadiusY = cloud.radiusY * 1.5;
-      if (cloud.x - visualRadiusX > canvas.width) cloud.x = -visualRadiusX;
-      if (cloud.x + visualRadiusX < 0) cloud.x = canvas.width + visualRadiusX;
-      if (cloud.y - visualRadiusY > canvas.height) cloud.y = -visualRadiusY;
-      if (cloud.y + visualRadiusY < 0) cloud.y = canvas.height + visualRadiusY;
+      if (cloud.x - visualRadiusX > currentCssWidth) cloud.x = -visualRadiusX;
+      if (cloud.x + visualRadiusX < 0) cloud.x = currentCssWidth + visualRadiusX;
+      if (cloud.y - visualRadiusY > currentCssHeight) cloud.y = -visualRadiusY;
+      if (cloud.y + visualRadiusY < 0) cloud.y = currentCssHeight + visualRadiusY;
       
       const time = animationTime.current;
       const sizePulse = (Math.sin(time * cloud.sizePulseSpeed + cloud.timeOffsetSize) + 1) / 2; 
@@ -494,17 +516,15 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
 
       const cloudGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(cloud.radiusX, cloud.radiusY) * currentSizeFactor);
       
-      // Simplified gradient with 4 color stops
       const colorCore = getHarmonizedHsla(masterHue.current, dynamicHueOffset, cloud.saturation, currentLuminosityInner, finalOpacity, true);
       const colorMid = getHarmonizedHsla(masterHue.current, dynamicHueOffset + 10, cloud.saturation * 0.85, (currentLuminosityInner + currentLuminosityOuter) / 2.5, finalOpacity * 0.60, true);
       const colorOuter = getHarmonizedHsla(masterHue.current, dynamicHueOffset - 5, cloud.saturation * 0.9, currentLuminosityOuter * 0.8, finalOpacity * 0.25, true);
       const colorEdge = getHarmonizedHsla(masterHue.current, dynamicHueOffset, cloud.saturation * 0.9, currentLuminosityOuter, 0, true);
 
       cloudGrad.addColorStop(0, colorCore);
-      cloudGrad.addColorStop(0.35, colorMid); // Adjusted stop
-      cloudGrad.addColorStop(0.75, colorOuter); // Adjusted stop
+      cloudGrad.addColorStop(0.35, colorMid); 
+      cloudGrad.addColorStop(0.75, colorOuter); 
       cloudGrad.addColorStop(1, colorEdge);
-
 
       ctx.save();
       ctx.translate(cloud.x + cloud.initialOffsetX, cloud.y + cloud.initialOffsetY);
@@ -522,14 +542,14 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
     cosmicDustParticles.current.forEach(dust => {
       dust.x += dust.vx;
       dust.y += dust.vy;
-      if (dust.x > canvas.width + dust.radius) dust.x = -dust.radius; else if (dust.x < -dust.radius) dust.x = canvas.width + dust.radius;
-      if (dust.y > canvas.height + dust.radius) dust.y = -dust.radius; else if (dust.y < -dust.radius) dust.y = canvas.height + dust.radius;
+      if (dust.x > currentCssWidth + dust.radius) dust.x = -dust.radius; else if (dust.x < -dust.radius) dust.x = currentCssWidth + dust.radius;
+      if (dust.y > currentCssHeight + dust.radius) dust.y = -dust.radius; else if (dust.y < -dust.radius) dust.y = currentCssHeight + dust.radius;
       const twinkle = (Math.sin(animationTime.current * 0.3 + dust.id) + 1) / 2 * 0.5 + 0.5;
       ctx.fillStyle = getHarmonizedHsla(masterHue.current, dust.hueOffset, config.COSMIC_DUST_BASE_SATURATION, config.COSMIC_DUST_BASE_LIGHTNESS, dust.baseAlpha * twinkle, true);
       ctx.beginPath(); ctx.arc(dust.x, dust.y, dust.radius, 0, TWO_PI); ctx.fill();
     });
 
-    drawRevealedGrid(canvas, ctx);
+    drawRevealedGrid(ctx);
 
     clickEffects.current = clickEffects.current.filter(effect => { effect.life--; return effect.life > 0; });
 
@@ -567,15 +587,17 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
             const dist = Math.sqrt(distSq); 
             if (dist > 0) { 
                  const force = (1 - dist / effect.maxRadius) * (effect.strength / dist) * (effect.life / config.CLICK_EFFECT_DURATION);
-                 p.vx += dx * force * 0.03; p.vy += dy * force * 0.03;
+                 p.vx += dx * force * 0.03; 
+                 p.vy += dy * force * 0.03;
             }
         }
       });
       let targetHI = 0; p.targetRadius = p.radius;
       if (mousePosition.current.x !== null && mousePosition.current.y !== null) {
-        const dxM = p.x - mousePosition.current.x; const dyM = p.y - mousePosition.current.y; 
+        const dxM = p.x - mousePosition.current.x; // Both are CSS pixels
+        const dyM = p.y - mousePosition.current.y; // Both are CSS pixels
         const distMSq = dxM * dxM + dyM * dyM;
-        if (distMSq < config.MOUSE_INTERACTION_RADIUS * config.MOUSE_INTERACTION_RADIUS) {
+        if (distMSq < config.MOUSE_INTERACTION_RADIUS * config.MOUSE_INTERACTION_RADIUS) { // MOUSE_INTERACTION_RADIUS is CSS pixels
             const distM = Math.sqrt(distMSq);
             targetHI = 1 - (distM / config.MOUSE_INTERACTION_RADIUS);
             p.targetRadius = p.radius * (1 + (config.MOUSE_RADIUS_MULTIPLIER - 1) * targetHI);
@@ -587,9 +609,16 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
       }
       p.highlightIntensity = lerp(p.highlightIntensity, targetHI, config.HIGHLIGHT_FADE_SPEED);
       p.currentRadius = lerp(p.currentRadius, p.targetRadius, config.RADIUS_LERP_SPEED);
+      
+      // Lerp current velocity back towards original velocity
+      p.vx = lerp(p.vx, p.originalVx, config.PARTICLE_RETURN_LERP_AMOUNT);
+      p.vy = lerp(p.vy, p.originalVy, config.PARTICLE_RETURN_LERP_AMOUNT);
+
       p.x += p.vx; p.y += p.vy;
-      if (p.x + p.currentRadius > canvas.width || p.x - p.currentRadius < 0) { p.vx *= -1; p.x = Math.max(p.currentRadius, Math.min(p.x, canvas.width - p.currentRadius)); }
-      if (p.y + p.currentRadius > canvas.height || p.y - p.currentRadius < 0) { p.vy *= -1; p.y = Math.max(p.currentRadius, Math.min(p.y, canvas.height - p.currentRadius)); }
+      
+      if (p.x + p.currentRadius > currentCssWidth || p.x - p.currentRadius < 0) { p.vx *= -1; p.x = Math.max(p.currentRadius, Math.min(p.x, currentCssWidth - p.currentRadius)); }
+      if (p.y + p.currentRadius > currentCssHeight || p.y - p.currentRadius < 0) { p.vy *= -1; p.y = Math.max(p.currentRadius, Math.min(p.y, currentCssHeight - p.currentRadius)); }
+      
       p.pulseAngle = (p.pulseAngle + p.pulseSpeed) % TWO_PI;
       const pulseF = (Math.sin(p.pulseAngle) + 1) / 2;
       let dRadius = p.currentRadius + pulseF * p.pulseAmplitude * (p.currentRadius / p.radius) + Math.min(p.connectionCount * config.CONNECTION_RADIUS_BONUS, config.MAX_CONNECTION_BONUS_RADIUS);
@@ -601,43 +630,59 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
       ctx.fill();
     });
 
-    animationFrameId.current = requestAnimationFrame(() => animate(canvas, ctx));
-  }, [config, drawRevealedGrid]); 
+    animationFrameId.current = requestAnimationFrame(() => animate(ctx));
+  }, [config, drawRevealedGrid, gridWidth]); 
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: true }); 
     if (!ctx) return;
 
     const resizeCanvas = () => {
       if (canvas) {
         const dpr = window.devicePixelRatio || 1;
-        const rect = canvas.getBoundingClientRect();
-        
-        canvas.width = rect.width * dpr;
-        canvas.height = rect.height * dpr;
-        
-        ctx.scale(dpr, dpr); 
+        const rect = canvas.getBoundingClientRect(); 
 
-        canvas.style.width = `${rect.width}px`;
-        canvas.style.height = `${rect.height}px`;
+        const cssWidth = gridWidth; // gridWidth prop is the full CSS width
+        const cssHeight = rect.height; // Canvas CSS height from its layout
+        canvasCssHeightRef.current = cssHeight; // Store CSS height
+
+        canvas.width = cssWidth * dpr; 
+        canvas.height = cssHeight * dpr;
         
-        initParticles(canvas); 
-        initCosmicDust(canvas);
-        initNebulaClouds(canvas); 
+        ctx.resetTransform(); // Clear previous transforms, especially scale
+        ctx.scale(dpr, dpr); 
+        
+        initParticles(); 
+        initCosmicDust();
+        initNebulaClouds(); 
       }
     };
 
     const handleMouseMove = (event: MouseEvent) => {
-      if (!canvas) return; const rect = canvas.getBoundingClientRect();
-      mousePosition.current = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      const scrollContainer = canvasRef.current?.parentElement?.parentElement;
+      if (!scrollContainer) return;
+      const scrollContainerRect = scrollContainer.getBoundingClientRect();
+      
+      mousePosition.current = { 
+        x: (event.clientX - scrollContainerRect.left) + scrollContainer.scrollLeft, 
+        y: (event.clientY - scrollContainerRect.top) + scrollContainer.scrollTop
+      };
     };
+
     const handleMouseLeave = () => { mousePosition.current = { x: null, y: null }; };
+
     const handleMouseDown = (event: MouseEvent) => {
-      if (!canvas) return; const rect = canvas.getBoundingClientRect();
-      const clickX = event.clientX - rect.left; const clickY = event.clientY - rect.top;
-      if (clickX >= 0 && clickX <= rect.width && clickY >= 0 && clickY <= rect.height) {
+      const scrollContainer = canvasRef.current?.parentElement?.parentElement;
+      if (!scrollContainer) return;
+      const scrollContainerRect = scrollContainer.getBoundingClientRect();
+      
+      const clickX = (event.clientX - scrollContainerRect.left) + scrollContainer.scrollLeft;
+      const clickY = (event.clientY - scrollContainerRect.top) + scrollContainer.scrollTop;
+
+      // Check click against the CSS dimensions
+      if (clickX >= 0 && clickX <= gridWidth && clickY >= 0 && clickY <= canvasCssHeightRef.current) {
         clickEffects.current.push({ x: clickX, y: clickY, strength: config.CLICK_REPEL_STRENGTH, maxRadius: config.CLICK_EFFECT_RADIUS, life: config.CLICK_EFFECT_DURATION });
       }
     };
@@ -645,31 +690,38 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize }) => {
     resizeCanvas(); 
     
     window.addEventListener('resize', resizeCanvas); 
-    window.addEventListener('mousemove', handleMouseMove); 
-    canvas.addEventListener('mouseleave', handleMouseLeave); 
-    canvas.addEventListener('mousedown', handleMouseDown); 
+    
+    const scrollContainerForEvents = canvas.parentElement?.parentElement; 
+    if (scrollContainerForEvents) {
+        scrollContainerForEvents.addEventListener('mousemove', handleMouseMove as EventListener);
+        scrollContainerForEvents.addEventListener('mousedown', handleMouseDown as EventListener);
+        scrollContainerForEvents.addEventListener('mouseleave', handleMouseLeave);
+    }
+
 
     if (!animationFrameId.current) {
-      animationFrameId.current = requestAnimationFrame(() => animate(canvas, ctx));
+      animationFrameId.current = requestAnimationFrame(() => animate(ctx));
     }
 
     return () => {
       window.removeEventListener('resize', resizeCanvas);
-      window.removeEventListener('mousemove', handleMouseMove);
-      canvas.removeEventListener('mouseleave', handleMouseLeave);
-      canvas.removeEventListener('mousedown', handleMouseDown);
+      if (scrollContainerForEvents) {
+        scrollContainerForEvents.removeEventListener('mousemove', handleMouseMove as EventListener);
+        scrollContainerForEvents.removeEventListener('mousedown', handleMouseDown as EventListener);
+        scrollContainerForEvents.removeEventListener('mouseleave', handleMouseLeave);
+      }
       if (animationFrameId.current) {
         cancelAnimationFrame(animationFrameId.current);
         animationFrameId.current = null;
       }
     };
-  }, [initParticles, initCosmicDust, initNebulaClouds, animate, config, cellSize]); 
+  }, [initParticles, initCosmicDust, initNebulaClouds, animate, config, cellSize, gridWidth]); 
 
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 w-full h-full pointer-events-auto"
-      style={{ zIndex: -1 }}
+      className="absolute inset-0 w-full h-full" 
+      style={{ zIndex: -1 }} 
     ></canvas>
   );
 };
