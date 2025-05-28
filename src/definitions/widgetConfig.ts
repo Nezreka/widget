@@ -77,7 +77,7 @@ export const WIDGET_SIZE_PRESETS: Record<WidgetSizePresetKey, WidgetSizePresetDe
   content_driven_large: { targetWidthPx: 40 * DEFAULT_CELL_SIZE, targetHeightPx: 30 * DEFAULT_CELL_SIZE, description: "Content Large" },
   full_width_short: { targetWidthPx: 30 * DEFAULT_CELL_SIZE, targetHeightPx: 8 * DEFAULT_CELL_SIZE, description: "Full Short" },
   half_width_medium: { targetWidthPx: 15 * DEFAULT_CELL_SIZE, targetHeightPx: 12 * DEFAULT_CELL_SIZE, description: "Half Medium" },
-  hub_default_size: { targetWidthPx: 25 * DEFAULT_CELL_SIZE, targetHeightPx: 25 * DEFAULT_CELL_SIZE, description: "Google Hub Size" }, // Adjusted size
+  hub_default_size: { targetWidthPx: 5 * DEFAULT_CELL_SIZE, targetHeightPx: 5 * DEFAULT_CELL_SIZE, description: "Google Hub Size" }, // Adjusted size
 };
 
 // --- Widget Types and Settings ---

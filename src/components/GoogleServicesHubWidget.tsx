@@ -29,17 +29,11 @@ export type GoogleServiceActionKey =
 
 interface GoogleServicesHubWidgetProps {
   settings?: GoogleServicesHubWidgetSettings;
-  onRequestClose?: () => void; // To be called when the widget should close itself (e.g., after selection)
+  onRequestClose?: () => void;
   onSelectService?: (serviceKey: GoogleServiceActionKey) => void;
-  // isActive prop to determine if the widget is the current "focused" widget on the dashboard
-  // This would typically be managed by the parent page/component.
-  // For this rebuild, we'll assume if the component is rendered, it's meant to be 'active'
-  // and the menu should be open. A more robust implementation would use a prop.
-  // For now, we'll use an internal state that defaults to open.
 }
 
-// --- Placeholder Icons ---
-// Using the provided icons, ensuring they are flexible with className and color
+// --- Placeholder Icons (Unchanged) ---
 const PlaceholderGmailIcon = ({ className = "w-8 h-8", color }: { className?: string; color?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill={color || "currentColor"} xmlns="http://www.w3.org/2000/svg">
     <path d="M20 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4ZM20 8L12 13L4 8V6L12 11L20 6V8Z"/>
@@ -76,55 +70,65 @@ const PlaceholderMeetIcon = ({ className = "w-8 h-8", color }: { className?: str
   </svg>
 );
 
-// --- Central Orb Component ---
-const CentralOrb = ({ onClick, isMenuOpen, colorSpectrum }: { onClick?: () => void, isMenuOpen: boolean, colorSpectrum: string[] }) => {
-  const [orbColorIndex, setOrbColorIndex] = useState(0);
+// --- Enhanced Central Orb Component ---
+const CentralOrbReimagined = ({ onClick, isMenuOpen, colorSpectrum }: { onClick?: () => void, isMenuOpen: boolean, colorSpectrum: string[] }) => {
+  const [orbColor, setOrbColor] = useState(colorSpectrum[0] || '#FFFFFF');
+  const orbColorIndexRef = useRef(0);
 
   useEffect(() => {
-    if (!isMenuOpen || colorSpectrum.length === 0) return;
+    if (!isMenuOpen || colorSpectrum.length === 0) {
+      setOrbColor(colorSpectrum[0] || '#FFFFFF');
+      return;
+    }
     const interval = setInterval(() => {
-      setOrbColorIndex(prev => (prev + 1) % colorSpectrum.length);
-    }, 2000); // Change color every 2 seconds
+      orbColorIndexRef.current = (orbColorIndexRef.current + 1) % colorSpectrum.length;
+      setOrbColor(colorSpectrum[orbColorIndexRef.current]);
+    }, 2500);
     return () => clearInterval(interval);
   }, [isMenuOpen, colorSpectrum]);
-  
-  const currentColor = colorSpectrum[orbColorIndex] || '#FFFFFF'; // Fallback color
 
   return (
     <button
       onClick={onClick}
-      className={`relative z-20 w-20 h-20 md:w-24 md:h-24 rounded-full shadow-2xl
-                  transition-all duration-500 ease-bounce
+      className={`group relative z-20 w-20 h-20 md:w-24 md:h-24 rounded-full shadow-xl
+                  transition-all duration-500 ease-out-quint
                   focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-offset-slate-950`}
       style={{ 
-        backgroundColor: currentColor,
-        boxShadow: `0 0 25px 8px ${currentColor}50, 0 0 10px 2px ${currentColor}30 inset`,
-        transform: isMenuOpen ? 'scale(1)' : 'scale(0.8)',
-        // Ring color should also transition or be tied to currentColor
-        // For simplicity, using a generic focus ring color here, but could be dynamic
-        '--tw-ring-color': `${currentColor}99` 
+        backgroundColor: 'rgba(50, 58, 71, 0.7)',
+        boxShadow: isMenuOpen 
+          ? `0 0 35px 10px ${orbColor}40, 0 0 15px 5px ${orbColor}20 inset, 0 0 60px -10px #000`
+          : `0 0 20px 5px #77779933, 0 0 8px 2px #FFFFFF1A inset`,
+        transform: isMenuOpen ? 'scale(1.05)' : 'scale(0.9)',
+        '--tw-ring-color': `${orbColor}AA`
       } as React.CSSProperties}
       aria-label={isMenuOpen ? "Close services menu" : "Open services menu"}
     >
-      <div className="absolute inset-0 animate-pulse-slow opacity-50">
-        <svg viewBox="0 0 80 80" className="w-full h-full">
-          <circle cx="40" cy="40" r="38" strokeWidth="1.5" fill="none"
-            className="stroke-current text-white/30 transition-colors duration-1000"
-          />
+      <div className={`absolute inset-0 flex items-center justify-center transition-all duration-500 ${isMenuOpen ? 'opacity-100' : 'opacity-70'}`}>
+        <span className="text-4xl md:text-5xl font-bold text-slate-100"
+              style={{ textShadow: `0 0 10px ${isMenuOpen ? orbColor : '#FFFFFF'}99, 0 0 20px ${isMenuOpen ? orbColor : '#FFFFFF'}55` }}>
+          G
+        </span>
+      </div>
+      <div className="absolute inset-0 animate-orb-pulse opacity-60">
+        <svg viewBox="0 0 100 100" className="w-full h-full">
+          <circle cx="50" cy="50" r="48" strokeWidth="1" fill="none"
+            className="stroke-current transition-colors duration-1000"
+            style={{ color: `${orbColor}55`, animationDelay: '0s' }} />
+           <circle cx="50" cy="50" r="45" strokeWidth="0.5" fill="none"
+            className="stroke-current transition-colors duration-1000"
+            style={{ color: `${orbColor}33`, animationDelay: '0.5s' }} />
         </svg>
       </div>
-      <div className="absolute inset-1 animate-slow-spin">
-         <svg viewBox="0 0 80 80" className="w-full h-full">
-          <circle cx="40" cy="40" r="30" strokeDasharray="10 15" strokeWidth="1" fill="none"
-            className="stroke-current text-white/20 transition-colors duration-1000"
-          />
+      <div className="absolute inset-0 animate-orb-spin opacity-40">
+         <svg viewBox="0 0 100 100" className="w-full h-full">
+          <circle cx="50" cy="50" r="42" strokeDasharray="5 10" strokeWidth="0.75" fill="none"
+            className="stroke-current transition-colors duration-1000"
+             style={{ color: `${orbColor}77` }} />
         </svg>
       </div>
-       <span className="text-slate-900 font-bold text-3xl mix-blend-multiply">G</span>
     </button>
   );
 };
-
 
 // --- Main GoogleServicesHubWidget Component ---
 const GoogleServicesHubWidget: React.FC<GoogleServicesHubWidgetProps> = ({
@@ -132,14 +136,15 @@ const GoogleServicesHubWidget: React.FC<GoogleServicesHubWidgetProps> = ({
   onRequestClose,
   onSelectService,
 }) => {
-  // Assume menu is open by default when widget is active/rendered
+  const [isActuallyVisible, setIsActuallyVisible] = useState(true);
   const [isMenuOpen, setIsMenuOpen] = useState(true); 
   const [isClosingWidget, setIsClosingWidget] = useState(false);
+  const [isAnimatingMenu, setIsAnimatingMenu] = useState(false);
   const [clickedServiceKey, setClickedServiceKey] = useState<GoogleServiceActionKey | null>(null);
 
   const animationSpeedSetting = settings?.animationSpeed || 'normal';
   const iconSizeSetting = settings?.iconSize || 'medium';
-  const customRadius = settings?.menuRadius; // User-defined radius
+  const customRadius = settings?.menuRadius;
 
   const widgetRef = useRef<HTMLDivElement>(null);
 
@@ -155,241 +160,347 @@ const GoogleServicesHubWidget: React.FC<GoogleServicesHubWidgetProps> = ({
 
   const colorSpectrum = useMemo(() => services.map(s => s.color), [services]);
 
-
   const getAnimationTimings = (speed: string) => {
     switch (speed) {
-      case 'fast': return { base: 250, stagger: 30, outroBase: 200, outroStagger: 25, title: 300 };
-      case 'slow': return { base: 700, stagger: 120, outroBase: 600, outroStagger: 100, title: 600 };
-      default:   return { base: 450, stagger: 65, outroBase: 350, outroStagger: 50, title: 450 };
+      case 'fast': return { base: 280, stagger: 35, outroBase: 220, outroStagger: 30, title: 300, widgetEntry: 400, cancelButton: 350 };
+      case 'slow': return { base: 750, stagger: 100, outroBase: 650, outroStagger: 80, title: 700, widgetEntry: 800, cancelButton: 700 };
+      default:   return { base: 500, stagger: 60, outroBase: 400, outroStagger: 50, title: 500, widgetEntry: 600, cancelButton: 500 };
     }
   };
   const animTimings = getAnimationTimings(animationSpeedSetting);
 
   const getIconDimensions = (sizeSetting: string) => {
     switch (sizeSetting) {
-      case 'small': return { button: 'w-14 h-14 md:w-16 md:h-16', icon: 'w-6 h-6 md:w-7 md:h-7' };
-      case 'large': return { button: 'w-20 h-20 md:w-24 md:h-24', icon: 'w-10 h-10 md:w-12 md:h-12' };
-      default:      return { button: 'w-16 h-16 md:w-20 md:h-20', icon: 'w-8 h-8 md:w-10 md:h-10' }; // medium
+      case 'small': return { button: 'w-14 h-14 md:w-16 md:h-16', icon: 'w-6 h-6 md:w-7 md:h-7', nameOffset: '-bottom-6 text-xs' };
+      case 'large': return { button: 'w-20 h-20 md:w-24 md:h-24', icon: 'w-10 h-10 md:w-12 md:h-12', nameOffset: '-bottom-9 text-sm' };
+      default:      return { button: 'w-16 h-16 md:w-20 md:h-20', icon: 'w-8 h-8 md:w-10 md:h-10', nameOffset: '-bottom-8 text-xs md:text-sm' };
     }
   };
   const iconDimensions = getIconDimensions(iconSizeSetting);
 
-  const [dynamicRadius, setDynamicRadius] = useState(120); // Default radius
+  const [dynamicRadius, setDynamicRadius] = useState(130);
 
   useEffect(() => {
     if (widgetRef.current) {
       const { offsetWidth, offsetHeight } = widgetRef.current;
       const baseVal = Math.min(offsetWidth, offsetHeight);
-      // Adjust radius: make it larger, ensure it's responsive but with a sensible min/max
-      // Target roughly 38-42% of the smaller dimension for icon orbit.
-      const newRadius = customRadius !== undefined && customRadius > 50 ? customRadius : Math.max(100, Math.min(baseVal * 0.40, 220));
+      const newRadius = customRadius !== undefined && customRadius >= 60 
+                        ? customRadius 
+                        : Math.max(110, Math.min(baseVal * 0.38, 240));
       setDynamicRadius(newRadius);
     }
-  }, [customRadius, isMenuOpen]); // Recalculate if menu opens or customRadius changes
+  }, [customRadius, isMenuOpen, iconSizeSetting]);
 
+  const commonCloseSequence = () => {
+    // This function will handle the visual closing of the widget
+    // after icons have animated out (triggered by setting isAnimatingMenu and isMenuOpen to false).
+    setIsClosingWidget(true); // Start main widget fade-out
+    setTimeout(() => {
+      if (onRequestClose) {
+        onRequestClose();
+      }
+      setIsActuallyVisible(false); // Remove from DOM
+    }, animTimings.widgetEntry);
+  };
 
   const handleServiceClick = (serviceKey: GoogleServiceActionKey) => {
-    if (isClosingWidget) return;
+    if (isAnimatingMenu || isClosingWidget || !isActuallyVisible) return;
 
     setClickedServiceKey(serviceKey);
-    setIsClosingWidget(true); // Start closing animation for all items
+    setIsAnimatingMenu(true); 
+
+    const selectedIconAnimationTime = animTimings.outroBase + 150;
+    const allIconsOutroTime = animTimings.outroBase + (services.length * animTimings.outroStagger) + 100;
 
     if (onSelectService) {
-      setTimeout(() => onSelectService(serviceKey), animTimings.outroBase * 0.5); // Select slightly before full close
+      setTimeout(() => onSelectService(serviceKey), selectedIconAnimationTime * 0.5);
     }
 
-    if (onRequestClose) {
-      const totalOutroTime = animTimings.outroBase + (services.length * animTimings.outroStagger) + 200; // Buffer
-      setTimeout(onRequestClose, totalOutroTime);
-    }
+    setTimeout(() => {
+      // At this point, icons are animating out or have animated out.
+      // isMenuOpen will effectively be false due to isAnimatingMenu and clickedServiceKey being set.
+      // Now trigger the common close sequence for the widget itself.
+      commonCloseSequence();
+    }, allIconsOutroTime * 0.7);
   };
   
+  const handleCancelSelection = () => {
+    if (isAnimatingMenu || isClosingWidget || !isActuallyVisible) return;
+
+    setIsAnimatingMenu(true); // Start icon retraction
+    setClickedServiceKey(null); // Ensure no item is treated as "selected" during retraction
+    setIsMenuOpen(false); // This, along with isAnimatingMenu, will trigger icons to retract
+
+    const iconRetractTime = animTimings.outroBase + (services.length * animTimings.outroStagger) + 100; // Time for icons to retract
+
+    setTimeout(() => {
+      // After icons have retracted
+      setIsAnimatingMenu(false); // Reset icon animation flag
+      commonCloseSequence(); // Trigger widget fade-out and removal
+    }, iconRetractTime);
+  };
+
   const toggleMenu = () => {
-    if (isClosingWidget) return;
-    // If menu is currently open and we toggle, it means we start the closing sequence for icons
-    if (isMenuOpen) {
-      setIsClosingWidget(true); // This will trigger icons to animate out
-      // After icons are out, actually set menu to closed (or trigger widget close)
-      const totalOutroTime = animTimings.outroBase + (services.length * animTimings.outroStagger);
-      setTimeout(() => {
-        setIsMenuOpen(false);
-        setIsClosingWidget(false); // Reset closing state
-         if (onRequestClose) onRequestClose(); // If toggling closed means closing widget
-      }, totalOutroTime);
-    } else {
-      setIsMenuOpen(true); // This will trigger icons to animate in
+    if (isAnimatingMenu || isClosingWidget || !isActuallyVisible) return;
+
+    setIsAnimatingMenu(true);
+    if (isMenuOpen) { 
+      setClickedServiceKey(null); 
+      const iconRetractTime = animTimings.outroBase + (services.length * animTimings.outroStagger);
+      
+      setTimeout(() => { 
+        setIsMenuOpen(false); 
+        setIsAnimatingMenu(false); 
+        // Note: Clicking the orb only closes the radial menu, not the whole widget.
+        // The new cancel button handles full widget dismissal.
+      }, iconRetractTime);
+    } else { 
+      setIsMenuOpen(true);
+      setTimeout(() => setIsAnimatingMenu(false), animTimings.base + (services.length * animTimings.stagger));
     }
   };
 
-
   const numServices = services.length;
-  const angleRange = 300; // Wider arc for more spacing
+  const angleRange = 320;
   const startAngle = -90 - (angleRange / 2); 
   const angleStep = numServices > 1 ? angleRange / (numServices - 1) : 0;
 
-  // Entry animation for the widget itself
   const [widgetHasEntered, setWidgetHasEntered] = useState(false);
   useEffect(() => {
     const entryTimer = setTimeout(() => setWidgetHasEntered(true), 50);
     return () => clearTimeout(entryTimer);
   }, []);
 
+  if (!isActuallyVisible) {
+    return null;
+  }
 
   return (
     <div
       ref={widgetRef}
-      className={`w-full h-full flex flex-col items-center justify-center bg-slate-950/95 backdrop-blur-lg text-slate-100 overflow-hidden p-4 md:p-6 relative transition-all duration-700 ease-out ${widgetHasEntered && !isClosingWidget ? 'opacity-100 scale-100' : 'opacity-0 scale-90'}`}
+      className={`fixed inset-0 w-full h-full flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-xl text-slate-100 overflow-hidden p-4 md:p-6 transition-all ease-out-quint ${widgetHasEntered && !isClosingWidget ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+      style={{transitionDuration: `${animTimings.widgetEntry}ms`}}
       aria-modal="true"
       role="dialog"
-      aria-labelledby="google-services-hub-title-reborn"
+      aria-labelledby="google-services-hub-title-reimagined"
     >
-      {/* Dynamic Background Elements */}
       <div className="absolute inset-0 -z-10 overflow-hidden">
-        {[...Array(3)].map((_, i) => (
+        {[...Array(4)].map((_, i) => (
           <div
-            key={`nebula-bg-${i}`}
-            className="absolute rounded-full animate-pulse-slow-reborn filter blur-3xl"
+            key={`nebula-bg-reimagined-${i}`}
+            className="absolute rounded-full animate-nebula-drift filter blur-3xl"
             style={{
-              width: `${40 + i * 20}%`,
-              height: `${40 + i * 20}%`,
-              left: `${10 + i * 15}%`,
-              top: `${15 + i * 10}%`,
-              backgroundColor: colorSpectrum[(i * 2) % colorSpectrum.length] || '#334155', // Use service colors
-              animationDuration: `${12 + i * 4}s`,
-              animationDelay: `${i * 1.5}s`,
-              opacity: 0.08 + (i*0.02) // Subtle opacity
-            }}
-          />
+              width: `${30 + i * 25}%`,
+              height: `${30 + i * 25}%`,
+              left: `${5 + i * 20 - Math.random()*10}%`,
+              top: `${10 + i * 15 - Math.random()*10}%`,
+              backgroundColor: colorSpectrum[(i * 2 + Math.floor(Math.random()*2)) % colorSpectrum.length] || '#334155',
+              animationDuration: `${15 + i * 5 + Math.random()*5}s`,
+              animationDelay: `${i * 1.2}s`,
+              opacity: 0.05 + (i*0.015)
+            }} />
         ))}
-        {/* Faint Grid Overlay */}
-        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" className="absolute inset-0 opacity-[0.04]">
+        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" className="absolute inset-0 opacity-[0.03]">
             <defs>
-                <pattern id="rebornGrid" width="50" height="50" patternUnits="userSpaceOnUse">
-                    <path d="M 50 0 L 0 0 0 50" fill="none" stroke="rgba(200,220,255,0.5)" strokeWidth="0.5"/>
+                <pattern id="reimaginedGrid" width="60" height="60" patternUnits="userSpaceOnUse">
+                    <path d="M 60 0 L 0 0 0 60" fill="none" stroke="rgba(180,200,255,0.4)" strokeWidth="0.3"/>
+                     <circle cx="30" cy="30" r="0.5" fill="rgba(180,200,255,0.3)" />
                 </pattern>
             </defs>
-            <rect width="100%" height="100%" fill="url(#rebornGrid)" />
+            <rect width="100%" height="100%" fill="url(#reimaginedGrid)" />
         </svg>
       </div>
 
-      {/* Title (Optional, as menu is primary) - Kept subtle if orb is main focus */}
-      <div className={`absolute top-8 md:top-12 text-center transition-all duration-500 ease-out ${isMenuOpen && !isClosingWidget ? 'opacity-70 translate-y-0' : 'opacity-0 -translate-y-5'}`} style={{transitionDelay: `${animTimings.title * 0.5}ms`}}>
-        <h2 id="google-services-hub-title-reborn" className="text-xl md:text-2xl font-semibold tracking-tight text-slate-200/80">
-          Select Service
+      <div 
+        className={`absolute top-10 md:top-16 text-center transition-all ease-out-quint`}
+        style={{
+            opacity: isMenuOpen && !isAnimatingMenu && !isClosingWidget ? 1 : 0,
+            transform: isMenuOpen && !isAnimatingMenu && !isClosingWidget ? 'translateY(0)' : 'translateY(-20px)',
+            transitionDuration: `${animTimings.title}ms`,
+            transitionDelay: `${isMenuOpen ? animTimings.base * 0.2 : 0}ms`
+        }}>
+        <h2 id="google-services-hub-title-reimagined" className="text-xl md:text-2xl font-medium tracking-wide text-slate-200/90">
+          Connect to Service
         </h2>
       </div>
       
-      {/* Central Orb & Radial Menu Items Container */}
-      <div className="relative flex items-center justify-center mt-10 md:mt-0"> {/* Added margin-top for title space */}
-        <CentralOrb onClick={toggleMenu} isMenuOpen={isMenuOpen} colorSpectrum={colorSpectrum} />
+      <div className="relative flex flex-col items-center justify-center mt-12 md:mt-8"> {/* Changed to flex-col for cancel button */}
+        <CentralOrbReimagined onClick={toggleMenu} isMenuOpen={isMenuOpen} colorSpectrum={colorSpectrum} />
 
-        {/* Service Icons */}
         {services.map((service, index) => {
           const angle = startAngle + (index * angleStep);
           const x = dynamicRadius * Math.cos(angle * Math.PI / 180);
           const y = dynamicRadius * Math.sin(angle * Math.PI / 180);
 
-          const itemVisible = isMenuOpen && !isClosingWidget;
-          const isThisClicked = clickedServiceKey === service.actionKey && isClosingWidget;
+          // Icon visibility logic:
+          // - Show if menu is open AND not animating menu (i.e., stable open state)
+          // - OR if menu is closing (isAnimatingMenu=true, isMenuOpen=false) but it's not the clicked item (clickedServiceKey is null or different)
+          // - OR if it IS the clicked item that is animating out.
+          const itemShouldBeVisibleAndOpen = isMenuOpen && !isAnimatingMenu;
+          const isThisClickedAndClosing = clickedServiceKey === service.actionKey && isAnimatingMenu && !isMenuOpen; // Specific to selected item closing
 
-          let transformStyle = 'translate(0px, 0px) scale(0.5)'; // Start from center, scaled down
+
+          let transformStyle = 'translate(0px, 0px) scale(0.3) rotate(-45deg)';
           let opacityStyle = 0;
           let transitionDelayMs = 0;
           let currentTransitionDuration = animTimings.base;
           let zIndex = 10;
+          let filterStyle = 'blur(5px)';
 
-          if (itemVisible) {
+          if (itemShouldBeVisibleAndOpen) { // Animating IN or stable open
             transformStyle = `translate(${x}px, ${y}px) scale(1) rotate(0deg)`;
             opacityStyle = 1;
+            filterStyle = 'blur(0px)';
             transitionDelayMs = index * animTimings.stagger;
-          } else if (isClosingWidget) { // If closing menu OR widget
-            if (isThisClicked) { // Clicked item animates differently
-              transformStyle = `translate(0px, 0px) scale(1.5)`; // Expand towards center
+            currentTransitionDuration = animTimings.base;
+          } else if (isAnimatingMenu && !isMenuOpen) { // Animating OUT (menu is set to closed, animation in progress)
+            if (isThisClickedAndClosing) { // Clicked item animates to center and expands/fades
+              transformStyle = `translate(0px, 0px) scale(1.8)`;
               opacityStyle = 0;
-              currentTransitionDuration = animTimings.outroBase + 100;
-              zIndex = 30; // Ensure clicked is on top
-            } else { // Non-clicked items fly back to center
-              transformStyle = 'translate(0px, 0px) scale(0) rotate(-30deg)';
+              filterStyle = 'blur(8px)';
+              currentTransitionDuration = animTimings.outroBase + 150;
+              transitionDelayMs = 0; 
+              zIndex = 30;
+            } else { // Non-clicked items or general menu retract (e.g. cancel)
+              transformStyle = 'translate(0px, 0px) scale(0.2) rotate(30deg)';
               opacityStyle = 0;
+              filterStyle = 'blur(5px)';
+              transitionDelayMs = (services.length - 1 - index) * animTimings.outroStagger * 0.6;
+              currentTransitionDuration = animTimings.outroBase;
             }
-            transitionDelayMs = (services.length - 1 - index) * animTimings.outroStagger * 0.7;
-            currentTransitionDuration = isThisClicked ? animTimings.outroBase + 100 : animTimings.outroBase * 0.8;
           }
           
           return (
             <button
               key={service.id}
+              // Ensure the button is positioned absolutely relative to the orb's container
+              // The parent div of CentralOrbReimagined and these buttons is already relative.
+              // So, these buttons will be positioned around the center of that div.
               onClick={() => handleServiceClick(service.actionKey)}
-              className={`group absolute flex flex-col items-center justify-center rounded-full shadow-2xl
+              className={`group absolute flex flex-col items-center justify-center rounded-full
                           border-2 border-transparent backdrop-blur-md
-                          transition-all ease-bounce pointer-events-auto
+                          transition-all ease-out-quint-custom pointer-events-auto
                           focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-offset-slate-950 ${iconDimensions.button}`}
               style={{
                 '--service-color': service.color,
+                '--service-glow': `${service.color}99`,
+                '--service-glow-strong': `${service.color}CC`,
                 transform: transformStyle,
                 opacity: opacityStyle,
                 zIndex: zIndex,
+                filter: filterStyle,
                 transitionDuration: `${currentTransitionDuration}ms`,
-                transitionProperty: 'transform, opacity, box-shadow, border-color, background-color',
+                transitionProperty: 'transform, opacity, box-shadow, border-color, background-color, filter',
                 transitionDelay: `${transitionDelayMs}ms`,
-                backgroundColor: `rgba(51, 65, 85, 0.6)`, // slate-700 with alpha
-                '--tw-ring-color': `${service.color}99`, // For focus ring
+                backgroundColor: `rgba(71, 85, 105, 0.5)`,
+                boxShadow: `0 0 0px 0px var(--service-glow)`,
+                '--tw-ring-color': `var(--service-glow-strong)`,
+                // Correct positioning: top-1/2 left-1/2 then translate by -50% of self, then by x,y for radial
+                // This is implicitly handled by the parent div being flex centered and items being absolute.
+                // The transform: translate(x,y) then moves it from that center.
               } as React.CSSProperties}
               onMouseEnter={(e) => { 
-                  if (isClosingWidget || !isMenuOpen) return;
-                  e.currentTarget.style.borderColor = service.color;
-                  e.currentTarget.style.boxShadow = `0 0 30px 7px ${service.color}60, 0 0 10px 1px ${service.color}40 inset`;
-                  e.currentTarget.style.transform = `translate(${x}px, ${y}px) scale(1.22)`; // More pronounced hover
+                  if (isAnimatingMenu || !isMenuOpen) return;
+                  const currentTarget = e.currentTarget as HTMLButtonElement;
+                  currentTarget.style.borderColor = `var(--service-color)`;
+                  currentTarget.style.boxShadow = `0 0 25px 5px var(--service-glow), 0 0 8px 2px var(--service-color) inset`;
+                  currentTarget.style.transform = `translate(${x}px, ${y}px) scale(1.25) rotate(5deg)`;
+                  currentTarget.style.zIndex = '20';
               }}
               onMouseLeave={(e) => { 
-                  if (isClosingWidget || !isMenuOpen) return;
-                  e.currentTarget.style.borderColor = `transparent`;
-                  e.currentTarget.style.boxShadow = `none`;
-                  e.currentTarget.style.transform = `translate(${x}px, ${y}px) scale(1)`;
+                  if (isAnimatingMenu || !isMenuOpen) return;
+                  const currentTarget = e.currentTarget as HTMLButtonElement;
+                  currentTarget.style.borderColor = `transparent`;
+                  currentTarget.style.boxShadow = `0 0 0px 0px var(--service-glow)`;
+                  currentTarget.style.transform = `translate(${x}px, ${y}px) scale(1) rotate(0deg)`;
+                  currentTarget.style.zIndex = '10';
               }}
               aria-label={`Open ${service.name}`}
-              disabled={isClosingWidget || !isMenuOpen}
-            >
-              <div className={`p-2 rounded-full transition-all duration-200 ease-out`} style={{ backgroundColor: `${service.color}33`}}>
+              disabled={isAnimatingMenu || !isMenuOpen || isClosingWidget} >
+              <div className={`p-2 rounded-full transition-all duration-200 ease-out-quint`} 
+                   style={{ backgroundColor: `${service.color}26`}}>
                 <service.icon
-                  className={`${iconDimensions.icon} transition-transform duration-200 group-hover:scale-110`}
-                  color={service.color}
-                />
+                  className={`${iconDimensions.icon} transition-transform duration-200 group-hover:scale-115`}
+                  color={service.color} />
               </div>
               <span 
-                  className={`absolute -bottom-7 text-xs font-semibold text-slate-100 p-1 px-2 bg-slate-800/80 rounded-md shadow-lg
+                  className={`absolute ${iconDimensions.nameOffset} font-medium text-slate-100/90 p-1.5 px-2.5 
+                             bg-slate-800/90 rounded-lg shadow-xl backdrop-blur-sm
                              opacity-0 group-hover:opacity-100 group-focus:opacity-100 
-                             transform translate-y-1 group-hover:translate-y-0 group-focus:translate-y-0
-                             transition-all duration-200 ease-out delay-100 pointer-events-none`}
-              >
+                             transform translate-y-2 group-hover:translate-y-0 group-focus:translate-y-0
+                             transition-all duration-250 ease-out-quint delay-150 pointer-events-none`} >
                   {service.name}
               </span>
             </button>
           );
         })}
+
+        {/* Cancel Button */}
+        <div 
+          className="absolute" // Positioned relative to the flex-col container
+          style={{ 
+            // Position it below the orb. Orb is ~h-24 (96px). Add some spacing.
+            // The parent is flex items-center justify-center.
+            // So, this div will also be centered. We want to push it down.
+            // Using top and transform to position it relative to the center.
+            top: 'calc(50% + 60px)', // 50% (center) + half orb height (48px) + spacing (12px)
+            left: '50%',
+            transform: 'translateX(-50%)',
+            transition: `opacity ${animTimings.cancelButton}ms ease-out-quint, transform ${animTimings.cancelButton}ms ease-out-quint`,
+            opacity: isMenuOpen && !isAnimatingMenu && !isClosingWidget ? 1 : 0,
+            pointerEvents: isMenuOpen && !isAnimatingMenu && !isClosingWidget ? 'auto' : 'none',
+            // Delay appearance slightly after icons
+            transitionDelay: isMenuOpen && !isAnimatingMenu && !isClosingWidget ? `${animTimings.stagger * services.length * 0.5}ms` : '0ms', 
+        }}>
+          <button
+            onClick={handleCancelSelection}
+            className={`px-5 py-2.5 rounded-lg bg-slate-700/60 hover:bg-slate-600/80 backdrop-blur-sm
+                        text-slate-300 hover:text-slate-100 font-medium shadow-lg
+                        transition-all duration-200 ease-out-quint
+                        focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 focus:ring-offset-slate-950`}
+            aria-label="Cancel selection and close"
+            disabled={isAnimatingMenu || isClosingWidget || !isMenuOpen}
+          >
+            Cancel
+          </button>
+        </div>
       </div>
 
-      <style jsx global>{`
-        @keyframes pulse-slow-reborn {
-          0%, 100% { transform: scale(0.95) rotate(0deg); opacity: var(--start-opacity, 0.08); }
-          50% { transform: scale(1.05) rotate(7deg); opacity: var(--end-opacity, 0.12); }
-        }
-        .animate-pulse-slow-reborn {
-          animation: pulse-slow-reborn infinite ease-in-out alternate;
-        }
-        .ease-bounce { transition-timing-function: cubic-bezier(0.68, -0.6, 0.32, 1.6); } /* Bouncy effect */
 
-        @keyframes slow-spin { /* For CentralOrb inner rings */
+      <style jsx global>{`
+        .ease-out-quint { transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1); }
+        .ease-in-out-sine { transition-timing-function: cubic-bezier(0.445, 0.05, 0.55, 0.95); }
+        .ease-out-quint-custom { transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
+
+        @keyframes nebula-drift {
+          0% { transform: scale(0.95) translate(0px, 0px) rotate(0deg); opacity: var(--start-opacity, 0.05); }
+          50% { transform: scale(1.05) translate(15px, -10px) rotate(5deg); opacity: var(--end-opacity, 0.08); }
+          100% { transform: scale(0.95) translate(0px, 0px) rotate(0deg); opacity: var(--start-opacity, 0.05); }
+        }
+        .animate-nebula-drift { animation: nebula-drift infinite ease-in-out alternate; }
+
+        @keyframes orb-pulse {
+            0%, 100% { transform: scale(1); opacity: 0.6; }
+            50% { transform: scale(1.08); opacity: 0.9; }
+        }
+        .animate-orb-pulse { animation: orb-pulse 3s infinite ease-in-out-sine; }
+        
+        @keyframes orb-spin {
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
         }
-        .animate-slow-spin { animation: slow-spin 30s linear infinite; }
+        .animate-orb-spin { animation: orb-spin 40s linear infinite; }
+
+        *:focus-visible {
+          outline: 2px solid var(--tw-ring-color, #38bdf8) !important;
+          outline-offset: 2px !important;
+        }
       `}</style>
     </div>
   );
 };
 
-// --- Settings Panel ---
+// --- Settings Panel (Largely Unchanged) ---
 export const GoogleServicesHubSettingsPanel: React.FC<{
   widgetId: string;
   currentSettings: GoogleServicesHubWidgetSettings | undefined;
@@ -397,73 +508,73 @@ export const GoogleServicesHubSettingsPanel: React.FC<{
 }> = ({ currentSettings, onSave }) => {
   const [animationSpeed, setAnimationSpeed] = useState(currentSettings?.animationSpeed || 'normal');
   const [iconSize, setIconSize] = useState(currentSettings?.iconSize || 'medium');
-  const [menuRadius, setMenuRadius] = useState(currentSettings?.menuRadius || 120); // Default example
+  const [menuRadius, setMenuRadius] = useState(currentSettings?.menuRadius || 130);
 
   const handleSave = () => {
     onSave({ 
         animationSpeed: animationSpeed as 'slow' | 'normal' | 'fast',
         iconSize: iconSize as 'small' | 'medium' | 'large',
-        menuRadius: Number(menuRadius) >= 50 ? Number(menuRadius) : undefined // Only save if valid
+        menuRadius: Number(menuRadius) >= 60 ? Number(menuRadius) : undefined
     });
   };
   
   return (
-    <div className="space-y-6 text-primary p-1">
+    <div className="space-y-6 p-4 bg-slate-800 text-slate-200 rounded-lg shadow-2xl">
       <div>
-        <h3 className="text-lg font-medium text-primary mb-2">Radial Hub Customization</h3>
-        <p className="text-sm text-secondary mb-4">
-          Refine the appearance and behavior of the services menu.
+        <h3 className="text-xl font-semibold text-slate-100 mb-1">Hub Customization</h3>
+        <p className="text-sm text-slate-400 mb-4">
+          Fine-tune the reimagined services menu.
         </p>
       </div>
       <div>
-        <label htmlFor="hub-animation-speed" className="block text-sm font-medium text-secondary mb-1">
+        <label htmlFor="hub-animation-speed-reimagined" className="block text-sm font-medium text-slate-300 mb-1">
           Animation Speed:
         </label>
         <select
-          id="hub-animation-speed"
+          id="hub-animation-speed-reimagined"
           value={animationSpeed}
           onChange={(e) => setAnimationSpeed(e.target.value as 'slow' | 'normal' | 'fast')}
-          className="mt-1 block w-full px-3 py-2 bg-widget border border-border-interactive rounded-md shadow-sm focus:outline-none focus:ring-accent-primary focus:border-accent-primary sm:text-sm text-primary"
+          className="mt-1 block w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-slate-100"
         >
-          <option value="slow">Graceful (Slow)</option>
-          <option value="normal">Balanced (Normal)</option>
-          <option value="fast">Swift (Fast)</option>
+          <option value="slow">Cinematic (Slow)</option>
+          <option value="normal">Dynamic (Normal)</option>
+          <option value="fast">Hyper (Fast)</option>
         </select>
       </div>
       <div>
-        <label htmlFor="hub-icon-size" className="block text-sm font-medium text-secondary mb-1">
+        <label htmlFor="hub-icon-size-reimagined" className="block text-sm font-medium text-slate-300 mb-1">
           Icon Size:
         </label>
         <select
-          id="hub-icon-size"
+          id="hub-icon-size-reimagined"
           value={iconSize}
           onChange={(e) => setIconSize(e.target.value as 'small' | 'medium' | 'large')}
-          className="mt-1 block w-full px-3 py-2 bg-widget border border-border-interactive rounded-md shadow-sm focus:outline-none focus:ring-accent-primary focus:border-accent-primary sm:text-sm text-primary"
+          className="mt-1 block w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-slate-100"
         >
           <option value="small">Compact</option>
-          <option value="medium">Standard (Default)</option>
+          <option value="medium">Standard</option>
           <option value="large">Prominent</option>
         </select>
       </div>
       <div>
-        <label htmlFor="hub-menu-radius" className="block text-sm font-medium text-secondary mb-1">
-          Menu Radius (px, min 50):
+        <label htmlFor="hub-menu-radius-reimagined" className="block text-sm font-medium text-slate-300 mb-1">
+          Menu Radius (px, min 60):
         </label>
         <input
           type="number"
-          id="hub-menu-radius"
-          min="50" max="300" step="10"
+          id="hub-menu-radius-reimagined"
+          min="60" max="300" step="10"
           value={menuRadius}
           onChange={(e) => setMenuRadius(parseInt(e.target.value, 10))}
-          className="mt-1 block w-full px-3 py-2 bg-widget border border-border-interactive rounded-md shadow-sm focus:outline-none focus:ring-accent-primary focus:border-accent-primary sm:text-sm text-primary"
+          className="mt-1 block w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-slate-100"
         />
-         <p className="text-xs text-secondary mt-1">Adjusts the spread of the service icons. Effective range ~100-220px.</p>
+         <p className="text-xs text-slate-400 mt-1">Adjusts icon spread. Recommended: 110-240px.</p>
       </div>
        <button
         onClick={handleSave}
-        className="mt-8 w-full px-4 py-2.5 bg-accent-primary text-on-accent font-semibold rounded-lg hover:bg-accent-primary-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent-primary focus:ring-offset-dark-surface transition-colors duration-150 ease-in-out"
+        className="mt-8 w-full px-4 py-2.5 bg-sky-600 text-white font-semibold rounded-lg hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 focus:ring-offset-slate-800 transition-colors duration-150 ease-in-out"
       >
-        Apply Hub Settings
+        Apply Settings
       </button>
     </div>
   );
