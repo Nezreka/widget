@@ -28,6 +28,12 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+        port: '',
+        pathname: '/**', // Allows any path under this hostname
+      },
       // You can add other trusted hostnames here if needed
       // For example, if you also load images from 'source.unsplash.com':
       // {

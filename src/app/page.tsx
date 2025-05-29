@@ -908,7 +908,7 @@ export default function Home() {
         length: history.current.length,
       });
     },
-    []
+    [] // Removed actualGridPixelWidth as it's not used inside this callback
   );
 
   useEffect(() => {
@@ -3930,7 +3930,7 @@ export default function Home() {
         return (
           <GoogleCalendarWidget
             settings={currentWidgetSettings as GoogleCalendarWidgetSettings | undefined}
-            instanceId={widgetConfig.id}
+            // instanceId={widgetConfig.id} // Removed instanceId as it's not expected by GoogleCalendarWidgetProps
           />
         );
       default:
