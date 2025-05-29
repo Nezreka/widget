@@ -614,10 +614,32 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize, gridWidth }) 
       p.vx = lerp(p.vx, p.originalVx, config.PARTICLE_RETURN_LERP_AMOUNT);
       p.vy = lerp(p.vy, p.originalVy, config.PARTICLE_RETURN_LERP_AMOUNT);
 
-      p.x += p.vx; p.y += p.vy;
+      p.x += p.vx; 
+      p.y += p.vy;
       
-      if (p.x + p.currentRadius > currentCssWidth || p.x - p.currentRadius < 0) { p.vx *= -1; p.x = Math.max(p.currentRadius, Math.min(p.x, currentCssWidth - p.currentRadius)); }
-      if (p.y + p.currentRadius > currentCssHeight || p.y - p.currentRadius < 0) { p.vy *= -1; p.y = Math.max(p.currentRadius, Math.min(p.y, currentCssHeight - p.currentRadius)); }
+      // --- MODIFIED BOUNDARY COLLISION LOGIC ---
+      // Horizontal collision and bounce
+      if (p.x + p.currentRadius > currentCssWidth) { // Hit right wall
+        p.vx *= -1; // Reverse current velocity
+        p.originalVx *= -1; // Reverse original velocity component for ricochet
+        p.x = currentCssWidth - p.currentRadius; // Clamp position to prevent sticking
+      } else if (p.x - p.currentRadius < 0) { // Hit left wall
+        p.vx *= -1; // Reverse current velocity
+        p.originalVx *= -1; // Reverse original velocity component for ricochet
+        p.x = p.currentRadius; // Clamp position
+      }
+
+      // Vertical collision and bounce
+      if (p.y + p.currentRadius > currentCssHeight) { // Hit bottom wall
+        p.vy *= -1; // Reverse current velocity
+        p.originalVy *= -1; // Reverse original velocity component for ricochet
+        p.y = currentCssHeight - p.currentRadius; // Clamp position
+      } else if (p.y - p.currentRadius < 0) { // Hit top wall
+        p.vy *= -1; // Reverse current velocity
+        p.originalVy *= -1; // Reverse original velocity component for ricochet
+        p.y = p.currentRadius; // Clamp position
+      }
+      // --- END OF MODIFIED BOUNDARY COLLISION LOGIC ---
       
       p.pulseAngle = (p.pulseAngle + p.pulseSpeed) % TWO_PI;
       const pulseF = (Math.sin(p.pulseAngle) + 1) / 2;
