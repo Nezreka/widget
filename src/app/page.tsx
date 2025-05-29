@@ -62,12 +62,15 @@ import GeminiChatWidget, {
   GeminiChatSettingsPanel,
   type GeminiChatWidgetSettings,
 } from "@/components/GeminiChatWidget";
-// Import the new GoogleServicesHubWidget and its settings panel
 import GoogleServicesHubWidget, {
   GoogleServicesHubSettingsPanel,
   type GoogleServicesHubWidgetSettings,
   type GoogleServiceActionKey,
 } from "@/components/GoogleServicesHubWidget";
+import GoogleCalendarWidget, { // Added Google Calendar Widget
+  GoogleCalendarSettingsPanel, // Added Google Calendar Settings Panel
+  type GoogleCalendarWidgetSettings,
+} from "@/components/GoogleCalendarWidget";
 
 import AddWidgetContextMenu, {
   mapBlueprintToContextMenuItem,
@@ -82,7 +85,6 @@ import {
   AddIcon,
   AutoSortIcon,
   DensityIcon,
-  // AI Command Bar Icons
   AiIcon,
   MicIcon,
   MicOffIcon,
@@ -98,8 +100,8 @@ import {
   PHOTO_WIDGET_DEFAULT_INSTANCE_SETTINGS,
   PORTFOLIO_WIDGET_DEFAULT_INSTANCE_SETTINGS,
   GEMINI_CHAT_WIDGET_DEFAULT_INSTANCE_SETTINGS,
-  // Import the new default settings for the hub
   GOOGLE_SERVICES_HUB_DEFAULT_INSTANCE_SETTINGS,
+  GOOGLE_CALENDAR_DEFAULT_INSTANCE_SETTINGS, // Added Google Calendar default settings
   type WidgetSizePresetKey,
   type AllWidgetSettings,
   type WidgetType,
@@ -107,11 +109,10 @@ import {
   type PageInstanceNotesSettings,
 } from "@/definitions/widgetConfig";
 
-// AI Command Integration
 import {
   type ParsedAiCommand,
   AI_COMMAND_SCHEMA,
-  getGeminiSystemPrompt as getBaseGeminiSystemPrompt, // Renamed original to avoid conflict
+  getGeminiSystemPrompt as getBaseGeminiSystemPrompt,
   type AddWidgetAiCommand,
   type DeleteWidgetAiCommand,
   type MoveWidgetAiCommand,
@@ -184,13 +185,9 @@ interface SpeechRecognition extends EventTarget {
   interimResults: boolean;
   maxAlternatives: number;
   serviceURI?: string;
-
-  // Methods
   abort(): void;
   start(): void;
-  stop(): void; // Add this line
-
-  // Event handlers
+  stop(): void;
   onaudiostart: ((this: SpeechRecognition, ev: Event) => void) | null;
   onaudioend: ((this: SpeechRecognition, ev: Event) => void) | null;
   onend: ((this: SpeechRecognition, ev: Event) => void) | null;
@@ -208,8 +205,6 @@ interface SpeechRecognition extends EventTarget {
   onspeechstart: ((this: SpeechRecognition, ev: Event) => void) | null;
   onspeechend: ((this: SpeechRecognition, ev: Event) => void) | null;
   onstart: ((this: SpeechRecognition, ev: Event) => void) | null;
-
-  // Event listener methods
   addEventListener<K extends keyof SpeechRecognitionEventMap>(
     type: K,
     listener: (
@@ -271,15 +266,15 @@ const CELL_SIZE_OPTIONS = [
 ];
 
 const MAX_HISTORY_LENGTH = 50;
-const MINIMIZED_WIDGET_ROW_SPAN = 2; // Standard height for minimized widgets
-const DASHBOARD_LAYOUT_STORAGE_KEY = "dashboardLayoutV3.23_AI_GoogleHub_Scroll"; // Updated version
+const MINIMIZED_WIDGET_ROW_SPAN = 2;
+const DASHBOARD_LAYOUT_STORAGE_KEY = "dashboardLayoutV3.23_AI_GoogleHub_Scroll";
 const GLOBAL_NOTES_STORAGE_KEY = "dashboardGlobalNotesCollection_v1";
 const GLOBAL_TODOS_STORAGE_KEY = "dashboardGlobalSingleTodoList_v1";
 const GLOBAL_PHOTO_HISTORY_STORAGE_KEY = "dashboardGlobalPhotoHistory_v1";
 const DATA_SAVE_DEBOUNCE_MS = 700;
 const WIDGET_DESELECT_TIMEOUT_MS = 5000;
-const MOBILE_BREAKPOINT_PX = 768; // Mobile breakpoint
-const SMOOTH_SCROLL_DURATION_MS = 1000; // For widget centering
+const MOBILE_BREAKPOINT_PX = 768;
+const SMOOTH_SCROLL_DURATION_MS = 1000;
 
 const DEFAULT_WIDGET_CONTAINER_SETTINGS: WidgetContainerSettings = {
   alwaysShowTitleBar: false,
@@ -325,7 +320,7 @@ const initialMobileWidgetLayout: Omit<
     containerSettings: {
       ...DEFAULT_WIDGET_CONTAINER_SETTINGS,
       innerPadding: "p-0",
-    }, // Ensure no padding for mobile full screen
+    },
   },
 ];
 
@@ -408,6 +403,20 @@ const ensureGoogleServicesHubInstanceSettings = (
   };
 };
 
+const ensureGoogleCalendarInstanceSettings = ( // Added for Google Calendar
+  settings: AllWidgetSettings | undefined
+): GoogleCalendarWidgetSettings => {
+  const calendarInstanceDefaults = GOOGLE_CALENDAR_DEFAULT_INSTANCE_SETTINGS;
+  const currentCalendarSettings = settings as GoogleCalendarWidgetSettings | undefined;
+  return {
+    viewMode: currentCalendarSettings?.viewMode || calendarInstanceDefaults.viewMode,
+    showWeekends: typeof currentCalendarSettings?.showWeekends === 'boolean'
+      ? currentCalendarSettings.showWeekends
+      : calendarInstanceDefaults.showWeekends,
+  };
+};
+
+
 const processWidgetConfig = (
   widgetData: Partial<PageWidgetConfig>,
   currentCellSize: number,
@@ -452,7 +461,6 @@ const processWidgetConfig = (
   }
 
   let colSpan, rowSpan;
-  // Ensure containerSettings is initialized
   const finalContainerSettings: WidgetContainerSettings = {
     ...DEFAULT_WIDGET_CONTAINER_SETTINGS,
     ...(widgetData.containerSettings || {}),
@@ -466,7 +474,7 @@ const processWidgetConfig = (
   ) {
     colSpan = Math.max(blueprint.minColSpan, containerColsForMobile);
     rowSpan = Math.max(blueprint.minRowSpan, containerRowsForMobile);
-    finalContainerSettings.innerPadding = "p-0"; // Ensure no padding for full screen mobile portfolio
+    finalContainerSettings.innerPadding = "p-0";
   } else if (
     widgetData.colSpan !== undefined &&
     widgetData.rowSpan !== undefined
@@ -492,6 +500,8 @@ const processWidgetConfig = (
     ...(blueprint.defaultSettings || {}),
     ...(widgetData.settings || {}),
   };
+
+  // Ensure specific widget settings are correctly typed and defaulted
   if (widgetData.type === "photo")
     finalContentSettings = ensurePhotoWidgetInstanceSettings(
       finalContentSettings as PhotoWidgetSettings
@@ -504,15 +514,17 @@ const processWidgetConfig = (
     finalContentSettings = ensureGeminiChatWidgetInstanceSettings(
       finalContentSettings as GeminiChatWidgetSettings
     );
-  else if (widgetData.type === "googleServicesHub")
+  else if (widgetData.type === "googleServicesHub") {
     finalContentSettings = ensureGoogleServicesHubInstanceSettings(
       finalContentSettings as GoogleServicesHubWidgetSettings
     );
-
-  if (widgetData.type === "googleServicesHub") {
-    // Ensure Google Hub also has no padding if needed
-    finalContainerSettings.innerPadding = "p-0";
+    finalContainerSettings.innerPadding = "p-0"; // Hub specific container setting
+  } else if (widgetData.type === "googleCalendar") { // Added for Google Calendar
+    finalContentSettings = ensureGoogleCalendarInstanceSettings(
+      finalContentSettings as GoogleCalendarWidgetSettings
+    );
   }
+
 
   return {
     id: widgetData.id || `${blueprint.type}-${Date.now()}`,
@@ -539,7 +551,7 @@ interface StoredDashboardLayout {
   sharedGlobalTodos?: TodoItem[];
   sharedGlobalPhotoHistory?: HistoricImage[];
   isMobileLayout?: boolean;
-  actualGridPixelWidth?: number; // Added for scrollable grid
+  actualGridPixelWidth?: number;
 }
 
 const getGeminiSystemPrompt = (widgets: PageWidgetConfig[]): string => {
@@ -616,7 +628,6 @@ const getGeminiSystemPrompt = (widgets: PageWidgetConfig[]): string => {
   return promptLines.join("\n");
 };
 
-// Helper function for smooth scrolling with duration
 const smoothScrollTo = (
   element: HTMLElement,
   to: number,
@@ -630,7 +641,6 @@ const smoothScrollTo = (
   const animateScroll = (currentTime: number) => {
     const elapsedTime = currentTime - startTime;
     const progress = Math.min(elapsedTime / duration, 1);
-    // Cubic ease-out: starts fast, decelerates
     const easedProgress = 1 - Math.pow(1 - progress, 3);
 
     if (axis === "left") {
@@ -652,7 +662,7 @@ export default function Home() {
   const [widgetContainerCols, setWidgetContainerCols] = useState(0);
   const [widgetContainerRows, setWidgetContainerRows] = useState(0);
   const [activeWidgetId, setActiveWidgetId] = useState<string | null>(null);
-  const [actualGridPixelWidth, setActualGridPixelWidth] = useState(0); // For dynamic grid width
+  const [actualGridPixelWidth, setActualGridPixelWidth] = useState(0);
 
   const initialLayoutIsDefaultRef = useRef(false);
   const initialCenteringDoneRef = useRef(false);
@@ -667,7 +677,6 @@ export default function Home() {
   const [aiError, setAiError] = useState<string | null>(null);
   const speechRecognitionRef = useRef<SpeechRecognition | null>(null);
 
-  // Corrected useEffect for mobile view detection
   useEffect(() => {
     const checkMobile = () => {
       const newIsMobileView = window.innerWidth < MOBILE_BREAKPOINT_PX;
@@ -679,14 +688,14 @@ export default function Home() {
       });
     };
 
-    checkMobile(); // Initial check
+    checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
-  }, [setIsMobileView]); // Dependency array includes setIsMobileView (stable identity)
+  }, [setIsMobileView]);
 
   useEffect(() => {
     let loadedCellSize = DEFAULT_CELL_SIZE;
-    let loadedWidgetsConfig: Partial<PageWidgetConfig>[] | null = null; // Store as partial first
+    let loadedWidgetsConfig: Partial<PageWidgetConfig>[] | null = null;
     let wasMobileLayoutSaved = false;
     let loadedGridPixelWidth: number | undefined = undefined;
 
@@ -724,7 +733,6 @@ export default function Home() {
               wasMobileLayoutSaved = savedData.isMobileLayout || false;
               loadedGridPixelWidth = savedData.actualGridPixelWidth;
 
-              // Only assign if the view mode matches or if we intend to adapt it later
               if (Array.isArray(savedData.widgets)) {
                 loadedWidgetsConfig = savedData.widgets;
               }
@@ -748,7 +756,7 @@ export default function Home() {
     setCellSize(loadedCellSize);
 
     if (isMobileView) {
-      setActualGridPixelWidth(window.innerWidth); // Crucial: Set mobile width first
+      setActualGridPixelWidth(window.innerWidth);
       const mobileCols = Math.max(
         1,
         Math.floor(window.innerWidth / loadedCellSize)
@@ -763,7 +771,7 @@ export default function Home() {
       const mobileTargetRows =
         mobileRowsAvailable > 1 ? mobileRowsAvailable - 1 : 1;
 
-      const portfolioBlueprint = initialMobileWidgetLayout[0]; // Base definition
+      const portfolioBlueprint = initialMobileWidgetLayout[0];
       let portfolioConfigToSet: Partial<PageWidgetConfig> = portfolioBlueprint;
 
       if (loadedWidgetsConfig && wasMobileLayoutSaved) {
@@ -774,27 +782,24 @@ export default function Home() {
           portfolioConfigToSet = savedPortfolio;
         }
       }
-      // Ensure it's correctly positioned and sized for mobile
       portfolioConfigToSet = {
-        ...portfolioConfigToSet, // Spread existing settings, id, title
+        ...portfolioConfigToSet,
         colStart: 1,
         rowStart: 1,
-        // colSpan and rowSpan will be set by processWidgetConfig
       };
 
       setWidgets([
         processWidgetConfig(
           portfolioConfigToSet,
           loadedCellSize,
-          true, // isMobileTarget
-          mobileCols, // containerColsForMobile
-          mobileTargetRows // containerRowsForMobile
+          true,
+          mobileCols,
+          mobileTargetRows
         ),
       ]);
       initialLayoutIsDefaultRef.current =
         !loadedWidgetsConfig || !wasMobileLayoutSaved;
     } else {
-      // Desktop View
       setActualGridPixelWidth(loadedGridPixelWidth || window.innerWidth);
       if (loadedWidgetsConfig && !wasMobileLayoutSaved) {
         setWidgets(
@@ -804,7 +809,6 @@ export default function Home() {
         );
         initialLayoutIsDefaultRef.current = false;
       } else {
-        // Desktop default or adapting from mobile save
         setWidgets(
           initialDesktopWidgetsLayout.map((w) =>
             processWidgetConfig(w, loadedCellSize, false)
@@ -813,9 +817,9 @@ export default function Home() {
         initialLayoutIsDefaultRef.current = true;
       }
     }
-    initialCenteringDoneRef.current = isMobileView; // No centering for mobile full screen
+    initialCenteringDoneRef.current = isMobileView;
     setIsLayoutEngineReady(true);
-  }, [isMobileView]); // This effect runs when isMobileView changes, setting up the base layout.
+  }, [isMobileView]);
 
   const [sharedNotes, setSharedNotes] = useState<Note[]>([]);
   const [activeSharedNoteId, setActiveSharedNoteId] = useState<string | null>(
@@ -835,8 +839,8 @@ export default function Home() {
   const isPerformingUndoRedo = useRef(false);
   const headerRef = useRef<HTMLElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const dashboardAreaRef = useRef<HTMLDivElement>(null); // Will be the scroll container
-  const gridWrapperRef = useRef<HTMLDivElement>(null); // Wraps the actual grid for width control
+  const dashboardAreaRef = useRef<HTMLDivElement>(null);
+  const gridWrapperRef = useRef<HTMLDivElement>(null);
   const densityMenuRef = useRef<HTMLDivElement>(null);
 
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -934,7 +938,7 @@ export default function Home() {
           widgets: widgets,
           cellSize: cellSize,
           isMobileLayout: isMobileView,
-          actualGridPixelWidth: actualGridPixelWidth, // Save the grid width
+          actualGridPixelWidth: actualGridPixelWidth,
         };
         window.localStorage.setItem(
           DASHBOARD_LAYOUT_STORAGE_KEY,
@@ -1234,9 +1238,8 @@ export default function Home() {
     };
   }, [isAddWidgetMenuOpen, isDensityMenuOpen]);
 
-  // This useEffect is crucial for managing grid dimensions and mobile layout enforcement.
   useEffect(() => {
-    if (!isLayoutEngineReady) return; // Don't run until initial layout is processed
+    if (!isLayoutEngineReady) return;
 
     const determineSizesAndLayout = () => {
       const screenWidth = window.innerWidth;
@@ -1252,14 +1255,13 @@ export default function Home() {
       const desiredRows = Math.max(1, Math.floor(contentH / cellSize));
 
       if (isMobileView) {
-        desiredGridPxWidth = screenWidth; // Mobile: grid width is screen width
+        desiredGridPxWidth = screenWidth;
         desiredCols = Math.max(1, Math.floor(desiredGridPxWidth / cellSize));
-        const targetMobileRows = desiredRows > 1 ? desiredRows - 1 : 1; // Or desiredRows for full height
+        const targetMobileRows = desiredRows > 1 ? desiredRows - 1 : 1;
 
-        const portfolioBlueprint = initialMobileWidgetLayout[0]; // Base definition
+        const portfolioBlueprint = initialMobileWidgetLayout[0];
         const currentPortfolio = widgets.find((w) => w.type === "portfolio");
 
-        // Check if the current widgets state matches the desired mobile portfolio state
         const isCorrectMobileState =
           widgets.length === 1 &&
           currentPortfolio &&
@@ -1272,7 +1274,6 @@ export default function Home() {
         if (!isCorrectMobileState) {
           const mobilePortfolioConfig = processWidgetConfig(
             {
-              // Base config, preserving ID/title/settings if a portfolio already exists
               id:
                 currentPortfolio?.id ||
                 portfolioBlueprint.id ||
@@ -1281,19 +1282,17 @@ export default function Home() {
               type: portfolioBlueprint.type,
               settings:
                 currentPortfolio?.settings || portfolioBlueprint.settings,
-              colStart: 1, // Will be forced by processWidgetConfig for mobile target
-              rowStart: 1, // Will be forced by processWidgetConfig for mobile target
+              colStart: 1,
+              rowStart: 1,
             },
             cellSize,
-            true, // isMobileTarget
-            desiredCols, // containerColsForMobile
-            targetMobileRows // containerRowsForMobile
+            true,
+            desiredCols,
+            targetMobileRows
           );
-          setWidgets([mobilePortfolioConfig]); // This will re-trigger this effect.
-          // The isCorrectMobileState check will prevent an infinite loop.
+          setWidgets([mobilePortfolioConfig]);
         }
       } else {
-        // Desktop View
         let maxColOccupied = 0;
         widgets.forEach((w) => {
           maxColOccupied = Math.max(maxColOccupied, w.colStart + w.colSpan - 1);
@@ -1303,7 +1302,6 @@ export default function Home() {
         desiredCols = Math.max(1, Math.floor(desiredGridPxWidth / cellSize));
       }
 
-      // Only update states if they have actually changed
       if (actualGridPixelWidth !== desiredGridPxWidth) {
         setActualGridPixelWidth(desiredGridPxWidth);
       }
@@ -1316,22 +1314,17 @@ export default function Home() {
     };
 
     determineSizesAndLayout();
-    // No need for timeout here, direct calculation is better.
-    // Resize listener will trigger this effect again due to state changes or direct call.
     window.addEventListener("resize", determineSizesAndLayout);
     return () => window.removeEventListener("resize", determineSizesAndLayout);
   }, [
     isMobileView,
     cellSize,
     showAiCommandBar,
-    widgets, // Critical: if widgets change, re-evaluate
+    widgets,
     isLayoutEngineReady,
-    actualGridPixelWidth, // Added to dependencies to react to its changes
-    widgetContainerCols, // Added to dependencies
-    widgetContainerRows, // Added to dependencies
-    // Note: Adding actualGridPixelWidth, widgetContainerCols, widgetContainerRows here means if they are set
-    // by another effect or handler, this effect will re-run and ensure consistency.
-    // The conditional updates inside `determineSizesAndLayout` are key to preventing infinite loops.
+    actualGridPixelWidth,
+    widgetContainerCols,
+    widgetContainerRows,
   ]);
 
   useEffect(() => {
@@ -1359,7 +1352,7 @@ export default function Home() {
         sharedGlobalTodos: sharedTodos,
         sharedGlobalPhotoHistory: sharedPhotoHistory,
         isMobileLayout: isMobileView,
-        actualGridPixelWidth: actualGridPixelWidth, // Export current grid width
+        actualGridPixelWidth: actualGridPixelWidth,
       };
       const jsonString = JSON.stringify(layoutToExport, null, 2);
       const blob = new Blob([jsonString], { type: "application/json" });
@@ -1497,13 +1490,12 @@ export default function Home() {
             const checkWidget = {
               ...widget,
               colSpan: Math.max(widget.colSpan, widget.minColSpan),
-              // Use the actual rowSpan for checking, which might be minimized
               rowSpan: Math.max(widget.rowSpan, widget.minRowSpan),
             };
             if (
               canPlaceWidget(checkWidget, c, r, newLayout, newCols, newRows)
             ) {
-              newLayout.push({ ...widget, colStart: c, rowStart: r }); // Place with its current rowSpan
+              newLayout.push({ ...widget, colStart: c, rowStart: r });
               placed = true;
               break;
             }
@@ -1536,7 +1528,7 @@ export default function Home() {
         const parsedJson = JSON.parse(text);
 
         let finalWidgetsToSet: PageWidgetConfig[];
-        let finalCellSize = cellSize; // Default to current
+        let finalCellSize = cellSize;
         let notesToSet = sharedNotes;
         let activeNoteIdToSet = activeSharedNoteId;
         let todosToSet = sharedTodos;
@@ -1564,7 +1556,6 @@ export default function Home() {
             if (validOption) finalCellSize = validOption.value;
           }
 
-          // Determine target cols/rows based on imported cell size and current/imported view mode
           const targetScreenWidth = isMobileView
             ? window.innerWidth
             : importedGridPixelWidth;
@@ -1583,7 +1574,6 @@ export default function Home() {
             tempRowsAvailable > 1 ? tempRowsAvailable - 1 : 1;
 
           if (isMobileView) {
-            // Current view is mobile
             alertMessage = `Imported layout. Adapting to mobile view. Global data imported.`;
             const portfolioBlueprint = initialMobileWidgetLayout[0];
             let portfolioDataToUse: Partial<PageWidgetConfig> =
@@ -1603,19 +1593,15 @@ export default function Home() {
                 tempMobileTargetRows
               ),
             ];
-            importedGridPixelWidth = window.innerWidth; // Force to current screen for mobile
+            importedGridPixelWidth = window.innerWidth;
           } else {
-            // Current view is desktop
             if (importedIsMobileLayout) {
-              // Importing a mobile layout to desktop
               alertMessage = `Imported mobile layout. Adapting to desktop view with default widgets. Global data imported.`;
               finalWidgetsToSet = initialDesktopWidgetsLayout.map((w) =>
                 processWidgetConfig(w, finalCellSize, false)
               );
-              // Use current window.innerWidth for desktop if adapting from mobile
               importedGridPixelWidth = window.innerWidth;
             } else {
-              // Importing a desktop layout to desktop
               finalWidgetsToSet = (modernData.widgets || []).map((w) =>
                 processWidgetConfig(
                   w as Partial<PageWidgetConfig>,
@@ -1636,15 +1622,14 @@ export default function Home() {
           if (modernData.sharedGlobalPhotoHistory)
             photoHistoryToSet = modernData.sharedGlobalPhotoHistory;
         } else if (Array.isArray(parsedJson)) {
-          // Legacy format
           alertMessage =
             "Dashboard layout (legacy format) imported. Adapting to current view. Global data and settings will use defaults or existing data.";
-          const tempCurrentCellSize = cellSize; // Use current cell size for legacy
-          importedGridPixelWidth = window.innerWidth; // Reset for legacy
+          const tempCurrentCellSize = cellSize;
+          importedGridPixelWidth = window.innerWidth;
 
           const processedLegacy = (
             parsedJson as Partial<PageWidgetConfig>[]
-          ).map((w) => processWidgetConfig(w, tempCurrentCellSize, false)); // Process as desktop first
+          ).map((w) => processWidgetConfig(w, tempCurrentCellSize, false));
 
           if (isMobileView) {
             const mobileColsForSort = Math.max(
@@ -1692,7 +1677,6 @@ export default function Home() {
                 desktopRowsForSort
               ) || processedLegacy;
           }
-          // For legacy, cellSize remains the current cellSize.
           finalCellSize = tempCurrentCellSize;
         } else {
           throw new Error(
@@ -1702,15 +1686,9 @@ export default function Home() {
 
         alert(alertMessage);
 
-        // Apply changes
-        // Order matters: cellSize, then actualGridPixelWidth, then widgets
-        // This allows subsequent effects (like determineSizesAndLayout) to use the correct values.
-        setCellSize(finalCellSize); // This will trigger determineSizesAndLayout
-        setActualGridPixelWidth(importedGridPixelWidth); // This might also trigger it or be used by it
-
-        // Set widgets last, as determineSizesAndLayout might adjust them further based on new cell/grid size
+        setCellSize(finalCellSize);
+        setActualGridPixelWidth(importedGridPixelWidth);
         setWidgets(finalWidgetsToSet);
-
         setSharedNotes(notesToSet);
         setActiveSharedNoteId(activeNoteIdToSet);
         setSharedTodos(todosToSet);
@@ -1726,7 +1704,7 @@ export default function Home() {
         });
 
         initialLayoutIsDefaultRef.current = false;
-        initialCenteringDoneRef.current = true; // Assume centering is done or not applicable
+        initialCenteringDoneRef.current = true;
       } catch (err: unknown) {
         let message = "Invalid file content.";
         if (err instanceof Error) {
@@ -1788,13 +1766,12 @@ export default function Home() {
   const attemptPlaceWidgetWithShrinking = useCallback(
     (
       currentWidgetsImmutable: PageWidgetConfig[],
-      newWidgetConfig: PageWidgetConfig // This is the widget to be added
+      newWidgetConfig: PageWidgetConfig
     ): PageWidgetConfig[] | null => {
       if (widgetContainerCols === 0 || widgetContainerRows === 0) return null;
 
       const tempWidgetsLayout = currentWidgetsImmutable.map((w) => ({ ...w }));
 
-      // Attempt to sort with the new widget first (using its potentially minimized rowSpan)
       const sortedWithNew = performAutoSortWithGivenGrid(
         [...tempWidgetsLayout, { ...newWidgetConfig }],
         widgetContainerCols,
@@ -1804,15 +1781,13 @@ export default function Home() {
         return sortedWithNew;
       }
 
-      // If that fails, try shrinking existing widgets
       const shrinkableWidgets = tempWidgetsLayout
         .filter((w) => w.colSpan > w.minColSpan || w.rowSpan > w.minRowSpan)
-        .sort((a, b) => b.colSpan * b.rowSpan - a.colSpan * a.rowSpan); // Prioritize shrinking larger widgets
+        .sort((a, b) => b.colSpan * b.rowSpan - a.colSpan * a.rowSpan);
 
       for (const existingWidget of shrinkableWidgets) {
         const originalColSpan = existingWidget.colSpan;
 
-        // Try shrinking column span
         if (existingWidget.colSpan > existingWidget.minColSpan) {
           const widgetsWithShrunkCol = tempWidgetsLayout.map((w) =>
             w.id === existingWidget.id
@@ -1829,7 +1804,6 @@ export default function Home() {
           }
         }
 
-        // Reset column span and try shrinking row span (if col shrink didn't work)
         if (existingWidget.rowSpan > existingWidget.minRowSpan) {
           const widgetsWithShrunkRow = tempWidgetsLayout.map((w) =>
             w.id === existingWidget.id
@@ -1850,7 +1824,7 @@ export default function Home() {
           }
         }
       }
-      return null; // Failed to place even after attempting to shrink others
+      return null;
     },
     [widgetContainerCols, widgetContainerRows, performAutoSortWithGivenGrid]
   );
@@ -1858,7 +1832,7 @@ export default function Home() {
   const findNextAvailablePosition = useCallback(
     (
       targetColSpan: number,
-      targetRowSpan: number, // This should be the actual rowSpan (minimized if necessary)
+      targetRowSpan: number,
       currentLayout: PageWidgetConfig[]
     ): { colStart: number; rowStart: number } | null => {
       if (widgetContainerCols === 0 || widgetContainerRows === 0) return null;
@@ -1954,9 +1928,8 @@ export default function Home() {
         isMobileView
       );
       const finalColSpan = newWidgetConfigProcessed.colSpan;
-      let finalRowSpan = newWidgetConfigProcessed.rowSpan; // This is the intended full rowSpan
+      let finalRowSpan = newWidgetConfigProcessed.rowSpan;
 
-      // Check for vertical space and minimize if necessary
       if (widgetContainerRows > 0 && finalRowSpan > widgetContainerRows) {
         console.log(
           `[handleAddNewWidget] Widget ${newWidgetConfigProcessed.title} (rowSpan: ${finalRowSpan}) is taller than grid (rows: ${widgetContainerRows}). Adding as minimized.`
@@ -1964,10 +1937,10 @@ export default function Home() {
         newWidgetConfigProcessed = {
           ...newWidgetConfigProcessed,
           isMinimized: true,
-          originalRowSpan: finalRowSpan, // Store the original intended span
-          rowSpan: MINIMIZED_WIDGET_ROW_SPAN, // Set to minimized span
+          originalRowSpan: finalRowSpan,
+          rowSpan: MINIMIZED_WIDGET_ROW_SPAN,
         };
-        finalRowSpan = MINIMIZED_WIDGET_ROW_SPAN; // Update finalRowSpan to use for placement
+        finalRowSpan = MINIMIZED_WIDGET_ROW_SPAN;
       }
 
       let finalLayout: PageWidgetConfig[] | null = null;
@@ -1975,7 +1948,6 @@ export default function Home() {
 
       let positionFound = false;
       if (newColStart && newRowStart) {
-        // Use finalColSpan and the (potentially minimized) finalRowSpan for placement check
         if (
           canPlaceWidget(
             {
@@ -2003,7 +1975,6 @@ export default function Home() {
       }
 
       if (!positionFound) {
-        // Use finalColSpan and the (potentially minimized) finalRowSpan for finding position
         const initialPosition = findNextAvailablePosition(
           finalColSpan,
           finalRowSpan,
@@ -2021,7 +1992,6 @@ export default function Home() {
             },
           ];
         } else {
-          // The newWidgetConfigProcessed already has the correct (potentially minimized) rowSpan here
           const attemptLayout = [
             ...currentWidgetsCopy,
             {
@@ -2060,7 +2030,6 @@ export default function Home() {
             `[handleAddNewWidget] Initial placement failed. Attempting sort with expanded cols: ${finalTargetSortCols} (current: ${widgetContainerCols}, requiredIfSingleRow: ${requiredColsIfSingleRow}, currentActualWidthImplies: ${currentColsBasedOnActualWidth})`
           );
 
-          // performAutoSortWithGivenGrid will use the rowSpan from newWidgetConfigProcessed (which is minimized if needed)
           const tempSortedLayout = performAutoSortWithGivenGrid(
             attemptLayout,
             finalTargetSortCols,
@@ -2093,7 +2062,6 @@ export default function Home() {
             console.log(
               `[handleAddNewWidget] Sort with expansion to ${finalTargetSortCols} cols failed. Attempting shrinking.`
             );
-            // attemptPlaceWidgetWithShrinking will also use the (potentially minimized) rowSpan from newWidgetConfigProcessed
             finalLayout = attemptPlaceWidgetWithShrinking(currentWidgetsCopy, {
               ...newWidgetConfigProcessed,
               colSpan: finalColSpan,
@@ -2188,7 +2156,6 @@ export default function Home() {
       let isMinimizedDueToPreset = false;
       let originalRowSpanForPreset: number | undefined = undefined;
 
-      // Check if the new preset size is too tall for the grid
       if (widgetContainerRows > 0 && newRowSpan > widgetContainerRows) {
         console.log(
           `[handleApplyWidgetSizePreset] Preset ${presetKey} for ${targetWidget.title} (rowSpan: ${newRowSpan}) is taller than grid (rows: ${widgetContainerRows}). Applying as minimized.`
@@ -2201,13 +2168,12 @@ export default function Home() {
       const updatedWidgetConfig = {
         ...targetWidget,
         colSpan: newColSpan,
-        rowSpan: newRowSpan, // This is now potentially the minimized rowSpan
-        isMinimized: isMinimizedDueToPreset || targetWidget.isMinimized, // Preserve existing minimized unless overridden by preset logic
+        rowSpan: newRowSpan,
+        isMinimized: isMinimizedDueToPreset || targetWidget.isMinimized,
         originalRowSpan: isMinimizedDueToPreset
           ? originalRowSpanForPreset
           : targetWidget.originalRowSpan,
       };
-      // If it was minimized by preset, ensure isMinimized is true. If it was already minimized, keep it that way.
       if (isMinimizedDueToPreset) {
         updatedWidgetConfig.isMinimized = true;
       }
@@ -2361,14 +2327,14 @@ export default function Home() {
           newRowSpan = tempNewRowsForMobile > 1 ? tempNewRowsForMobile - 1 : 1;
           newColStart = 1;
           newRowStart = 1;
-          newIsMinimized = false; // Mobile portfolio should not be minimized by density change
+          newIsMinimized = false;
           newOriginalRowSpan = undefined;
         } else {
           const currentPixelWidth = w.colSpan * oldCellSize;
           const currentPixelHeight =
             (w.isMinimized && w.originalRowSpan
               ? w.originalRowSpan
-              : w.rowSpan) * oldCellSize; // Use original if minimized for scaling intent
+              : w.rowSpan) * oldCellSize;
           const currentPixelX = (w.colStart - 1) * oldCellSize;
           const currentPixelY = (w.rowStart - 1) * oldCellSize;
 
@@ -2389,7 +2355,6 @@ export default function Home() {
             Math.round(currentPixelY / newCellSize) + 1
           );
 
-          // Check if the newly scaled widget (if it were full size) is too tall for the new grid height
           const tempNewGridRows = Math.max(
             1,
             Math.floor(
@@ -2406,9 +2371,8 @@ export default function Home() {
           } else {
             newRowSpan = intendedNewRowSpan;
             if (w.isMinimized) {
-              // If it was minimized before, keep it minimized unless logic above changed it
               newIsMinimized = true;
-              newOriginalRowSpan = intendedNewRowSpan; // Update original span to new scaled full span
+              newOriginalRowSpan = intendedNewRowSpan;
               newRowSpan = MINIMIZED_WIDGET_ROW_SPAN;
             } else {
               newIsMinimized = false;
@@ -2471,8 +2435,6 @@ export default function Home() {
           }
         });
       } else {
-        // For mobile, scaledWidgets should contain the correctly sized portfolio.
-        // The main useEffect for determineSizesAndLayout will also run and ensure this.
         setWidgets(scaledWidgets);
         updateWidgetsAndPushToHistory(
           scaledWidgets,
@@ -2880,8 +2842,6 @@ export default function Home() {
   const handleCloseContextMenu = () => {
     setIsAddWidgetContextMenuOpen(false);
   };
-
-  // --- AI Integration Functions ---
 
   const startListening = () => {
     if (
@@ -3755,17 +3715,60 @@ export default function Home() {
     }
   };
 
-  // --- End AI Integration Functions ---
-
   const handleGoogleServiceSelect = (
-    widgetId: string,
+    hubWidgetId: string,
     serviceKey: GoogleServiceActionKey
   ) => {
-    console.log(`Google service selected from hub ${widgetId}: ${serviceKey}`);
-    handleWidgetMinimizeToggle(widgetId);
-    alert(
-      `Selected ${serviceKey}. This would open the ${serviceKey} widget and close the hub. (Functionality to open specific widget not yet implemented)`
-    );
+    console.log(`Google service selected from hub ${hubWidgetId}: ${serviceKey}`);
+    const hubWidget = widgets.find(w => w.id === hubWidgetId);
+
+    if (serviceKey === 'calendar') {
+      if (hubWidget) {
+        // Option A: Delete Hub, Add Calendar at Hub's position
+        const hubColStart = hubWidget.colStart;
+        const hubRowStart = hubWidget.rowStart;
+        
+        // Delete the Hub widget first
+        // This is tricky because setWidgets is async.
+        // We need to ensure deletion happens before addition or placement logic might conflict.
+        setWidgets(prevWidgets => {
+            const widgetsAfterDelete = prevWidgets.filter(w => w.id !== hubWidgetId);
+            updateWidgetsAndPushToHistory(widgetsAfterDelete, `internal_delete_hub_for_${serviceKey}`);
+            
+            // Now, in the same state update, trigger the addition of the new widget.
+            // This requires handleAddNewWidget to be callable in a way that it uses this new state.
+            // For simplicity here, we'll call handleAddNewWidget *after* this state update.
+            // This might cause a quick re-render, but is safer.
+            // A more complex solution would involve passing a callback to setWidgets or using a layout queue.
+            
+            // Schedule the addition of the new widget
+            // Use a microtask to ensure it runs after the current state update cycle
+            Promise.resolve().then(() => {
+                handleAddNewWidget('googleCalendar', 'Google Calendar', hubColStart, hubRowStart);
+            });
+
+            return widgetsAfterDelete;
+        });
+        
+        // Close the Hub widget UI immediately (visual effect)
+        // The actual removal from 'widgets' state is handled above.
+        // If GoogleServicesHubWidget has an internal way to close itself, call that.
+        // For now, we assume deleting it from `widgets` is enough.
+
+      } else {
+        // Fallback if hubWidget is not found (should not happen)
+        handleAddNewWidget('googleCalendar', 'Google Calendar');
+      }
+      setAiLastFeedback(`Opening Google Calendar...`);
+    } else {
+      // Handle other Google services similarly
+      alert(
+        `Selected ${serviceKey}. This would open the ${serviceKey} widget. (Functionality for other services not yet implemented)`
+      );
+       if (hubWidget) {
+         handleWidgetMinimizeToggle(hubWidgetId); // Or delete if that's the desired UX for all services
+       }
+    }
   };
 
   const handleWheelScroll = (event: React.WheelEvent<HTMLDivElement>) => {
@@ -3917,10 +3920,17 @@ export default function Home() {
                 | GoogleServicesHubWidgetSettings
                 | undefined
             }
-            onRequestClose={() => handleWidgetMinimizeToggle(widgetConfig.id)}
+            onRequestClose={() => handleWidgetDelete(widgetConfig.id)} // Changed to delete for now
             onSelectService={(serviceKey) =>
               handleGoogleServiceSelect(widgetConfig.id, serviceKey)
             }
+          />
+        );
+      case "googleCalendar": // Added case for Google Calendar
+        return (
+          <GoogleCalendarWidget
+            settings={currentWidgetSettings as GoogleCalendarWidgetSettings | undefined}
+            instanceId={widgetConfig.id}
           />
         );
       default:
@@ -4104,6 +4114,14 @@ export default function Home() {
             onSave={boundSaveInstanceContentSettings}
           />
         );
+      case "googleCalendar": // Added case for Google Calendar Settings
+        return (
+          <GoogleCalendarSettingsPanel
+            widgetId={widgetConfig.id}
+            currentSettings={currentContentSettings as GoogleCalendarWidgetSettings | undefined}
+            onSave={boundSaveInstanceContentSettings}
+          />
+        );
       default:
         return (
           <p className="text-sm text-secondary">
@@ -4209,7 +4227,7 @@ export default function Home() {
                         disabled={!!maximizedWidgetId}
                       >
                         {" "}
-                        {widgetDef.icon && <widgetDef.icon />}{" "}
+                        {widgetDef.icon && <widgetDef.icon className="mr-2 w-4 h-4" />}{" "}
                         <span className="flex-grow">
                           {widgetDef.displayName ||
                             widgetDef.defaultTitle.replace("New ", "")}
@@ -4458,6 +4476,8 @@ export default function Home() {
                   }
                   isDraggable={!isMobileView}
                   isResizable={!isMobileView}
+                  isLocked={widgetConfig.type === 'googleServicesHub'} // Lock the hub
+                  disableHeader={widgetConfig.type === 'googleServicesHub'} // Disable header for hub
                 >
                   {renderWidgetContent(widgetConfig)}
                 </Widget>
@@ -4593,7 +4613,6 @@ export default function Home() {
   );
 }
 
-// Styles
 const styles = `
   .control-button { display:flex; align-items:center; justify-content:center; padding:0.5rem; background-color:var(--dark-accent-primary); border-radius:0.375rem; color:var(--dark-text-on-accent); transition:background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out; box-shadow:0 1px 2px 0 rgba(0,0,0,0.05); }
   .control-button:hover { background-color:var(--dark-accent-primary-hover); box-shadow:0 2px 4px 0 rgba(0,0,0,0.1); }

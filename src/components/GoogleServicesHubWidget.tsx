@@ -24,8 +24,6 @@ export type GoogleServiceActionKey =
   | 'keep'
   | 'calendar'
   | 'maps'
-  | 'drive'
-  | 'meet';
 
 interface GoogleServicesHubWidgetProps {
   settings?: GoogleServicesHubWidgetSettings;
@@ -59,16 +57,7 @@ const PlaceholderMapsIcon = ({ className = "w-8 h-8", color }: { className?: str
     <path d="M12 2C8.13 2 5 5.13 5 9C0 16.25 12 22 12 22C12 22 19 16.25 19 9C19 5.13 15.87 2 12 2ZM12 11.5C10.62 11.5 9.5 10.38 9.5 9C9.5 7.62 10.62 6.5 12 6.5C13.38 6.5 14.5 7.62 14.5 9C14.5 10.38 13.38 11.5 12 11.5Z"/>
   </svg>
 );
-const PlaceholderDriveIcon = ({ className = "w-8 h-8", color }: { className?: string; color?: string }) => (
-  <svg viewBox="0 0 24 24" className={className} fill={color || "currentColor"} xmlns="http://www.w3.org/2000/svg">
-    <path d="M7.71 3.5L1.5 15L7.44 15L12.03 6.51L7.71 3.5ZM8.56 15.5H15.43L19.5 8.5L12.37 8.5L8.56 15.5ZM16.29 3.5L11.97 6.51L16.56 15L22.5 15L16.29 3.5Z"/>
-  </svg>
-);
-const PlaceholderMeetIcon = ({ className = "w-8 h-8", color }: { className?: string; color?: string }) => (
-  <svg viewBox="0 0 24 24" className={className} fill={color || "currentColor"} xmlns="http://www.w3.org/2000/svg">
-    <path d="M17 10.5V7C17 6.45 16.55 6 16 6H4C3.45 6 3 6.45 3 7V17C3 17.55 3.45 18 4 18H16C16.55 18 17 17.55 17 17V13.5L21 17.5V6.5L17 10.5ZM14 13H11V10H9V13H6V15H9V18H11V15H14V13Z"/>
-  </svg>
-);
+
 
 // --- Enhanced Central Orb Component ---
 const CentralOrbReimagined = ({ onClick, isMenuOpen, colorSpectrum }: { onClick?: () => void, isMenuOpen: boolean, colorSpectrum: string[] }) => {
@@ -154,8 +143,8 @@ const GoogleServicesHubWidget: React.FC<GoogleServicesHubWidgetProps> = ({
     { id: 'keep', name: 'Keep', icon: PlaceholderKeepIcon, color: '#F4B400', actionKey: 'keep' },
     { id: 'calendar', name: 'Calendar', icon: PlaceholderCalendarIcon, color: '#34A853', actionKey: 'calendar' },
     { id: 'maps', name: 'Maps', icon: PlaceholderMapsIcon, color: '#4285F4', actionKey: 'maps' },
-    { id: 'drive', name: 'Drive', icon: PlaceholderDriveIcon, color: '#1AA260', actionKey: 'drive' },
-    { id: 'meet', name: 'Meet', icon: PlaceholderMeetIcon, color: '#00897B', actionKey: 'meet' },
+  
+   
   ], []);
 
   const colorSpectrum = useMemo(() => services.map(s => s.color), [services]);

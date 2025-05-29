@@ -9,8 +9,8 @@ import {
     WeatherIcon, ClockIcon, CalculatorIcon, TodoIcon, NotesIcon, YoutubeIcon,
     MinesweeperIcon, UnitConverterIcon, CountdownStopwatchIcon, PhotoIcon,
     PortfolioIcon, GeminiChatIcon,
-    // Import the new GoogleServicesHubIcon
     GoogleServicesHubIcon,
+    PlaceholderCalendarIcon, // Added for Google Calendar
 } from '@/components/Icons';
 
 
@@ -219,7 +219,6 @@ const AddWidgetContextMenu: React.FC<AddWidgetContextMenuProps> = ({
               <div className="relative z-10 flex items-center w-full">
                 {IconComponent && (
                   <div className="mr-3 p-1.5 bg-slate-700/50 dark:bg-slate-800/60 rounded-md shadow-sm group-hover:bg-sky-500/20 dark:group-hover:bg-sky-400/25 transition-all duration-200 group-hover:scale-105">
-                    {/* Pass a default className if the icon component expects it */}
                     <IconComponent className="w-5 h-5" />
                   </div>
                 )}
@@ -312,6 +311,7 @@ export const mapBlueprintToContextMenuItem = (blueprint: WidgetBlueprintFromConf
     iconComponent = blueprint.icon;
   } else {
     // Fallback logic if blueprint.icon is not directly provided (less ideal)
+    // This switch statement is a secondary fallback. Ideally, widgetConfig.ts provides the icon.
     switch (blueprint.type) {
       case 'weather': iconComponent = WeatherIcon; break;
       case 'clock': iconComponent = ClockIcon; break;
@@ -325,8 +325,9 @@ export const mapBlueprintToContextMenuItem = (blueprint: WidgetBlueprintFromConf
       case 'photo': iconComponent = PhotoIcon; break;
       case 'portfolio': iconComponent = PortfolioIcon; break;
       case 'geminiChat': iconComponent = GeminiChatIcon; break;
-      case 'googleServicesHub': iconComponent = GoogleServicesHubIcon; break; // Added new hub
-      default: iconComponent = undefined;
+      case 'googleServicesHub': iconComponent = GoogleServicesHubIcon; break;
+      case 'googleCalendar': iconComponent = PlaceholderCalendarIcon; break; // Added Google Calendar
+      default: iconComponent = undefined; // Or a generic icon
     }
   }
   return {
