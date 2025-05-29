@@ -10,8 +10,8 @@ interface Particle {
   radius: number;
   vx: number;
   vy: number;
-  originalVx: number; // Added to store initial velocity
-  originalVy: number; // Added to store initial velocity
+  originalVx: number;
+  originalVy: number;
   hueOffset: number;
   baseColorS: number;
   baseColorL: number;
@@ -34,6 +34,7 @@ interface ClickEffect {
   strength: number;
   maxRadius: number;
   life: number;
+  type: 'repel' | 'attract'; // Added type for click effect
 }
 
 // Interface for cosmic dust particles
@@ -77,6 +78,22 @@ interface NebulaCloud {
   luminosityPulseSpeed: number;
   luminosityPulseAmplitude: number;
   timeOffsetLuminosity: number;
+}
+
+// Interface for Stardust Trail particles (New)
+interface StardustParticle {
+  id: number;
+  x: number;
+  y: number;
+  radius: number;
+  vx: number;
+  vy: number;
+  life: number;
+  initialLife: number;
+  hueOffset: number;
+  baseAlpha: number;
+  saturation: number;
+  lightness: number;
 }
 
 
@@ -155,12 +172,14 @@ const getHarmonizedHsla = (
 
 const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize, gridWidth }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const canvasCssHeightRef = useRef<number>(0); // Stores CSS height of the canvas
+  const canvasCssHeightRef = useRef<number>(0);
   const particlesArray = useRef<Particle[]>([]);
   const cosmicDustParticles = useRef<CosmicDustParticle[]>([]);
   const nebulaClouds = useRef<NebulaCloud[]>([]);
   const mousePosition = useRef<{ x: number | null; y: number | null }>({ x: null, y: null });
   const clickEffects = useRef<ClickEffect[]>([]);
+  const stardustParticles = useRef<StardustParticle[]>([]); // New: For stardust trails
+  const stardustIdCounter = useRef(0); // New: For unique stardust IDs
   const animationFrameId = useRef<number | null>(null);
   
   const masterHue = useRef(260);
@@ -185,16 +204,18 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize, gridWidth }) 
       CONNECT_DISTANCE_SQUARED: initialConnectDistance * initialConnectDistance,
       PARTICLE_BASE_SPEED_MIN: 0.07,
       PARTICLE_BASE_SPEED_MAX: 0.22,
-      PARTICLE_RETURN_LERP_AMOUNT: 0.05, // How quickly particles return to original speed
+      PARTICLE_RETURN_LERP_AMOUNT: 0.05,
       MIN_RADIUS: 0.5,
       MAX_RADIUS: 1.7,
       HIGHLIGHT_FADE_SPEED: 0.07,
       CONNECTION_RADIUS_BONUS: 0.07,
       MAX_CONNECTION_BONUS_RADIUS: 1.2,
       MASTER_HUE_CYCLE_SPEED: 0.010,
-      CLICK_REPEL_STRENGTH: 45, 
+      CLICK_REPEL_STRENGTH: 45,
+      CLICK_ATTRACT_STRENGTH: 35, // New: Strength for attraction
       CLICK_EFFECT_RADIUS: 210,
       CLICK_EFFECT_DURATION: 32,
+      MIN_CLICK_INTERACTION_DISTANCE: 5, // New: Minimum distance for click force calculation
       MOUSE_RADIUS_MULTIPLIER: 1.65,
       RADIUS_LERP_SPEED: 0.11,
       
@@ -220,45 +241,39 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize, gridWidth }) 
 
       NEBULA_CLOUD_COUNT: isFirefox ? 0 : 5,
       NEBULA_COMPOSITE_OPERATION: 'lighter',
-
-      NEBULA_MAX_SIZE_FACTOR_W: 0.9,
-      NEBULA_MIN_SIZE_FACTOR_W: 0.5,
-      NEBULA_MAX_SIZE_FACTOR_H: 0.7,
-      NEBULA_MIN_SIZE_FACTOR_H: 0.3,
-      NEBULA_BASE_SATURATION_MIN: 60,
-      NEBULA_BASE_SATURATION_MAX: 85,
-      NEBULA_LUMINOSITY_INNER_MIN: 5, 
-      NEBULA_LUMINOSITY_INNER_MAX: 12,
-      NEBULA_LUMINOSITY_OUTER_MIN: 1,
-      NEBULA_LUMINOSITY_OUTER_MAX: 5,
-      NEBULA_BASE_OPACITY_MIN: 0.10,   
-      NEBULA_BASE_OPACITY_MAX: 0.30,
-      NEBULA_HUE_OFFSET_RANGE: 60,    
-      NEBULA_WARM_HUE_CHANCE: 0.25,   
-      NEBULA_WARM_HUE_PRIMARY: 15,    
-      NEBULA_WARM_HUE_SECONDARY: 340,  
+      NEBULA_MAX_SIZE_FACTOR_W: 0.9, NEBULA_MIN_SIZE_FACTOR_W: 0.5,
+      NEBULA_MAX_SIZE_FACTOR_H: 0.7, NEBULA_MIN_SIZE_FACTOR_H: 0.3,
+      NEBULA_BASE_SATURATION_MIN: 60, NEBULA_BASE_SATURATION_MAX: 85,
+      NEBULA_LUMINOSITY_INNER_MIN: 5, NEBULA_LUMINOSITY_INNER_MAX: 12,
+      NEBULA_LUMINOSITY_OUTER_MIN: 1, NEBULA_LUMINOSITY_OUTER_MAX: 5,
+      NEBULA_BASE_OPACITY_MIN: 0.10, NEBULA_BASE_OPACITY_MAX: 0.30,
+      NEBULA_HUE_OFFSET_RANGE: 60, NEBULA_WARM_HUE_CHANCE: 0.25,
+      NEBULA_WARM_HUE_PRIMARY: 15, NEBULA_WARM_HUE_SECONDARY: 340,
       NEBULA_DRIFT_SPEED_MAX: 0.00025,
-      NEBULA_PULSE_SPEED_SIZE: 0.0007,
-      NEBULA_PULSE_AMPLITUDE_SIZE: 0.12, 
-      NEBULA_PULSE_SPEED_OPACITY: 0.0009,
-      NEBULA_PULSE_AMPLITUDE_OPACITY: 0.35,
+      NEBULA_PULSE_SPEED_SIZE: 0.0007, NEBULA_PULSE_AMPLITUDE_SIZE: 0.12,
+      NEBULA_PULSE_SPEED_OPACITY: 0.0009, NEBULA_PULSE_AMPLITUDE_OPACITY: 0.35,
       NEBULA_ELLIPSE_ROTATION_MAX: Math.PI / 4,
+      NEBULA_HUE_OSCILLATION_SPEED_MIN: 0.0005, NEBULA_HUE_OSCILLATION_SPEED_MAX: 0.002,
+      NEBULA_HUE_OSCILLATION_AMPLITUDE_MIN: 5, NEBULA_HUE_OSCILLATION_AMPLITUDE_MAX: 25,
+      NEBULA_LUMINOSITY_PULSE_SPEED_MIN: 0.0006, NEBULA_LUMINOSITY_PULSE_SPEED_MAX: 0.0025,
+      NEBULA_LUMINOSITY_PULSE_AMPLITUDE_MIN: 0.1, NEBULA_LUMINOSITY_PULSE_AMPLITUDE_MAX: 0.4,
 
-      NEBULA_HUE_OSCILLATION_SPEED_MIN: 0.0005,
-      NEBULA_HUE_OSCILLATION_SPEED_MAX: 0.002,
-      NEBULA_HUE_OSCILLATION_AMPLITUDE_MIN: 5,
-      NEBULA_HUE_OSCILLATION_AMPLITUDE_MAX: 25,
-      NEBULA_LUMINOSITY_PULSE_SPEED_MIN: 0.0006,
-      NEBULA_LUMINOSITY_PULSE_SPEED_MAX: 0.0025,
-      NEBULA_LUMINOSITY_PULSE_AMPLITUDE_MIN: 0.1,
-      NEBULA_LUMINOSITY_PULSE_AMPLITUDE_MAX: 0.4,
-
-      GRID_NEBULA_X_FREQ: 0.013,
-      GRID_NEBULA_Y_FREQ: 0.013,
-      GRID_NEBULA_TIME_FREQ: 0.18,
-      GRID_NEBULA_INTENSITY: 0.6,
+      GRID_NEBULA_X_FREQ: 0.013, GRID_NEBULA_Y_FREQ: 0.013,
+      GRID_NEBULA_TIME_FREQ: 0.18, GRID_NEBULA_INTENSITY: 0.6,
       
       BASE_BACKGROUND_COLOR: 'hsla(0, 0%, 2%, 1)',
+
+      // New: Stardust Configuration
+      STARDUST_PARTICLE_COUNT_ON_MOVE: 2,
+      STARDUST_LIFESPAN: 60, // In frames
+      STARDUST_MAX_RADIUS: 0.8,
+      STARDUST_MIN_RADIUS: 0.2,
+      STARDUST_BASE_ALPHA: 0.9,
+      STARDUST_HUE_SPREAD: 40,
+      STARDUST_SATURATION: 70,
+      STARDUST_LIGHTNESS: 75,
+      STARDUST_SPEED_FACTOR_MIN: 0.1,
+      STARDUST_SPEED_FACTOR_MAX: 0.5,
     };
   });
 
@@ -310,7 +325,7 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize, gridWidth }) 
 
   const initParticles = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas || canvasCssHeightRef.current === 0) return; // Ensure CSS height is known
+    if (!canvas || canvasCssHeightRef.current === 0) return;
 
     particlesArray.current = [];
     const [, baseS, baseL, baseA] = parseHsla(config.PARTICLE_BASE_COLOR_STR);
@@ -322,13 +337,11 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize, gridWidth }) 
       const initialVx = (Math.random() - 0.5) * config.PARTICLE_BASE_SPEED_MAX * 2;
       const initialVy = (Math.random() - 0.5) * config.PARTICLE_BASE_SPEED_MAX * 2;
       particlesArray.current.push({
-        x: Math.random() * gridWidth, // Use CSS width
-        y: Math.random() * currentCssHeight, // Use CSS height
+        x: Math.random() * gridWidth, 
+        y: Math.random() * currentCssHeight,
         radius, 
-        vx: initialVx,
-        vy: initialVy,
-        originalVx: initialVx, // Store original velocity
-        originalVy: initialVy, // Store original velocity
+        vx: initialVx, vy: initialVy,
+        originalVx: initialVx, originalVy: initialVy,
         hueOffset: (Math.random() * 60) - 30,
         baseColorS: baseS, baseColorL: baseL, baseColorA: baseA,
         highlightColorL: highlightL, highlightColorA: highlightA, highlightIntensity: 0,
@@ -338,7 +351,8 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize, gridWidth }) 
         connectionCount: 0, targetRadius: radius, currentRadius: radius,
       });
     }
-  }, [config, gridWidth]); // Depend on gridWidth
+    stardustParticles.current = []; // Clear stardust on re-init
+  }, [config, gridWidth]); 
 
   const initCosmicDust = useCallback(() => {
     const canvas = canvasRef.current;
@@ -349,8 +363,8 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize, gridWidth }) 
     for (let i = 0; i < config.COSMIC_DUST_COUNT; i++) {
       cosmicDustParticles.current.push({
         id: i,
-        x: Math.random() * gridWidth, // Use CSS width
-        y: Math.random() * currentCssHeight, // Use CSS height
+        x: Math.random() * gridWidth, 
+        y: Math.random() * currentCssHeight,
         radius: Math.random() * (config.COSMIC_DUST_MAX_SIZE - config.COSMIC_DUST_MIN_SIZE) + config.COSMIC_DUST_MIN_SIZE,
         vx: (Math.random() - 0.5) * config.COSMIC_DUST_SPEED_FACTOR,
         vy: (Math.random() - 0.5) * config.COSMIC_DUST_SPEED_FACTOR,
@@ -376,8 +390,8 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize, gridWidth }) 
 
       nebulaClouds.current.push({
         id: i,
-        x: gridWidth * (0.25 + Math.random() * 0.5), // Use CSS width
-        y: currentCssHeight * (0.25 + Math.random() * 0.5), // Use CSS height
+        x: gridWidth * (0.25 + Math.random() * 0.5),
+        y: currentCssHeight * (0.25 + Math.random() * 0.5),
         radiusX: gridWidth * (Math.random() * (config.NEBULA_MAX_SIZE_FACTOR_W - config.NEBULA_MIN_SIZE_FACTOR_W) + config.NEBULA_MIN_SIZE_FACTOR_W),
         radiusY: currentCssHeight * (Math.random() * (config.NEBULA_MAX_SIZE_FACTOR_H - config.NEBULA_MIN_SIZE_FACTOR_H) + config.NEBULA_MIN_SIZE_FACTOR_H),
         angle: Math.random() * config.NEBULA_ELLIPSE_ROTATION_MAX * (Math.random() < 0.5 ? 1 : -1),
@@ -390,12 +404,10 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize, gridWidth }) 
         driftYFactor: (Math.random() - 0.5) * 2 * config.NEBULA_DRIFT_SPEED_MAX,
         sizePulseSpeed: config.NEBULA_PULSE_SPEED_SIZE * (0.75 + Math.random() * 0.5),
         opacityPulseSpeed: config.NEBULA_PULSE_SPEED_OPACITY * (0.75 + Math.random() * 0.5),
-        timeOffsetX: Math.random() * 1000,
-        timeOffsetY: Math.random() * 1000,
-        timeOffsetOpacity: Math.random() * 1000,
-        timeOffsetSize: Math.random() * 1000,
-        initialOffsetX: (Math.random() - 0.5) * gridWidth * 0.4, // Use CSS width
-        initialOffsetY: (Math.random() - 0.5) * currentCssHeight * 0.4, // Use CSS height
+        timeOffsetX: Math.random() * 1000, timeOffsetY: Math.random() * 1000,
+        timeOffsetOpacity: Math.random() * 1000, timeOffsetSize: Math.random() * 1000,
+        initialOffsetX: (Math.random() - 0.5) * gridWidth * 0.4, 
+        initialOffsetY: (Math.random() - 0.5) * currentCssHeight * 0.4,
         hueOscillationSpeed: (Math.random() * (config.NEBULA_HUE_OSCILLATION_SPEED_MAX - config.NEBULA_HUE_OSCILLATION_SPEED_MIN) + config.NEBULA_HUE_OSCILLATION_SPEED_MIN),
         hueOscillationAmplitude: (Math.random() * (config.NEBULA_HUE_OSCILLATION_AMPLITUDE_MAX - config.NEBULA_HUE_OSCILLATION_AMPLITUDE_MIN) + config.NEBULA_HUE_OSCILLATION_AMPLITUDE_MIN),
         timeOffsetHue: Math.random() * 1000,
@@ -408,8 +420,8 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize, gridWidth }) 
 
   const drawRevealedGrid = useCallback((ctx: CanvasRenderingContext2D) => {
     if (mousePosition.current.x === null || mousePosition.current.y === null || cellSize <= 0) return;
-    const mouseX = mousePosition.current.x; // Already in CSS pixels relative to full canvas
-    const mouseY = mousePosition.current.y; // Already in CSS pixels relative to full canvas
+    const mouseX = mousePosition.current.x; 
+    const mouseY = mousePosition.current.y; 
     
     const [, gridBaseS, gridBaseL, gridBaseInitialAlpha] = parseHsla(config.GRID_LINE_BASE_COLOR_STR);
     const [, , gridHighlightL, gridHighlightActualA] = parseHsla(config.GRID_LINE_HIGHLIGHT_COLOR_STR);
@@ -425,8 +437,7 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize, gridWidth }) 
 
     for (let gx = startGridX; gx <= endGridX; gx += cellSize) {
       for (let gy = startGridY; gy <= endGridY; gy += cellSize) {
-        const dx = gx - mouseX;
-        const dy = gy - mouseY;
+        const dx = gx - mouseX; const dy = gy - mouseY;
         const distSq = dx * dx + dy * dy;
 
         if (distSq < config.GRID_REVEAL_RADIUS_SQUARED) {
@@ -456,8 +467,7 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize, gridWidth }) 
           const avgDistNorm = (pDistNorm + pointNeighbor.distNormalized) / 2;
           if (avgAlpha > 0.005) {
             const L = lerp(gridBaseL, gridHighlightL, (1 - avgDistNorm) * avgPulse);
-            ctx.beginPath();
-            ctx.moveTo(px, py);
+            ctx.beginPath(); ctx.moveTo(px, py);
             ctx.lineTo(pointNeighbor.x, pointNeighbor.y);
             ctx.lineWidth = lerp(config.GRID_LINE_WIDTH_BASE, config.GRID_LINE_WIDTH_PULSE_MAX, avgPulse) * Math.pow(1 - avgDistNorm, 0.7);
             ctx.strokeStyle = getHarmonizedHsla(currentGridHue, 0, gridBaseS, L, avgAlpha);
@@ -470,84 +480,100 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize, gridWidth }) 
 
   const animate = useCallback((ctx: CanvasRenderingContext2D) => {
     const canvas = canvasRef.current;
-    if (!canvas || canvasCssHeightRef.current === 0) { // Ensure CSS height is known
+    if (!canvas || canvasCssHeightRef.current === 0) {
         animationFrameId.current = requestAnimationFrame(() => animate(ctx));
         return;
     }
-    const currentCssWidth = gridWidth; // Prop gridWidth is the CSS width
+    const currentCssWidth = gridWidth; 
     const currentCssHeight = canvasCssHeightRef.current;
 
     animationTime.current += 0.016; 
 
     ctx.fillStyle = config.BASE_BACKGROUND_COLOR;
-    ctx.fillRect(0, 0, currentCssWidth, currentCssHeight); // Clear using CSS dimensions
+    ctx.fillRect(0, 0, currentCssWidth, currentCssHeight);
 
     masterHue.current = (masterHue.current + config.MASTER_HUE_CYCLE_SPEED);
     if (masterHue.current >= 360) masterHue.current -= 360;
     if (masterHue.current < 0) masterHue.current += 360;
 
+    // Draw Nebulas
     ctx.globalCompositeOperation = config.NEBULA_COMPOSITE_OPERATION as GlobalCompositeOperation; 
     nebulaClouds.current.forEach(cloud => {
       cloud.x += cloud.driftXFactor * currentCssWidth * 0.01; 
       cloud.y += cloud.driftYFactor * currentCssHeight * 0.01;
-
       const visualRadiusX = cloud.radiusX * 1.5; 
       const visualRadiusY = cloud.radiusY * 1.5;
       if (cloud.x - visualRadiusX > currentCssWidth) cloud.x = -visualRadiusX;
       if (cloud.x + visualRadiusX < 0) cloud.x = currentCssWidth + visualRadiusX;
       if (cloud.y - visualRadiusY > currentCssHeight) cloud.y = -visualRadiusY;
       if (cloud.y + visualRadiusY < 0) cloud.y = currentCssHeight + visualRadiusY;
-      
       const time = animationTime.current;
       const sizePulse = (Math.sin(time * cloud.sizePulseSpeed + cloud.timeOffsetSize) + 1) / 2; 
       const currentSizeFactor = 1 + (sizePulse * config.NEBULA_PULSE_AMPLITUDE_SIZE - config.NEBULA_PULSE_AMPLITUDE_SIZE / 2);
       const opacityPulse = (Math.sin(time * cloud.opacityPulseSpeed + cloud.timeOffsetOpacity) + 1) / 2; 
       const currentOpacityFactor = 1 + (opacityPulse * config.NEBULA_PULSE_AMPLITUDE_OPACITY - config.NEBULA_PULSE_AMPLITUDE_OPACITY / 2);
       const finalOpacity = cloud.baseOpacity * currentOpacityFactor;
-
       if (finalOpacity < 0.005) return;
-
       const hueWave = Math.sin(time * cloud.hueOscillationSpeed + cloud.timeOffsetHue);
       const dynamicHueOffset = cloud.baseHueOffset + hueWave * cloud.hueOscillationAmplitude;
       const luminosityWave = (Math.sin(time * cloud.luminosityPulseSpeed + cloud.timeOffsetLuminosity) + 1) / 2;
       const luminosityMultiplier = 1 + (luminosityWave * cloud.luminosityPulseAmplitude - cloud.luminosityPulseAmplitude / 2);
       const currentLuminosityInner = cloud.luminosityInner * luminosityMultiplier;
       const currentLuminosityOuter = cloud.luminosityOuter * luminosityMultiplier;
-
       const cloudGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(cloud.radiusX, cloud.radiusY) * currentSizeFactor);
-      
       const colorCore = getHarmonizedHsla(masterHue.current, dynamicHueOffset, cloud.saturation, currentLuminosityInner, finalOpacity, true);
       const colorMid = getHarmonizedHsla(masterHue.current, dynamicHueOffset + 10, cloud.saturation * 0.85, (currentLuminosityInner + currentLuminosityOuter) / 2.5, finalOpacity * 0.60, true);
       const colorOuter = getHarmonizedHsla(masterHue.current, dynamicHueOffset - 5, cloud.saturation * 0.9, currentLuminosityOuter * 0.8, finalOpacity * 0.25, true);
       const colorEdge = getHarmonizedHsla(masterHue.current, dynamicHueOffset, cloud.saturation * 0.9, currentLuminosityOuter, 0, true);
-
-      cloudGrad.addColorStop(0, colorCore);
-      cloudGrad.addColorStop(0.35, colorMid); 
-      cloudGrad.addColorStop(0.75, colorOuter); 
-      cloudGrad.addColorStop(1, colorEdge);
-
+      cloudGrad.addColorStop(0, colorCore); cloudGrad.addColorStop(0.35, colorMid); 
+      cloudGrad.addColorStop(0.75, colorOuter); cloudGrad.addColorStop(1, colorEdge);
       ctx.save();
       ctx.translate(cloud.x + cloud.initialOffsetX, cloud.y + cloud.initialOffsetY);
       ctx.rotate(cloud.angle + Math.sin(time * 0.0005 + cloud.id) * 0.05 * (cloud.id % 2 === 0 ? 1 : -1) );
       ctx.scale(currentSizeFactor, currentSizeFactor * (cloud.radiusY / cloud.radiusX)); 
-      
-      ctx.beginPath();
-      ctx.arc(0,0, cloud.radiusX, 0, TWO_PI);
-      ctx.fillStyle = cloudGrad;
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(0,0, cloud.radiusX, 0, TWO_PI);
+      ctx.fillStyle = cloudGrad; ctx.fill();
       ctx.restore();
     });
     ctx.globalCompositeOperation = 'source-over'; 
 
+    // Draw Cosmic Dust
     cosmicDustParticles.current.forEach(dust => {
-      dust.x += dust.vx;
-      dust.y += dust.vy;
+      dust.x += dust.vx; dust.y += dust.vy;
       if (dust.x > currentCssWidth + dust.radius) dust.x = -dust.radius; else if (dust.x < -dust.radius) dust.x = currentCssWidth + dust.radius;
       if (dust.y > currentCssHeight + dust.radius) dust.y = -dust.radius; else if (dust.y < -dust.radius) dust.y = currentCssHeight + dust.radius;
       const twinkle = (Math.sin(animationTime.current * 0.3 + dust.id) + 1) / 2 * 0.5 + 0.5;
       ctx.fillStyle = getHarmonizedHsla(masterHue.current, dust.hueOffset, config.COSMIC_DUST_BASE_SATURATION, config.COSMIC_DUST_BASE_LIGHTNESS, dust.baseAlpha * twinkle, true);
       ctx.beginPath(); ctx.arc(dust.x, dust.y, dust.radius, 0, TWO_PI); ctx.fill();
     });
+
+    // New: Update and Draw Stardust Trails
+    stardustParticles.current = stardustParticles.current.filter(sd => {
+        sd.life--;
+        if (sd.life <= 0) return false;
+        sd.x += sd.vx;
+        sd.y += sd.vy;
+        const lifeRatio = sd.life / sd.initialLife;
+        const currentAlpha = sd.baseAlpha * lifeRatio; // Fade out
+        if (currentAlpha < 0.01) return false;
+
+        // Optional: slightly reduce radius over time
+        // sd.radius *= (0.98 + lifeRatio * 0.02); 
+
+        ctx.fillStyle = getHarmonizedHsla(
+            masterHue.current, 
+            sd.hueOffset, 
+            sd.saturation, 
+            sd.lightness, 
+            currentAlpha,
+            true
+        );
+        ctx.beginPath();
+        ctx.arc(sd.x, sd.y, sd.radius * lifeRatio, 0, TWO_PI); // Radius can also shrink
+        ctx.fill();
+        return true;
+    });
+
 
     drawRevealedGrid(ctx);
 
@@ -563,7 +589,6 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize, gridWidth }) 
         const p1 = particlesArray.current[i]; const p2 = particlesArray.current[j];
         const dx = p1.x - p2.x; const dy = p1.y - p2.y; 
         const distSq = dx * dx + dy * dy;
-
         if (distSq < config.CONNECT_DISTANCE_SQUARED) {
           const dist = Math.sqrt(distSq);
           p1.connectionCount++; p2.connectionCount++;
@@ -583,21 +608,33 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize, gridWidth }) 
       clickEffects.current.forEach(effect => {
         const dx = p.x - effect.x; const dy = p.y - effect.y; 
         const distSq = dx * dx + dy * dy;
-        if (distSq < effect.maxRadius * effect.maxRadius) {
-            const dist = Math.sqrt(distSq); 
-            if (dist > 0) { 
-                 const force = (1 - dist / effect.maxRadius) * (effect.strength / dist) * (effect.life / config.CLICK_EFFECT_DURATION);
-                 p.vx += dx * force * 0.03; 
-                 p.vy += dy * force * 0.03;
+        if (distSq < effect.maxRadius * effect.maxRadius && distSq > 0.001) { // Ensure distSq is not zero
+            const dist = Math.sqrt(distSq);
+            const clampedDist = Math.max(dist, config.MIN_CLICK_INTERACTION_DISTANCE); // Min distance for force calc
+
+            const forceMagnitude = (1 - dist / effect.maxRadius) * (effect.strength / clampedDist) * (effect.life / config.CLICK_EFFECT_DURATION);
+            
+            const forceX = (dx / dist) * forceMagnitude;
+            const forceY = (dy / dist) * forceMagnitude;
+
+            if (effect.type === 'attract') {
+                // Attract: pull towards the effect center (reverse direction)
+                // Adjust strength if needed, attraction can be more sensitive
+                p.vx -= forceX * 0.03; 
+                p.vy -= forceY * 0.03;
+            } else { // Repel
+                p.vx += forceX * 0.03; 
+                p.vy += forceY * 0.03;
             }
         }
       });
+
       let targetHI = 0; p.targetRadius = p.radius;
       if (mousePosition.current.x !== null && mousePosition.current.y !== null) {
-        const dxM = p.x - mousePosition.current.x; // Both are CSS pixels
-        const dyM = p.y - mousePosition.current.y; // Both are CSS pixels
+        const dxM = p.x - mousePosition.current.x; 
+        const dyM = p.y - mousePosition.current.y; 
         const distMSq = dxM * dxM + dyM * dyM;
-        if (distMSq < config.MOUSE_INTERACTION_RADIUS * config.MOUSE_INTERACTION_RADIUS) { // MOUSE_INTERACTION_RADIUS is CSS pixels
+        if (distMSq < config.MOUSE_INTERACTION_RADIUS * config.MOUSE_INTERACTION_RADIUS) {
             const distM = Math.sqrt(distMSq);
             targetHI = 1 - (distM / config.MOUSE_INTERACTION_RADIUS);
             p.targetRadius = p.radius * (1 + (config.MOUSE_RADIUS_MULTIPLIER - 1) * targetHI);
@@ -610,36 +647,15 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize, gridWidth }) 
       p.highlightIntensity = lerp(p.highlightIntensity, targetHI, config.HIGHLIGHT_FADE_SPEED);
       p.currentRadius = lerp(p.currentRadius, p.targetRadius, config.RADIUS_LERP_SPEED);
       
-      // Lerp current velocity back towards original velocity
       p.vx = lerp(p.vx, p.originalVx, config.PARTICLE_RETURN_LERP_AMOUNT);
       p.vy = lerp(p.vy, p.originalVy, config.PARTICLE_RETURN_LERP_AMOUNT);
 
-      p.x += p.vx; 
-      p.y += p.vy;
+      p.x += p.vx; p.y += p.vy;
       
-      // --- MODIFIED BOUNDARY COLLISION LOGIC ---
-      // Horizontal collision and bounce
-      if (p.x + p.currentRadius > currentCssWidth) { // Hit right wall
-        p.vx *= -1; // Reverse current velocity
-        p.originalVx *= -1; // Reverse original velocity component for ricochet
-        p.x = currentCssWidth - p.currentRadius; // Clamp position to prevent sticking
-      } else if (p.x - p.currentRadius < 0) { // Hit left wall
-        p.vx *= -1; // Reverse current velocity
-        p.originalVx *= -1; // Reverse original velocity component for ricochet
-        p.x = p.currentRadius; // Clamp position
-      }
-
-      // Vertical collision and bounce
-      if (p.y + p.currentRadius > currentCssHeight) { // Hit bottom wall
-        p.vy *= -1; // Reverse current velocity
-        p.originalVy *= -1; // Reverse original velocity component for ricochet
-        p.y = currentCssHeight - p.currentRadius; // Clamp position
-      } else if (p.y - p.currentRadius < 0) { // Hit top wall
-        p.vy *= -1; // Reverse current velocity
-        p.originalVy *= -1; // Reverse original velocity component for ricochet
-        p.y = p.currentRadius; // Clamp position
-      }
-      // --- END OF MODIFIED BOUNDARY COLLISION LOGIC ---
+      if (p.x + p.currentRadius > currentCssWidth) { p.vx *= -1; p.originalVx *= -1; p.x = currentCssWidth - p.currentRadius; } 
+      else if (p.x - p.currentRadius < 0) { p.vx *= -1; p.originalVx *= -1; p.x = p.currentRadius; }
+      if (p.y + p.currentRadius > currentCssHeight) { p.vy *= -1; p.originalVy *= -1; p.y = currentCssHeight - p.currentRadius; } 
+      else if (p.y - p.currentRadius < 0) { p.vy *= -1; p.originalVy *= -1; p.y = p.currentRadius; }
       
       p.pulseAngle = (p.pulseAngle + p.pulseSpeed) % TWO_PI;
       const pulseF = (Math.sin(p.pulseAngle) + 1) / 2;
@@ -665,32 +681,48 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize, gridWidth }) 
       if (canvas) {
         const dpr = window.devicePixelRatio || 1;
         const rect = canvas.getBoundingClientRect(); 
-
-        const cssWidth = gridWidth; // gridWidth prop is the full CSS width
-        const cssHeight = rect.height; // Canvas CSS height from its layout
-        canvasCssHeightRef.current = cssHeight; // Store CSS height
-
+        const cssWidth = gridWidth; 
+        const cssHeight = rect.height; 
+        canvasCssHeightRef.current = cssHeight;
         canvas.width = cssWidth * dpr; 
         canvas.height = cssHeight * dpr;
-        
-        ctx.resetTransform(); // Clear previous transforms, especially scale
+        ctx.resetTransform(); 
         ctx.scale(dpr, dpr); 
-        
-        initParticles(); 
-        initCosmicDust();
-        initNebulaClouds(); 
+        initParticles(); initCosmicDust(); initNebulaClouds(); 
       }
     };
 
     const handleMouseMove = (event: MouseEvent) => {
       const scrollContainer = canvasRef.current?.parentElement?.parentElement;
-      if (!scrollContainer) return;
+      if (!scrollContainer || !canvasRef.current) return;
       const scrollContainerRect = scrollContainer.getBoundingClientRect();
       
-      mousePosition.current = { 
-        x: (event.clientX - scrollContainerRect.left) + scrollContainer.scrollLeft, 
-        y: (event.clientY - scrollContainerRect.top) + scrollContainer.scrollTop
-      };
+      const currentMouseX = (event.clientX - scrollContainerRect.left) + scrollContainer.scrollLeft;
+      const currentMouseY = (event.clientY - scrollContainerRect.top) + scrollContainer.scrollTop;
+      mousePosition.current = { x: currentMouseX, y: currentMouseY };
+
+      // New: Create stardust particles
+      for (let i = 0; i < config.STARDUST_PARTICLE_COUNT_ON_MOVE; i++) {
+          const angle = Math.random() * TWO_PI;
+          const speed = Math.random() * (config.STARDUST_SPEED_FACTOR_MAX - config.STARDUST_SPEED_FACTOR_MIN) + config.STARDUST_SPEED_FACTOR_MIN;
+          stardustParticles.current.push({
+              id: stardustIdCounter.current++,
+              x: currentMouseX,
+              y: currentMouseY,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              radius: Math.random() * (config.STARDUST_MAX_RADIUS - config.STARDUST_MIN_RADIUS) + config.STARDUST_MIN_RADIUS,
+              life: config.STARDUST_LIFESPAN,
+              initialLife: config.STARDUST_LIFESPAN,
+              hueOffset: (Math.random() * config.STARDUST_HUE_SPREAD) - (config.STARDUST_HUE_SPREAD / 2),
+              baseAlpha: config.STARDUST_BASE_ALPHA * (0.7 + Math.random() * 0.3),
+              saturation: config.STARDUST_SATURATION,
+              lightness: config.STARDUST_LIGHTNESS,
+          });
+      }
+      if (stardustParticles.current.length > 200) { // Cap stardust particles
+         stardustParticles.current.splice(0, stardustParticles.current.length - 200);
+      }
     };
 
     const handleMouseLeave = () => { mousePosition.current = { x: null, y: null }; };
@@ -703,23 +735,36 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize, gridWidth }) 
       const clickX = (event.clientX - scrollContainerRect.left) + scrollContainer.scrollLeft;
       const clickY = (event.clientY - scrollContainerRect.top) + scrollContainer.scrollTop;
 
-      // Check click against the CSS dimensions
       if (clickX >= 0 && clickX <= gridWidth && clickY >= 0 && clickY <= canvasCssHeightRef.current) {
-        clickEffects.current.push({ x: clickX, y: clickY, strength: config.CLICK_REPEL_STRENGTH, maxRadius: config.CLICK_EFFECT_RADIUS, life: config.CLICK_EFFECT_DURATION });
+        let effectType: 'repel' | 'attract' = 'repel';
+        let strength = config.CLICK_REPEL_STRENGTH;
+
+        if (event.button === 2) { // Right click for attraction
+          effectType = 'attract';
+          strength = config.CLICK_ATTRACT_STRENGTH;
+          event.preventDefault(); // Prevent context menu
+        }
+        
+        clickEffects.current.push({ 
+            x: clickX, y: clickY, 
+            strength: strength, 
+            maxRadius: config.CLICK_EFFECT_RADIUS, 
+            life: config.CLICK_EFFECT_DURATION,
+            type: effectType 
+        });
       }
     };
 
     resizeCanvas(); 
-    
     window.addEventListener('resize', resizeCanvas); 
     
     const scrollContainerForEvents = canvas.parentElement?.parentElement; 
     if (scrollContainerForEvents) {
         scrollContainerForEvents.addEventListener('mousemove', handleMouseMove as EventListener);
-        scrollContainerForEvents.addEventListener('mousedown', handleMouseDown as EventListener);
+        scrollContainerForEvents.addEventListener('mousedown', handleMouseDown as EventListener); // This will now handle left and right clicks
         scrollContainerForEvents.addEventListener('mouseleave', handleMouseLeave);
+        scrollContainerForEvents.addEventListener('contextmenu', e => e.preventDefault()); // Ensure context menu is always prevented on canvas parent
     }
-
 
     if (!animationFrameId.current) {
       animationFrameId.current = requestAnimationFrame(() => animate(ctx));
@@ -731,6 +776,7 @@ const GridBackground: React.FC<GridBackgroundProps> = ({ cellSize, gridWidth }) 
         scrollContainerForEvents.removeEventListener('mousemove', handleMouseMove as EventListener);
         scrollContainerForEvents.removeEventListener('mousedown', handleMouseDown as EventListener);
         scrollContainerForEvents.removeEventListener('mouseleave', handleMouseLeave);
+        scrollContainerForEvents.removeEventListener('contextmenu', e => e.preventDefault());
       }
       if (animationFrameId.current) {
         cancelAnimationFrame(animationFrameId.current);
