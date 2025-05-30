@@ -72,7 +72,6 @@ This is a Next.js project.
         ```env
         NEXT_PUBLIC_TOMORROW_API_KEY=your_api_key_here
         ```
-    * **Note on YouTube API Key**: The YouTube widget currently uses an API key (`AIzaSyAIsr27eVlsTIgd0kLM9Lq_WDr-vGbJjtI`) directly in the `YoutubeWidget.tsx` file. **WARNING**: Exposing API keys on the client side is insecure for production applications. For a real-world deployment, you should move API calls that require sensitive keys to a backend proxy.
 
 4.  **Run the development server**:
     ```bash
