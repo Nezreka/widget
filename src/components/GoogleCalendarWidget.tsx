@@ -4,29 +4,22 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image'; // Import Next.js Image component
 
+// Import custom types defined in your gapi.d.ts.
+import type { GoogleCalendarEvent } from '@/types/gapi';
+
+// Types for GAPI and Google Identity Services (like google.accounts.oauth2.TokenClient,
+// google.accounts.oauth2.TokenResponse, google.accounts.oauth2.ClientConfigError)
+// are now expected to be globally available via the /// <reference types="..." />
+// in gapi.d.ts and the component files, and through the installed @types packages.
+
 export interface GoogleCalendarWidgetSettings {
   viewMode?: 'month' | 'week' | 'day';
   showWeekends?: boolean;
   calendarId?: string;
 }
 
-interface GoogleCalendarEvent {
-  id: string;
-  summary?: string;
-  start: { dateTime?: string; date?: string };
-  end: { dateTime?: string; date?: string };
-  location?: string;
-  colorId?: string;
-  description?: string;
-  attendees?: { email: string; responseStatus: string }[];
-  organizer?: { email: string; displayName?: string };
-  htmlLink?: string;
-  [key: string]: unknown; // Changed from any to unknown for better type safety
-}
-
 interface GoogleCalendarWidgetProps {
   settings?: GoogleCalendarWidgetSettings;
-  // instanceId?: string; // Removed as it's unused, can be added back if needed
 }
 
 // Ensure these are set in your .env.local or environment variables
@@ -36,96 +29,6 @@ const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
 const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"];
 const SCOPES = "https://www.googleapis.com/auth/calendar.events.readonly https://www.googleapis.com/auth/userinfo.profile";
 
-// Define more specific types for GAPI and Google Identity Services if possible
-// For now, using 'any' where complex external library types are involved,
-// but ideally, these would be narrowed down or official types used if available.
-interface GapiAuth2TokenObject {
-  access_token: string;
-  // Add other token properties if needed
-}
-
-interface GapiErrorResponse {
-  type?: string;
-  message?: string;
-  // Add other error properties if needed
-}
-
-interface GapiTokenResponse {
-  access_token?: string;
-  error?: string;
-  error_description?: string;
-  // Add other response properties if needed
-}
-
-interface GapiUserInfo {
-    name?: string;
-    email?: string;
-    picture?: string;
-    // Add other user info properties
-}
-
-interface GapiClient {
-  init: (args: { apiKey: string | undefined; discoveryDocs: string[] }) => Promise<void>;
-  load: (apiName: string, version: string) => Promise<void>;
-  calendar?: {
-    events: {
-      list: (args: {
-        calendarId: string;
-        timeMin: string;
-        timeMax: string;
-        showDeleted: boolean;
-        singleEvents: boolean;
-        maxResults: number;
-        orderBy: string;
-      }) => Promise<{ result: { items: GoogleCalendarEvent[] } }>; // More specific return type
-    };
-  };
-  oauth2?: {
-    userinfo: {
-        get: () => Promise<{result: GapiUserInfo}>;
-    }
-  };
-  getToken: () => GapiAuth2TokenObject | null;
-  setToken: (token: GapiAuth2TokenObject | null) => void;
-}
-
-interface GoogleTokenClient {
-  requestAccessToken: (options?: { prompt?: string }) => void;
-  // Add other methods/properties if needed
-}
-
-interface GoogleAccountsOauth2 {
-    initTokenClient: (config: {
-        client_id: string | undefined;
-        scope: string;
-        callback: (tokenResponse: GapiTokenResponse) => void;
-        error_callback: (errResp: GapiErrorResponse) => void;
-    }) => GoogleTokenClient;
-    revoke: (token: string, callback: () => void) => void;
-}
-
-interface GoogleAccountsId {
-    disableAutoSelect: () => void;
-    // Add other methods/properties if needed
-}
-
-declare global {
-  interface Window {
-    gapi: {
-        load: (api: string, callback: () => void) => void;
-        client: GapiClient;
-        // Add other gapi properties if needed
-    };
-    google: {
-        accounts: {
-            oauth2: GoogleAccountsOauth2;
-            id?: GoogleAccountsId;
-            // Add other google.accounts properties if needed
-        }
-    };
-    tokenClient: GoogleTokenClient; // Retaining for backward compatibility if used elsewhere, but prefer tokenClientRef.current
-  }
-}
 
 // Google's Material Design Event Colors - Revamped for a Dark Theme with Vibrant Accents
 const GOOGLE_EVENT_COLORS_DARK_THEME: { [key: string]: { cardBg: string; text: string; border: string; dot: string } } = {
@@ -145,15 +48,20 @@ const GOOGLE_EVENT_COLORS_DARK_THEME: { [key: string]: { cardBg: string; text: s
 
 // --- Icon Components ---
 
+// The type GoogleCalendarEvent is imported from '@/types/gapi'
+type CalendarEventListItems = GoogleCalendarEvent[];
+
+
 // Updated EventIndicator to show a triangle in the bottom-right corner with event count
-const EventIndicator: React.FC<{ eventsOnDay: GoogleCalendarEvent[] }> = ({ eventsOnDay }) => {
+const EventIndicator: React.FC<{ eventsOnDay: CalendarEventListItems }> = ({ eventsOnDay }) => {
   if (!eventsOnDay || eventsOnDay.length === 0) return null;
 
+  // Assuming GoogleCalendarEvent has a colorId property
   const firstEventColorId = eventsOnDay[0].colorId || 'default';
   const triangleBgColorClass = GOOGLE_EVENT_COLORS_DARK_THEME[firstEventColorId]?.dot || GOOGLE_EVENT_COLORS_DARK_THEME['default'].dot;
   const eventCount = eventsOnDay.length;
 
-  const triangleStyle: React.CSSProperties = { // Added type for style object
+  const triangleStyle: React.CSSProperties = {
     clipPath: 'polygon(100% 0, 0% 100%, 100% 100%)',
   };
 
@@ -177,15 +85,15 @@ const EventIndicator: React.FC<{ eventsOnDay: GoogleCalendarEvent[] }> = ({ even
 const GoogleCalendarDynamicIcon: React.FC<{ className?: string, date?: number, isSignInPage?: boolean }> = ({ className = "w-6 h-6", date, isSignInPage = false }) => (
   <svg className={className} viewBox="0 0 36 36" aria-hidden="true">
     <defs>
-        <linearGradient id="gradBlue" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style={{stopColor: '#4285F4', stopOpacity: 1}} /><stop offset="100%" style={{stopColor: '#2962FF', stopOpacity: 1}} /></linearGradient>
-        <linearGradient id="gradGreen" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style={{stopColor: '#34A853', stopOpacity: 1}} /><stop offset="100%" style={{stopColor: '#1E8E3E', stopOpacity: 1}} /></linearGradient>
-        <linearGradient id="gradYellow" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style={{stopColor: '#FBBC05', stopOpacity: 1}} /><stop offset="100%" style={{stopColor: '#F9AB00', stopOpacity: 1}} /></linearGradient>
-        <linearGradient id="gradRed" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style={{stopColor: '#EA4335', stopOpacity: 1}} /><stop offset="100%" style={{stopColor: '#D93025', stopOpacity: 1}} /></linearGradient>
+        <linearGradient id="gradBlueCal" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style={{stopColor: '#4285F4', stopOpacity: 1}} /><stop offset="100%" style={{stopColor: '#2962FF', stopOpacity: 1}} /></linearGradient>
+        <linearGradient id="gradGreenCal" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style={{stopColor: '#34A853', stopOpacity: 1}} /><stop offset="100%" style={{stopColor: '#1E8E3E', stopOpacity: 1}} /></linearGradient>
+        <linearGradient id="gradYellowCal" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style={{stopColor: '#FBBC05', stopOpacity: 1}} /><stop offset="100%" style={{stopColor: '#F9AB00', stopOpacity: 1}} /></linearGradient>
+        <linearGradient id="gradRedCal" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style={{stopColor: '#EA4335', stopOpacity: 1}} /><stop offset="100%" style={{stopColor: '#D93025', stopOpacity: 1}} /></linearGradient>
     </defs>
-    <path fill="url(#gradGreen)" d="M16 0H2C.9 0 0 .9 0 2v14h18V2c0-1.1-.9-2-2-2z" />
-    <path fill="url(#gradBlue)" d="M0 16h18v14c0 1.1-.9 2-2 2H2c-1.1 0-2-.9-2-2V16z" />
-    <path fill="url(#gradYellow)" d="M16 32h14c1.1 0 2-.9 2-2V16H16v16z" />
-    <path fill="url(#gradRed)" d="M32 0H16v16h18V2c0-1.1-.9-2-2-2z" />
+    <path fill="url(#gradGreenCal)" d="M16 0H2C.9 0 0 .9 0 2v14h18V2c0-1.1-.9-2-2-2z" />
+    <path fill="url(#gradBlueCal)" d="M0 16h18v14c0 1.1-.9 2-2 2H2c-1.1 0-2-.9-2-2V16z" />
+    <path fill="url(#gradYellowCal)" d="M16 32h14c1.1 0 2-.9 2-2V16H16v16z" />
+    <path fill="url(#gradRedCal)" d="M32 0H16v16h18V2c0-1.1-.9-2-2-2z" />
     {date && (
         <text x="50%" y={isSignInPage ? "54%" : "53%"} dominantBaseline="middle" textAnchor="middle" fontSize={isSignInPage ? "20" : "17"} fill="#fff" fontWeight="600" fontFamily="Roboto, Inter, sans-serif">
             {date}
@@ -211,16 +119,18 @@ const GoogleCalendarWidget: React.FC<GoogleCalendarWidgetProps> = ({ settings })
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
-  const [events, setEvents] = useState<GoogleCalendarEvent[]>([]);
+  const [events, setEvents] = useState<CalendarEventListItems>([]);
   const [error, setError] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [userImage, setUserImage] = useState<string | null>(null);
 
   const [currentMonthDate, setCurrentMonthDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [selectedDateEvents, setSelectedDateEvents] = useState<GoogleCalendarEvent[]>([]);
+  const [selectedDateEvents, setSelectedDateEvents] = useState<CalendarEventListItems>([]);
 
-  const tokenClientRef = useRef<GoogleTokenClient | null>(null); // Typed the ref
+  // Use the standard google.accounts.oauth2.TokenClient type
+  const tokenClientRef = useRef<google.accounts.oauth2.TokenClient | null>(null);
+
 
   const getEventColorStyles = (colorId?: string) => {
     return GOOGLE_EVENT_COLORS_DARK_THEME[colorId || 'default'] || GOOGLE_EVENT_COLORS_DARK_THEME['default'];
@@ -253,7 +163,10 @@ const GoogleCalendarWidget: React.FC<GoogleCalendarWidgetProps> = ({ settings })
   }, []);
 
   const fetchUserProfile = useCallback(async () => {
-    if (!window.gapi?.client?.oauth2?.userinfo) return;
+    if (!window.gapi?.client?.oauth2?.userinfo) {
+        console.warn("GAPI oauth2.userinfo not available for fetching profile.");
+        return;
+    }
     setIsLoadingProfile(true);
     try {
       const response = await window.gapi.client.oauth2.userinfo.get();
@@ -263,11 +176,11 @@ const GoogleCalendarWidget: React.FC<GoogleCalendarWidgetProps> = ({ settings })
       }
     } catch (e) {
       console.error("Error fetching user profile:", e);
-      if (!userName) setUserName('User'); // Set a default if fetch fails and userName is still null
+      if (!userName) setUserName('User'); 
     } finally {
       setIsLoadingProfile(false);
     }
-  }, [userName]); // userName is a dependency here because it's checked in the catch block.
+  }, [userName]); 
 
   const initializeGapiClientAndTokenClient = useCallback(async () => {
     if (!CLIENT_ID) { setError("Configuration Error: Google Client ID is missing. Please check your environment variables (NEXT_PUBLIC_GOOGLE_CLIENT_ID)."); setIsLoading(false); return; }
@@ -275,11 +188,17 @@ const GoogleCalendarWidget: React.FC<GoogleCalendarWidgetProps> = ({ settings })
 
     setIsLoading(true);
     try {
+      if (!window.gapi || !window.gapi.client) {
+          setError("GAPI client not loaded. Cannot initialize.");
+          setIsLoading(false);
+          return;
+      }
       await window.gapi.client.init({ apiKey: API_KEY, discoveryDocs: DISCOVERY_DOCS });
       await window.gapi.client.load('calendar', 'v3');
-      await window.gapi.client.load('oauth2', 'v2');
-    } catch (e: unknown) { // Changed from any to unknown
-        const error = e as Error; // Type assertion
+      await window.gapi.client.load('oauth2', 'v2'); 
+
+    } catch (e: unknown) {
+        const error = e as Error;
         setError(`API Initialization Error: ${error.message || 'Unknown error during API init.'}`);
         setIsLoading(false); return;
     }
@@ -288,42 +207,58 @@ const GoogleCalendarWidget: React.FC<GoogleCalendarWidgetProps> = ({ settings })
       if (window.google?.accounts?.oauth2) {
         tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
           client_id: CLIENT_ID, scope: SCOPES,
-          callback: (tokenResponse: GapiTokenResponse) => { // Typed tokenResponse
-            if (tokenResponse?.access_token) {
+          callback: (tokenResponse: google.accounts.oauth2.TokenResponse) => { 
+            if (tokenResponse.access_token && window.gapi?.client) { // Check for access_token directly
               window.gapi.client.setToken({ access_token: tokenResponse.access_token });
               setIsSignedIn(true);
               setError(null);
               fetchUserProfile();
-            } else if (tokenResponse?.error) {
-              setError(`Authentication Error: ${tokenResponse.error_description || tokenResponse.error}`);
+            } else if (tokenResponse.error) { // Check for error property
+              // Error information is within the TokenResponse object
+              const errorDesc = tokenResponse.error_description;
+              setError(`Authentication Error: ${errorDesc || tokenResponse.error}`);
+              setIsSignedIn(false);
+            } else {
+              // Fallback for unexpected structure, though GIS usually provides access_token or error
+              setError("Authentication failed: Unexpected response structure.");
               setIsSignedIn(false);
             }
             setIsLoading(false);
           },
-          error_callback: (errResp: GapiErrorResponse) => { // Typed errResp
+          error_callback: (errorResponse: google.accounts.oauth2.ClientConfigError) => { 
             let msg = 'Authentication Failed.';
-            if (errResp?.type === 'popup_closed') msg = 'Sign-in popup was closed before completing authentication.';
-            else if (errResp?.type === 'popup_failed_to_open') msg = 'Sign-in popup failed to open. Please disable popup blockers for this site.';
-            else if (errResp?.message) msg = errResp.message;
+            // Check for more specific error types if needed, e.g. PopupClosedError
+            if (errorResponse?.type === 'popup_closed') {
+                 msg = 'Sign-in popup was closed before completing authentication.';
+            } else if (errorResponse?.type === 'popup_failed_to_open') {
+                 msg = 'Sign-in popup failed to open. Please disable popup blockers for this site.';
+            } else if ('message' in errorResponse && typeof (errorResponse as {message: string}).message === 'string') {
+                 msg = `${errorResponse.type ? errorResponse.type + ': ' : ''}${(errorResponse as {message: string}).message}`;
+            } else if (errorResponse?.type) {
+                 msg = errorResponse.type;
+            }
             setError(msg); setIsSignedIn(false); setIsLoading(false);
           }
         });
-        if (window.gapi.client.getToken()) {
+        
+        if (window.gapi?.client?.getToken && window.gapi.client.getToken()) {
            setIsSignedIn(true);
-           fetchUserProfile();
+           fetchUserProfile(); 
+        } else {
+           setIsSignedIn(false);
         }
       } else {
         setError("Google Identity Services (accounts.oauth2) not available on window.google object.");
         setIsLoading(false);
         return;
       }
-    } catch (e: unknown) { // Changed from any to unknown
-        const error = e as Error; // Type assertion
+    } catch (e: unknown) {
+        const error = e as Error;
         setError(`Sign-In Initialization Error: ${error.message || 'Unknown error during sign-in init.'}`);
         setIsLoading(false); return;
     }
     setIsLoading(false);
-  }, [fetchUserProfile]);
+  }, [fetchUserProfile]); 
 
   useEffect(() => {
     if (gapiReady && gisReady) {
@@ -338,19 +273,20 @@ const GoogleCalendarWidget: React.FC<GoogleCalendarWidgetProps> = ({ settings })
     }
     setIsLoading(true);
     setError(null);
-    tokenClientRef.current.requestAccessToken({ prompt: 'consent' });
+    tokenClientRef.current.requestAccessToken({ prompt: 'consent' }); 
   };
 
   const handleSignOut = () => {
     setIsLoading(true);
-    const token = window.gapi.client.getToken();
+    const token = window.gapi?.client?.getToken ? window.gapi.client.getToken() : null;
     const callback = () => {
-      window.gapi.client.setToken(null);
+      if(window.gapi?.client) window.gapi.client.setToken(null); 
       setIsSignedIn(false); setEvents([]); setError(null);
       setUserName(null); setUserImage(null);
       setIsLoading(false); setSelectedDate(null); setSelectedDateEvents([]);
-      if(window.google?.accounts?.id) window.google.accounts.id.disableAutoSelect();
+      if(window.google?.accounts?.id) window.google.accounts.id.disableAutoSelect(); 
     };
+
     if (token?.access_token && window.google?.accounts?.oauth2?.revoke) {
       window.google.accounts.oauth2.revoke(token.access_token, callback);
     } else {
@@ -359,8 +295,8 @@ const GoogleCalendarWidget: React.FC<GoogleCalendarWidgetProps> = ({ settings })
   };
 
   const listMonthEvents = useCallback(async (dateForMonth: Date) => {
-    if (!isSignedIn || !window.gapi?.client?.calendar) {
-      setEvents([]);
+    if (!isSignedIn || !window.gapi?.client?.calendar?.events) {
+      setEvents([]); 
       return;
     }
     setError(null); setIsLoadingEvents(true);
@@ -374,13 +310,12 @@ const GoogleCalendarWidget: React.FC<GoogleCalendarWidgetProps> = ({ settings })
         timeMax: lastDay.toISOString(),
         showDeleted: false,
         singleEvents: true,
-        maxResults: 250,
+        maxResults: 250, 
         orderBy: 'startTime'
       });
       setEvents(response.result.items || []);
-    } catch (e: unknown) { // Changed from any to unknown
+    } catch (e: unknown) {
       let msg = `Event Fetch Error: An unknown error occurred.`;
-      // More robust error checking
       const errorResult = (e as { result?: { error?: { message?: string; status?: string; code?: number } } })?.result?.error;
       if (errorResult?.message) {
         msg = `Event Fetch Error: ${errorResult.message}`;
@@ -390,7 +325,7 @@ const GoogleCalendarWidget: React.FC<GoogleCalendarWidgetProps> = ({ settings })
 
       if ((errorResult?.status === 'INVALID_ARGUMENT' || errorResult?.status === 'NOT_FOUND') && currentSettings.calendarId !== 'primary') {
          msg = `Calendar ID '${currentSettings.calendarId}' was not found or is invalid. Please check the ID or use 'primary'.`;
-      } else if (errorResult?.code === 401 ) {
+      } else if (errorResult?.code === 401 ) { 
         msg = "Authentication error. Please try signing out and signing back in.";
       }
       setError(msg); setEvents([]);
@@ -403,17 +338,18 @@ const GoogleCalendarWidget: React.FC<GoogleCalendarWidgetProps> = ({ settings })
     if (isSignedIn && gapiReady && gisReady && window.gapi?.client?.calendar) {
       listMonthEvents(currentMonthDate);
     } else if (!isSignedIn) {
-      setEvents([]);
+      setEvents([]); 
     }
   }, [isSignedIn, gapiReady, gisReady, currentMonthDate, listMonthEvents]);
+
 
   const generateCalendarGrid = () => {
     const year = currentMonthDate.getFullYear();
     const month = currentMonthDate.getMonth();
-    const firstDayOfMonthStart = new Date(year, month, 1).getDay();
+    const firstDayOfMonthStart = new Date(year, month, 1).getDay(); 
     const daysInPrevMonth = new Date(year, month, 0).getDate();
     const daysInCurrentMonth = new Date(year, month + 1, 0).getDate();
-    const grid: { day: number; monthType: 'prev' | 'current' | 'next'; date: Date, events: GoogleCalendarEvent[] }[] = [];
+    const grid: { day: number; monthType: 'prev' | 'current' | 'next'; date: Date, events: CalendarEventListItems }[] = [];
 
     for (let i = 0; i < firstDayOfMonthStart; i++) {
       grid.push({ day: daysInPrevMonth - firstDayOfMonthStart + 1 + i, monthType: 'prev', date: new Date(year, month - 1, daysInPrevMonth - firstDayOfMonthStart + 1 + i), events: [] });
@@ -438,27 +374,28 @@ const GoogleCalendarWidget: React.FC<GoogleCalendarWidgetProps> = ({ settings })
       });
       grid.push({ day, monthType: 'current', date: dateCell, events: dayEvents });
     }
-    const totalCells = Math.max(35, Math.ceil(grid.length / 7) * 7);
-    const remainingCells = Math.max(totalCells, 42) - grid.length;
+    const totalCells = Math.max(35, Math.ceil(grid.length / 7) * 7); 
+    const remainingCells = Math.max(totalCells, 42) - grid.length; 
     for (let i = 1; i <= remainingCells; i++) {
       grid.push({ day: i, monthType: 'next', date: new Date(year, month + 1, i), events: [] });
     }
     return grid;
   };
 
-  const calendarGrid = isSignedIn ? generateCalendarGrid() : [];
-  const weekdays = ["S", "M", "T", "W", "T", "F", "S"];
 
-  const handleDayClick = (date: Date, dayEvents: GoogleCalendarEvent[]) => {
+  const calendarGrid = isSignedIn ? generateCalendarGrid() : [];
+  const weekdays = ["S", "M", "T", "W", "T", "F", "S"]; 
+
+  const handleDayClick = (date: Date, dayEvents: CalendarEventListItems) => {
     setSelectedDate(date);
     setSelectedDateEvents(dayEvents);
   };
 
   const changeMonth = (offset: number) => {
-    setSelectedDate(null); setSelectedDateEvents([]);
+    setSelectedDate(null); setSelectedDateEvents([]); 
     setCurrentMonthDate(prev => {
       const newDate = new Date(prev);
-      newDate.setDate(1);
+      newDate.setDate(1); 
       newDate.setMonth(prev.getMonth() + offset);
       return newDate;
     });
@@ -475,13 +412,14 @@ const GoogleCalendarWidget: React.FC<GoogleCalendarWidgetProps> = ({ settings })
             eventStartDate = new Date(parseInt(yearStr, 10), parseInt(monthStr, 10) - 1, parseInt(dayStr, 10));
         } else if (event.start?.dateTime) {
             eventStartDate = new Date(event.start.dateTime);
-        } else { return false; }
+        } else { return false; } 
         return eventStartDate.getFullYear() === today.getFullYear() &&
                eventStartDate.getMonth() === today.getMonth() &&
                eventStartDate.getDate() === today.getDate();
     });
-    handleDayClick(today, todayEvents);
+    handleDayClick(today, todayEvents); 
   };
+
 
   const renderContent = () => {
     const googleSignInButtonClasses = "bg-white hover:bg-gray-100 text-slate-700 dark:bg-slate-50 dark:hover:bg-slate-200 dark:text-slate-800 font-medium py-2.5 px-6 rounded-lg shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-slate-850 transition-all duration-150 ease-in-out disabled:opacity-70 group flex items-center justify-center transform active:scale-95 hover:scale-[1.02]";
@@ -500,13 +438,13 @@ const GoogleCalendarWidget: React.FC<GoogleCalendarWidgetProps> = ({ settings })
             <h3 className="font-semibold text-base mb-2 text-rose-300">An Error Occurred</h3>
             <p className="mb-3">{error}</p>
             {(!CLIENT_ID || !API_KEY) && <p className="mb-3 text-xs font-semibold">Crucial configuration (Client ID/API Key) might be missing. Please contact support or check environment variables.</p>}
-            {(error.includes("popup") || error.includes("Auth Error") || error.includes("Sign-In not ready") || error.includes("Failed to load") || error.includes("Authentication Error")) && (
+            {(error.includes("popup") || error.includes("Auth Error") || error.includes("Sign-In not ready") || error.includes("Failed to load") || error.includes("Authentication Error") || error.includes("Authentication Failed")) && (
               <button onClick={handleSignIn} disabled={!tokenClientRef.current || isLoading} className={`${googleSignInButtonClasses} mt-2 text-sm`}> Retry Sign In </button>
             )}
           </div>
         );
     }
-    if (!tokenClientRef.current && !isLoading && !isSignedIn) {
+    if (!tokenClientRef.current && !isLoading && !isSignedIn) { 
         return (
           <div className="text-sm text-amber-400 p-5 m-4 rounded-lg bg-amber-500/10 border border-amber-500/30 w-auto max-w-md mx-auto text-center shadow-lg" role="alert" aria-live="assertive">
             <h3 className="font-semibold text-base mb-2 text-amber-300">Initialization Issue</h3>
@@ -533,7 +471,7 @@ const GoogleCalendarWidget: React.FC<GoogleCalendarWidgetProps> = ({ settings })
           </p>
           <button
             onClick={handleSignIn}
-            disabled={!tokenClientRef.current || isLoading}
+            disabled={!tokenClientRef.current || isLoading} 
             className={googleSignInButtonClasses}
             aria-label="Sign In with Google"
           >
@@ -560,8 +498,10 @@ const GoogleCalendarWidget: React.FC<GoogleCalendarWidgetProps> = ({ settings })
       );
     }
 
+    // Signed In View
     return (
       <div className="w-full h-full flex flex-col bg-slate-800 dark:bg-slate-900 rounded-lg overflow-hidden font-['Inter',_sans-serif] text-slate-300">
+        {/* Header */}
         <div className="flex items-center justify-between p-3 md:p-4 border-b border-slate-700 dark:border-slate-700/70">
           <div className="flex items-center">
             <GoogleCalendarDynamicIcon className="w-10 h-10 mr-3 flex-shrink-0" date={new Date().getDate()} />
@@ -589,7 +529,9 @@ const GoogleCalendarWidget: React.FC<GoogleCalendarWidgetProps> = ({ settings })
           </div>
         </div>
 
+        {/* Main Content Area (Calendar Grid and Event Details) */}
         <div className={`flex flex-grow overflow-hidden transition-all duration-300 ease-in-out ${selectedDate ? 'flex-col md:flex-row' : 'flex-col'}`}>
+          {/* Calendar Grid */}
           <div className={`flex-grow flex flex-col p-3 md:p-4 transition-all duration-300 ease-in-out ${selectedDate ? 'md:w-[65%] lg:w-[70%]' : 'w-full'}`}>
             <div className="grid grid-cols-7 gap-x-1 md:gap-x-2 text-center text-xs font-semibold text-slate-400 dark:text-slate-500 mb-2.5">
               {weekdays.map((day, index) => <div key={`${day}-${index}`} className="py-1.5" aria-hidden="true">{day}</div>)}
@@ -632,6 +574,7 @@ const GoogleCalendarWidget: React.FC<GoogleCalendarWidgetProps> = ({ settings })
             )}
           </div>
 
+          {/* Event Details Panel */}
           <div className={`transition-all duration-300 ease-in-out overflow-hidden ${selectedDate ? 'w-full md:w-[35%] lg:w-[30%] opacity-100' : 'w-0 opacity-0 md:w-0'}`} aria-live="polite" aria-busy={isLoadingEvents && !!selectedDate}>
             {selectedDate && (
             <div className={`h-full border-l border-slate-700 dark:border-slate-600/50 flex flex-col bg-slate-750 dark:bg-slate-850 p-4 md:p-5 animate-slideInFromRightImproved`}>
@@ -658,13 +601,13 @@ const GoogleCalendarWidget: React.FC<GoogleCalendarWidgetProps> = ({ settings })
                 {!isLoadingEvents && selectedDateEvents.length > 0 ? (
                   selectedDateEvents.map((event, idx) => {
                     const { cardBg, text, border: borderColorClass } = getEventColorStyles(event.colorId);
-                    const startTime = event.start?.dateTime ? new Date(event.start.dateTime) : (event.start?.date ? new Date(event.start.date + "T00:00:00") : null);
-                    const endTime = event.end?.dateTime ? new Date(event.end.dateTime) : (event.end?.date ? new Date(new Date(event.end.date + "T00:00:00").getTime() -1) : null);
+                    const startTime = event.start?.dateTime ? new Date(event.start.dateTime) : (event.start?.date ? new Date(event.start.date + "T00:00:00") : null); 
+                    const endTime = event.end?.dateTime ? new Date(event.end.dateTime) : (event.end?.date ? new Date(new Date(event.end.date + "T00:00:00").getTime() -1) : null); 
                     const isAllDay = !event.start?.dateTime;
 
                     return (
                     <a href={event.htmlLink || '#'} target="_blank" rel="noopener noreferrer"
-                       key={event.id}
+                       key={event.id || `event-${idx}`}
                        className={`block p-3.5 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 ease-out animate-fadeIn ${cardBg} ${text} border-l-4 ${borderColorClass}`}
                        style={{animationDelay: `${idx * 70}ms`}}
                        title={`View event: ${event.summary || 'Calendar Event'}`}
@@ -730,9 +673,10 @@ const GoogleCalendarWidget: React.FC<GoogleCalendarWidgetProps> = ({ settings })
         }
         .animate-slideInFromRightImproved { animation: slideInFromRightImproved 0.4s cubic-bezier(0.25, 0.8, 0.25, 1) forwards; }
 
-        .bg-slate-650 { background-color: #475569; }
-        .dark .bg-slate-750 { background-color: #293344; }
-        .bg-slate-750 { background-color: #334155; }
+        /* Custom background colors for calendar cells if needed */
+        .bg-slate-650 { background-color: #475569; } /* For Today if not selected */
+        .dark .bg-slate-750 { background-color: #293344; } /* For Today if not selected in dark mode */
+        .bg-slate-750 { background-color: #334155; } /* For event details panel in light mode */
        `}</style>
     </div>
   );

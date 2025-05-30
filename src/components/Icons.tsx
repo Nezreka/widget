@@ -43,9 +43,10 @@ export const SendArrowIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" fil
 export const CloseIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-5 h-5"> <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /> </svg> );
 export const ProcessingIcon = () => ( <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"> <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle> <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path> </svg> );
 
-// --- NEW Google Service Icons & Hub Icon ---
+// --- Google Service Icons & Hub Icon ---
 
 // Google Services Hub Icon (Stylized "G" or a grid for the main menu)
+// This is the icon for the Hub widget itself in the "Add Widget" menu.
 export const GoogleServicesHubIcon = ({ className = "w-5 h-5 text-sky-500" }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
@@ -58,46 +59,50 @@ export const GoogleServicesHubIcon = ({ className = "w-5 h-5 text-sky-500" }: { 
 );
 
 // --- Placeholder Icons for individual Google Services ---
-// These are used within the GoogleServicesHubWidget.tsx component.
-// For better visual fidelity, replace these with more accurate SVGs if available.
+// These are used as default icons for the widgets in the "Add Widget" menu.
+// The className default is "w-5 h-5" for consistency in menus.
+// The GoogleServicesHubWidget.tsx uses its own local definitions with "w-10 h-10",
+// which is fine as those are for the radial menu items inside the hub.
 
-export const PlaceholderGmailIcon = ({ className = "w-10 h-10" }: { className?: string }) => (
+export const PlaceholderGmailIcon = ({ className = "w-5 h-5 text-red-500" }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor" xmlns="http://www.w3.org/2000/svg">
     <path d="M20 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4ZM20 8L12 13L4 8V6L12 11L20 6V8Z"/>
   </svg>
 );
 
-export const PlaceholderPhotosIcon = ({ className = "w-10 h-10" }: { className?: string }) => (
+export const PlaceholderPhotosIcon = ({ className = "w-5 h-5 text-yellow-500" }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor" xmlns="http://www.w3.org/2000/svg">
     <path d="M21.99 4C21.99 2.9 21.1 2 20 2H4C2.9 2 2 2.9 2 4V20C2 21.1 2.9 22 4 22H20C21.1 22 21.99 21.1 21.99 20L22 4ZM11.25 16.5L9 13.73L6 17.5H18L14.25 12.75L11.25 16.5Z"/>
   </svg>
 );
 
-export const PlaceholderKeepIcon = ({ className = "w-10 h-10" }: { className?: string }) => (
+export const PlaceholderKeepIcon = ({ className = "w-5 h-5 text-yellow-400" }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor" xmlns="http://www.w3.org/2000/svg">
     <path d="M19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3ZM10 17H7V15H10V17ZM10 13H7V11H10V13ZM10 9H7V7H10V9ZM14.5 17H11.5V15H14.5V17ZM14.5 13H11.5V11H14.5V13ZM14.5 9H11.5V7H14.5V9ZM17 17H15V7H17V17Z"/>
   </svg>
 );
 
-export const PlaceholderCalendarIcon = ({ className = "w-10 h-10" }: { className?: string }) => (
+// PlaceholderCalendarIcon is for the Google Calendar Widget in "Add Widget" menu
+export const PlaceholderCalendarIcon = ({ className = "w-5 h-5 text-green-500" }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor" xmlns="http://www.w3.org/2000/svg">
     <path d="M19 4H18V2H16V4H8V2H6V4H5C3.89 4 3.01 4.89 3.01 6L3 20C3 21.11 3.89 22 5 22H19C20.11 22 21 21.11 21 20V6C21 4.89 20.11 4 19 4ZM19 20H5V10H19V20ZM19 8H5V6H19V8ZM12 13H7V18H12V13Z"/>
   </svg>
 );
 
-export const PlaceholderMapsIcon = ({ className = "w-10 h-10" }: { className?: string }) => (
+// PlaceholderMapsIcon is for the Google Maps Widget in "Add Widget" menu
+export const PlaceholderMapsIcon = ({ className = "w-5 h-5 text-blue-500" }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor" xmlns="http://www.w3.org/2000/svg">
     <path d="M12 2C8.13 2 5 5.13 5 9C0 16.25 12 22 12 22C12 22 19 16.25 19 9C19 5.13 15.87 2 12 2ZM12 11.5C10.62 11.5 9.5 10.38 9.5 9C9.5 7.62 10.62 6.5 12 6.5C13.38 6.5 14.5 7.62 14.5 9C14.5 10.38 13.38 11.5 12 11.5Z"/>
   </svg>
 );
 
-export const PlaceholderDriveIcon = ({ className = "w-10 h-10" }: { className?: string }) => (
+export const PlaceholderDriveIcon = ({ className = "w-5 h-5 text-yellow-600" }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor" xmlns="http://www.w3.org/2000/svg">
     <path d="M7.71 3.5L1.5 15L7.44 15L12.03 6.51L7.71 3.5ZM8.56 15.5H15.43L19.5 8.5L12.37 8.5L8.56 15.5ZM16.29 3.5L11.97 6.51L16.56 15L22.5 15L16.29 3.5Z"/>
   </svg>
 );
 
-export const PlaceholderMeetIcon = ({ className = "w-10 h-10" }: { className?: string }) => (
+export const PlaceholderMeetIcon = ({ className = "w-5 h-5 text-green-600" }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor" xmlns="http://www.w3.org/2000/svg">
     <path d="M17 10.5V7C17 6.45 16.55 6 16 6H4C3.45 6 3 6.45 3 7V17C3 17.55 3.45 18 4 18H16C16.55 18 17 17.55 17 17V13.5L21 17.5V6.5L17 10.5ZM14 13H11V10H9V13H6V15H9V18H11V15H14V13Z"/>
   </svg>

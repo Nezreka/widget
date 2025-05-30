@@ -1,4 +1,3 @@
-// src/definitions/widgetConfig.ts
 import React from 'react';
 
 // Import Icon Components
@@ -17,6 +16,7 @@ import {
   GeminiChatIcon,
   GoogleServicesHubIcon,
   PlaceholderCalendarIcon, // Added for Google Calendar
+  PlaceholderMapsIcon, // Added for Google Maps
 } from '@/components/Icons'; // Assuming Icons.tsx is in @/components/
 
 // Import specific widget settings types from their respective component files
@@ -35,6 +35,13 @@ import { type PortfolioWidgetSettings } from "@/components/PortfolioWidget";
 import { type GeminiChatWidgetSettings } from "@/components/GeminiChatWidget";
 import { type GoogleServicesHubWidgetSettings } from "@/components/GoogleServicesHubWidget";
 import { type GoogleCalendarWidgetSettings } from "@/components/GoogleCalendarWidget"; // Added for Google Calendar
+// Define GoogleMapsWidgetSettings - can be expanded later
+export interface GoogleMapsWidgetSettings {
+  defaultLocation?: string;
+  zoomLevel?: number;
+  mapType?: 'roadmap' | 'satellite' | 'hybrid' | 'terrain';
+  showTraffic?: boolean;
+}
 
 
 // Import WidgetContainerSettings from Widget.tsx as it's used by PageWidgetConfig
@@ -89,14 +96,14 @@ export type AllWidgetSettings =
     WeatherWidgetSettings | TodoWidgetSettings | ClockWidgetSettings | CalculatorWidgetSettings |
     PageInstanceNotesSettings | YoutubeWidgetSettings | MinesweeperWidgetSettings | UnitConverterWidgetSettings |
     CountdownStopwatchWidgetSettings | PhotoWidgetSettings | PortfolioWidgetSettings | GeminiChatWidgetSettings |
-    GoogleServicesHubWidgetSettings | GoogleCalendarWidgetSettings | // Added GoogleCalendarWidgetSettings
+    GoogleServicesHubWidgetSettings | GoogleCalendarWidgetSettings | GoogleMapsWidgetSettings | // Added GoogleMapsWidgetSettings
     Record<string, unknown>; // Fallback for generic or unknown settings
 
 export type WidgetType =
     'weather' | 'todo' | 'clock' | 'calculator' | 'notes' | 'youtube' |
     'minesweeper' | 'unitConverter' | 'countdownStopwatch' | 'photo' | 'portfolio' |
     'geminiChat' |
-    'googleServicesHub' | 'googleCalendar' | // Added 'googleCalendar'
+    'googleServicesHub' | 'googleCalendar' | 'googleMaps' | // Added 'googleMaps'
     'generic';
 
 // --- Widget Configuration Interfaces ---
@@ -147,6 +154,13 @@ export const GOOGLE_CALENDAR_DEFAULT_INSTANCE_SETTINGS: GoogleCalendarWidgetSett
     viewMode: 'month',
     showWeekends: true,
 };
+// Define default settings for the new Google Maps widget
+export const GOOGLE_MAPS_DEFAULT_INSTANCE_SETTINGS: GoogleMapsWidgetSettings = {
+    defaultLocation: 'current', // Special value to indicate using user's current location
+    zoomLevel: 12,
+    mapType: 'roadmap',
+    showTraffic: false,
+};
 
 
 // --- Available Widget Definitions ---
@@ -170,8 +184,8 @@ export const AVAILABLE_WIDGET_DEFINITIONS: WidgetBlueprint[] = [
     description: "Access various Google services.",
     icon: GoogleServicesHubIcon,
     defaultSizePreset: 'hub_default_size',
-    minColSpan: 15,
-    minRowSpan: 15,
+    minColSpan: 15, // Increased minColSpan for the Hub
+    minRowSpan: 15, // Increased minRowSpan for the Hub
     defaultSettings: GOOGLE_SERVICES_HUB_DEFAULT_INSTANCE_SETTINGS,
   },
   // Add the new Google Calendar blueprint
@@ -185,5 +199,17 @@ export const AVAILABLE_WIDGET_DEFINITIONS: WidgetBlueprint[] = [
     minColSpan: 12, // Minimum columns (e.g., 12 cells * 30px/cell = 360px)
     minRowSpan: 10, // Minimum rows (e.g., 10 cells * 30px/cell = 300px)
     defaultSettings: GOOGLE_CALENDAR_DEFAULT_INSTANCE_SETTINGS,
+  },
+  // Add the new Google Maps blueprint
+  {
+    type: 'googleMaps',
+    defaultTitle: 'Google Maps',
+    displayName: 'Google Maps',
+    description: 'Navigate and explore with Google Maps.',
+    icon: PlaceholderMapsIcon, // Using the placeholder from Icons.tsx
+    defaultSizePreset: 'content_driven_large', // Maps also benefit from larger space
+    minColSpan: 12, 
+    minRowSpan: 10,
+    defaultSettings: GOOGLE_MAPS_DEFAULT_INSTANCE_SETTINGS,
   },
 ];

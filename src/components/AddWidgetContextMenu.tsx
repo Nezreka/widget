@@ -10,7 +10,8 @@ import {
     MinesweeperIcon, UnitConverterIcon, CountdownStopwatchIcon, PhotoIcon,
     PortfolioIcon, GeminiChatIcon,
     GoogleServicesHubIcon,
-    PlaceholderCalendarIcon, // Added for Google Calendar
+    PlaceholderCalendarIcon,
+    PlaceholderMapsIcon, // Added for Google Maps
 } from '@/components/Icons';
 
 
@@ -326,7 +327,8 @@ export const mapBlueprintToContextMenuItem = (blueprint: WidgetBlueprintFromConf
       case 'portfolio': iconComponent = PortfolioIcon; break;
       case 'geminiChat': iconComponent = GeminiChatIcon; break;
       case 'googleServicesHub': iconComponent = GoogleServicesHubIcon; break;
-      case 'googleCalendar': iconComponent = PlaceholderCalendarIcon; break; // Added Google Calendar
+      case 'googleCalendar': iconComponent = PlaceholderCalendarIcon; break;
+      case 'googleMaps': iconComponent = PlaceholderMapsIcon; break; // Added Google Maps
       default: iconComponent = undefined; // Or a generic icon
     }
   }
