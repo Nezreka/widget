@@ -76,7 +76,6 @@ import GoogleMapsWidget, { // Added Google Maps Widget
   // type GoogleMapsWidgetSettings, // This will be imported from widgetConfig
 } from "@/components/GoogleMapsWidget";
 
-
 import AddWidgetContextMenu, {
   mapBlueprintToContextMenuItem,
   type WidgetBlueprintContextMenuItem,
@@ -138,130 +137,14 @@ import {
   type UnknownAiCommand,
 } from "@/definitions/aiCommands";
 
-// --- Web Speech API Type Definitions ---
-interface SpeechRecognitionResult {
-  readonly isFinal: boolean;
-  readonly length: number;
-  item(index: number): SpeechRecognitionAlternative;
-  [index: number]: SpeechRecognitionAlternative;
-}
+// Import Web Speech API Type Definitions
+import {
+  type SpeechRecognition,
+  type SpeechRecognitionEvent,
+  type SpeechRecognitionErrorEvent,
+  // Add other specific types if directly used, or rely on SpeechRecognition for most cases
+} from "@/definitions/speechTypes";
 
-interface SpeechRecognitionAlternative {
-  readonly transcript: string;
-  readonly confidence: number;
-}
-
-interface SpeechRecognitionResultList {
-  readonly length: number;
-  item(index: number): SpeechRecognitionResult;
-  [index: number]: SpeechRecognitionResult;
-}
-
-interface SpeechRecognitionEvent extends Event {
-  readonly resultIndex: number;
-  readonly results: SpeechRecognitionResultList;
-  readonly interpretation?: unknown;
-  readonly emma?: Document;
-}
-
-interface SpeechRecognitionErrorEvent extends Event {
-  readonly error: string;
-  readonly message: string;
-}
-
-interface SpeechGrammar {
-  src: string;
-  weight?: number;
-}
-interface SpeechGrammarList {
-  readonly length: number;
-  item(index: number): SpeechGrammar;
-  [index: number]: SpeechGrammar;
-  addFromString(string: string, weight?: number): void;
-  addFromURI(src: string, weight?: number): void;
-}
-
-interface SpeechRecognitionStatic {
-  new (): SpeechRecognition;
-}
-
-interface SpeechRecognition extends EventTarget {
-  grammars: SpeechGrammarList;
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  maxAlternatives: number;
-  serviceURI?: string;
-  abort(): void;
-  start(): void;
-  stop(): void;
-  onaudiostart: ((this: SpeechRecognition, ev: Event) => void) | null;
-  onaudioend: ((this: SpeechRecognition, ev: Event) => void) | null;
-  onend: ((this: SpeechRecognition, ev: Event) => void) | null;
-  onerror:
-    | ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => void)
-    | null;
-  onnomatch:
-    | ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => void)
-    | null;
-  onresult:
-    | ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => void)
-    | null;
-  onsoundstart: ((this: SpeechRecognition, ev: Event) => void) | null;
-  onsoundend: ((this: SpeechRecognition, ev: Event) => void) | null;
-  onspeechstart: ((this: SpeechRecognition, ev: Event) => void) | null;
-  onspeechend: ((this: SpeechRecognition, ev: Event) => void) | null;
-  onstart: ((this: SpeechRecognition, ev: Event) => void) | null;
-  addEventListener<K extends keyof SpeechRecognitionEventMap>(
-    type: K,
-    listener: (
-      this: SpeechRecognition,
-      ev: SpeechRecognitionEventMap[K]
-    ) => void,
-    options?: boolean | AddEventListenerOptions
-  ): void;
-  addEventListener(
-    type: string,
-    listener: EventListenerOrEventListenerObject,
-    options?: boolean | AddEventListenerOptions
-  ): void;
-  removeEventListener<K extends keyof SpeechRecognitionEventMap>(
-    type: K,
-    listener: (
-      this: SpeechRecognition,
-      ev: SpeechRecognitionEventMap[K]
-    ) => void,
-    options?: boolean | EventListenerOptions
-  ): void;
-  removeEventListener(
-    type: string,
-    listener: EventListenerOrEventListenerObject,
-    options?: boolean | EventListenerOptions
-  ): void;
-}
-
-interface SpeechRecognitionEventMap {
-  audiostart: Event;
-  audioend: Event;
-  end: Event;
-  error: SpeechRecognitionErrorEvent;
-  nomatch: SpeechRecognitionEvent;
-  result: SpeechRecognitionEvent;
-  soundstart: Event;
-  soundend: Event;
-  speechstart: Event;
-  speechend: Event;
-  start: Event;
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition: SpeechRecognitionStatic;
-    webkitSpeechRecognition: SpeechRecognitionStatic;
-    SpeechSynthesisUtterance: typeof SpeechSynthesisUtterance;
-    readonly speechSynthesis: SpeechSynthesis;
-  }
-}
 
 // --- Page-Specific Constants ---
 const CELL_SIZE_OPTIONS = [
@@ -409,7 +292,7 @@ const ensureGoogleServicesHubInstanceSettings = (
       currentHubSettings?.animationSpeed || hubInstanceDefaults.animationSpeed,
     // Add other hub-specific settings if they exist in the defaults
     iconSize: currentHubSettings?.iconSize || hubInstanceDefaults.iconSize,
-    menuRadius: currentHubSettings?.menuRadius // Default might be handled in component or could be set here
+    menuRadius: currentHubSettings?.menuRadius, // Default might be handled in component or could be set here
   };
 };
 
@@ -427,25 +310,30 @@ const ensureGoogleCalendarInstanceSettings = (
       typeof currentCalendarSettings?.showWeekends === "boolean"
         ? currentCalendarSettings.showWeekends
         : calendarInstanceDefaults.showWeekends,
-    calendarId: currentCalendarSettings?.calendarId || calendarInstanceDefaults.calendarId,
+    calendarId:
+      currentCalendarSettings?.calendarId ||
+      calendarInstanceDefaults.calendarId,
   };
 };
 
-const ensureGoogleMapsInstanceSettings = ( // Added for Google Maps
+const ensureGoogleMapsInstanceSettings = (
+  // Added for Google Maps
   settings: AllWidgetSettings | undefined
 ): GoogleMapsWidgetSettings => {
   const mapsInstanceDefaults = GOOGLE_MAPS_DEFAULT_INSTANCE_SETTINGS;
   const currentMapsSettings = settings as GoogleMapsWidgetSettings | undefined;
   return {
-    defaultLocation: currentMapsSettings?.defaultLocation || mapsInstanceDefaults.defaultLocation,
+    defaultLocation:
+      currentMapsSettings?.defaultLocation ||
+      mapsInstanceDefaults.defaultLocation,
     zoomLevel: currentMapsSettings?.zoomLevel || mapsInstanceDefaults.zoomLevel,
     mapType: currentMapsSettings?.mapType || mapsInstanceDefaults.mapType,
-    showTraffic: typeof currentMapsSettings?.showTraffic === "boolean"
+    showTraffic:
+      typeof currentMapsSettings?.showTraffic === "boolean"
         ? currentMapsSettings.showTraffic
         : mapsInstanceDefaults.showTraffic,
   };
 };
-
 
 const processWidgetConfig = (
   widgetData: Partial<PageWidgetConfig>,
@@ -553,12 +441,12 @@ const processWidgetConfig = (
     finalContentSettings = ensureGoogleCalendarInstanceSettings(
       finalContentSettings as GoogleCalendarWidgetSettings
     );
-  } else if (widgetData.type === "googleMaps") { // Added for Google Maps
+  } else if (widgetData.type === "googleMaps") {
+    // Added for Google Maps
     finalContentSettings = ensureGoogleMapsInstanceSettings(
       finalContentSettings as GoogleMapsWidgetSettings
     );
   }
-
 
   return {
     id: widgetData.id || `${blueprint.type}-${Date.now()}`,
@@ -3145,7 +3033,7 @@ export default function Home() {
       };
 
       speechRecognitionRef.current.onresult = (
-        event: SpeechRecognitionEvent
+        event: SpeechRecognitionEvent // Using imported type
       ) => {
         let interimTranscript = "";
         let finalTranscript = "";
@@ -3166,7 +3054,7 @@ export default function Home() {
       };
 
       speechRecognitionRef.current.onerror = (
-        event: SpeechRecognitionErrorEvent
+        event: SpeechRecognitionErrorEvent // Using imported type
       ) => {
         console.error("Speech recognition error:", event.error);
         let errorMsg = `Speech recognition error: ${event.error}.`;
@@ -4010,12 +3898,15 @@ export default function Home() {
     );
     const hubWidget = widgets.find((w) => w.id === hubWidgetId);
 
-    if (serviceKey === "calendar" || serviceKey === "maps") { // Updated to include "maps"
+    if (serviceKey === "calendar" || serviceKey === "maps") {
+      // Updated to include "maps"
       if (hubWidget) {
         const hubColStart = hubWidget.colStart;
         const hubRowStart = hubWidget.rowStart;
-        const widgetTypeToOpen = serviceKey === "calendar" ? "googleCalendar" : "googleMaps";
-        const widgetTitleToOpen = serviceKey === "calendar" ? "Google Calendar" : "Google Maps";
+        const widgetTypeToOpen =
+          serviceKey === "calendar" ? "googleCalendar" : "googleMaps";
+        const widgetTitleToOpen =
+          serviceKey === "calendar" ? "Google Calendar" : "Google Maps";
 
         setWidgets((prevWidgets) => {
           const widgetsAfterDelete = prevWidgets.filter(
@@ -4040,11 +3931,17 @@ export default function Home() {
           return widgetsAfterDelete;
         });
       } else {
-        const widgetTypeToOpen = serviceKey === "calendar" ? "googleCalendar" : "googleMaps";
-        const widgetTitleToOpen = serviceKey === "calendar" ? "Google Calendar" : "Google Maps";
+        const widgetTypeToOpen =
+          serviceKey === "calendar" ? "googleCalendar" : "googleMaps";
+        const widgetTitleToOpen =
+          serviceKey === "calendar" ? "Google Calendar" : "Google Maps";
         handleAddNewWidget(widgetTypeToOpen, widgetTitleToOpen);
       }
-      setAiLastFeedback(`Opening ${serviceKey === "calendar" ? "Google Calendar" : "Google Maps"}...`);
+      setAiLastFeedback(
+        `Opening ${
+          serviceKey === "calendar" ? "Google Calendar" : "Google Maps"
+        }...`
+      );
     } else {
       alert(
         `Selected ${serviceKey}. This would open the ${serviceKey} widget. (Functionality for other services not yet implemented)`
@@ -4054,7 +3951,6 @@ export default function Home() {
       }
     }
   };
-
 
   const handleWheelScroll = (event: React.WheelEvent<HTMLDivElement>) => {
     if (activeWidgetId || !dashboardAreaRef.current || isMobileView) {
