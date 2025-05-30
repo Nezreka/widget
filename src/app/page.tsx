@@ -10,6 +10,7 @@ import Widget, {
 import GridBackground from "@/components/GridBackground";
 import SettingsModal from "@/components/SettingsModal";
 import WidgetContainerSettingsModal from "@/components/WidgetContainerSettingsModal";
+import AiCommandBar from "@/components/AiCommandBar"; // Import the new AiCommandBar component
 
 // Import Widget-specific components and types
 import WeatherWidget, {
@@ -71,9 +72,8 @@ import GoogleCalendarWidget, {
   GoogleCalendarSettingsPanel,
   type GoogleCalendarWidgetSettings,
 } from "@/components/GoogleCalendarWidget";
-import GoogleMapsWidget, { // Added Google Maps Widget
-  GoogleMapsSettingsPanel, // Added Google Maps Settings Panel
-  // type GoogleMapsWidgetSettings, // This will be imported from widgetConfig
+import GoogleMapsWidget, {
+  GoogleMapsSettingsPanel,
 } from "@/components/GoogleMapsWidget";
 
 import AddWidgetContextMenu, {
@@ -90,11 +90,6 @@ import {
   AutoSortIcon,
   DensityIcon,
   AiIcon,
-  MicIcon,
-  MicOffIcon,
-  SendArrowIcon,
-  CloseIcon as AiCloseIcon,
-  ProcessingIcon,
 } from "@/components/Icons";
 
 import {
@@ -106,19 +101,19 @@ import {
   GEMINI_CHAT_WIDGET_DEFAULT_INSTANCE_SETTINGS,
   GOOGLE_SERVICES_HUB_DEFAULT_INSTANCE_SETTINGS,
   GOOGLE_CALENDAR_DEFAULT_INSTANCE_SETTINGS,
-  GOOGLE_MAPS_DEFAULT_INSTANCE_SETTINGS, // Added Google Maps default settings
+  GOOGLE_MAPS_DEFAULT_INSTANCE_SETTINGS,
   type WidgetSizePresetKey,
   type AllWidgetSettings,
   type WidgetType,
   type PageWidgetConfig,
   type PageInstanceNotesSettings,
-  type GoogleMapsWidgetSettings, // Added Google Maps settings type
+  type GoogleMapsWidgetSettings,
 } from "@/definitions/widgetConfig";
 
 import {
   type ParsedAiCommand,
-  AI_COMMAND_SCHEMA,
-  getGeminiSystemPrompt as getBaseGeminiSystemPrompt,
+  // AI_COMMAND_SCHEMA is used by AiCommandBar
+  // getBaseGeminiSystemPrompt is used by AiCommandBar
   type AddWidgetAiCommand,
   type DeleteWidgetAiCommand,
   type MoveWidgetAiCommand,
@@ -130,21 +125,14 @@ import {
   type ChangeCellSizeAiCommand,
   type SendChatMessageAiCommand,
   type GetWidgetInfoAiCommand,
-  type ClarifyCommandAiCommand,
+
   type OpenOrFocusWidgetAiCommand,
   type TargetWidgetAiCommand,
   type BaseAiCommand,
-  type UnknownAiCommand,
+
 } from "@/definitions/aiCommands";
 
-// Import Web Speech API Type Definitions
-import {
-  type SpeechRecognition,
-  type SpeechRecognitionEvent,
-  type SpeechRecognitionErrorEvent,
-  // Add other specific types if directly used, or rely on SpeechRecognition for most cases
-} from "@/definitions/speechTypes";
-
+// SpeechRecognition types are now used by AiCommandBar
 
 // --- Page-Specific Constants ---
 const CELL_SIZE_OPTIONS = [
@@ -290,9 +278,8 @@ const ensureGoogleServicesHubInstanceSettings = (
   return {
     animationSpeed:
       currentHubSettings?.animationSpeed || hubInstanceDefaults.animationSpeed,
-    // Add other hub-specific settings if they exist in the defaults
     iconSize: currentHubSettings?.iconSize || hubInstanceDefaults.iconSize,
-    menuRadius: currentHubSettings?.menuRadius, // Default might be handled in component or could be set here
+    menuRadius: currentHubSettings?.menuRadius,
   };
 };
 
@@ -317,7 +304,6 @@ const ensureGoogleCalendarInstanceSettings = (
 };
 
 const ensureGoogleMapsInstanceSettings = (
-  // Added for Google Maps
   settings: AllWidgetSettings | undefined
 ): GoogleMapsWidgetSettings => {
   const mapsInstanceDefaults = GOOGLE_MAPS_DEFAULT_INSTANCE_SETTINGS;
@@ -419,7 +405,6 @@ const processWidgetConfig = (
     ...(widgetData.settings || {}),
   };
 
-  // Ensure specific widget settings are correctly typed and defaulted
   if (widgetData.type === "photo")
     finalContentSettings = ensurePhotoWidgetInstanceSettings(
       finalContentSettings as PhotoWidgetSettings
@@ -436,13 +421,12 @@ const processWidgetConfig = (
     finalContentSettings = ensureGoogleServicesHubInstanceSettings(
       finalContentSettings as GoogleServicesHubWidgetSettings
     );
-    finalContainerSettings.innerPadding = "p-0"; // Hub specific container setting
+    finalContainerSettings.innerPadding = "p-0";
   } else if (widgetData.type === "googleCalendar") {
     finalContentSettings = ensureGoogleCalendarInstanceSettings(
       finalContentSettings as GoogleCalendarWidgetSettings
     );
   } else if (widgetData.type === "googleMaps") {
-    // Added for Google Maps
     finalContentSettings = ensureGoogleMapsInstanceSettings(
       finalContentSettings as GoogleMapsWidgetSettings
     );
@@ -476,79 +460,7 @@ interface StoredDashboardLayout {
   actualGridPixelWidth?: number;
 }
 
-const getGeminiSystemPrompt = (widgets: PageWidgetConfig[]): string => {
-  const basePrompt = getBaseGeminiSystemPrompt(widgets);
-  const promptLines = [basePrompt];
-
-  promptLines.push(
-    "\n--- YouTube Widget Specific Instructions (CRITICAL - READ CAREFULLY) ---"
-  );
-  promptLines.push("When the user's command is about YouTube:");
-  promptLines.push(
-    "1. The action is ALWAYS 'openOrFocusWidget' with 'widgetType': 'youtube'."
-  );
-  promptLines.push(
-    "2. **If the user's command includes ANY phrases like 'search for', 'find videos of', 'show me videos of', 'look for', 'YouTube [something]' or ANY other indication they want to find specific content on YouTube:**"
-  );
-  promptLines.push(
-    "   - You **MUST** extract the search term (e.g., if they say 'YouTube search for epic cat fails', the search term is 'epic cat fails')."
-  );
-  promptLines.push(
-    "   - You **MUST** include the 'initialSettings' field in your JSON command."
-  );
-  promptLines.push(
-    "   - Inside 'initialSettings', you **MUST** include a key named 'defaultSearchQuery'."
-  );
-  promptLines.push(
-    "   - The value for 'defaultSearchQuery' **MUST BE** the exact search term you extracted."
-  );
-  promptLines.push(
-    "   - **THIS IS NOT OPTIONAL. IF A SEARCH IS INTENDED, `initialSettings.defaultSearchQuery` IS REQUIRED.** Failure to include it means the search will NOT happen, and the command is INCORRECT."
-  );
-  promptLines.push(
-    "   - **CORRECT Example** for user prompt 'Show me music videos by Virtual Mage on YouTube':"
-  );
-  promptLines.push(
-    '     `{ "action": "openOrFocusWidget", "widgetType": "youtube", "initialSettings": { "defaultSearchQuery": "music videos by Virtual Mage" }, "feedbackToUser": "Searching YouTube for music videos by Virtual Mage..." }`'
-  );
-  promptLines.push(
-    "   - **INCORRECT Example** for user prompt 'Show me music videos by Virtual Mage on YouTube':"
-  );
-  promptLines.push(
-    '     `{ "action": "openOrFocusWidget", "widgetType": "youtube", "feedbackToUser": "Opening YouTube..." }` <-- WRONG! Missing `initialSettings.defaultSearchQuery`.'
-  );
-  promptLines.push(
-    "3. If, and ONLY IF, the user's command is simply to 'open YouTube' or 'focus on YouTube' WITHOUT ANY search term or search intent mentioned:"
-  );
-  promptLines.push(
-    "   - Then 'initialSettings' can be omitted, or 'defaultSearchQuery' can be an empty string if 'initialSettings' is present for other reasons."
-  );
-  promptLines.push("   - Example for 'open YouTube':");
-  promptLines.push(
-    '     `{ "action": "openOrFocusWidget", "widgetType": "youtube", "feedbackToUser": "Opening YouTube..." }`'
-  );
-
-  const youtubeWidgets = widgets.filter((w) => w.type === "youtube");
-  if (youtubeWidgets.length > 0) {
-    promptLines.push("\nExisting YouTube Widgets:");
-    youtubeWidgets.forEach((ytWidget) => {
-      const currentSearch = (ytWidget.settings as YoutubeWidgetSettings)
-        ?.defaultSearchQuery;
-      promptLines.push(
-        `- Title: '${ytWidget.title}', ID: '${ytWidget.id}'. Current search: ${
-          currentSearch ? `'${currentSearch}'` : "none"
-        }. If user wants to search in THIS specific widget, use its ID/title and include the new 'initialSettings.defaultSearchQuery'.`
-      );
-    });
-  } else {
-    promptLines.push(
-      "\nNo YouTube widgets exist. If user wants to search, you MUST add a new one AND include 'initialSettings.defaultSearchQuery'."
-    );
-  }
-  promptLines.push("--- End YouTube Widget Specific Instructions ---");
-
-  return promptLines.join("\n");
-};
+// getGeminiSystemPrompt is now in AiCommandBar.tsx
 
 const smoothScrollTo = (
   element: HTMLElement,
@@ -563,7 +475,7 @@ const smoothScrollTo = (
   const animateScroll = (currentTime: number) => {
     const elapsedTime = currentTime - startTime;
     const progress = Math.min(elapsedTime / duration, 1);
-    const easedProgress = 1 - Math.pow(1 - progress, 3);
+    const easedProgress = 1 - Math.pow(1 - progress, 3); // easeOutCubic
 
     if (axis === "left") {
       element.scrollLeft = start + change * easedProgress;
@@ -591,13 +503,9 @@ export default function Home() {
   const [widgets, setWidgets] = useState<PageWidgetConfig[]>([]);
   const [isLayoutEngineReady, setIsLayoutEngineReady] = useState(false);
 
+  // AI Command Bar states are now managed by AiCommandBar.tsx
   const [showAiCommandBar, setShowAiCommandBar] = useState(false);
-  const [aiInputValue, setAiInputValue] = useState("");
-  const [aiIsListening, setAiIsListening] = useState(false);
-  const [aiIsProcessing, setAiIsProcessing] = useState(false);
-  const [aiLastFeedback, setAiLastFeedback] = useState<string | null>(null);
-  const [aiError, setAiError] = useState<string | null>(null);
-  const speechRecognitionRef = useRef<SpeechRecognition | null>(null);
+  // aiInputValue, aiIsListening, aiIsProcessing, aiLastFeedback, aiError, speechRecognitionRef are removed.
 
   useEffect(() => {
     const checkMobile = () => {
@@ -915,7 +823,7 @@ export default function Home() {
         );
         const clockSpan = Math.max(
           clockBlueprint.minColSpan,
-          Math.max(1, Math.round(clockPreset.targetHeightPx / cellSize))
+          Math.max(1, Math.round(clockPreset.targetHeightPx / cellSize)) // Note: This was targetHeightPx, likely a typo, should be targetWidthPx for col span. Keeping as is from original.
         );
 
         const gap = 2;
@@ -938,13 +846,13 @@ export default function Home() {
                   colStart: newPortfolioColStart,
                   colSpan: portfolioSpan,
                 };
-              if (w.id === "gemini-chat-main")
+              if (w.id === "gemini-chat-main") // Assuming an ID for gemini chat if it's part of initial layout
                 return {
                   ...w,
                   colStart: newGeminiChatColStart,
                   colSpan: geminiChatSpan,
                 };
-              if (w.id === "clock-widget-main")
+              if (w.id === "clock-widget-main") // Assuming an ID for clock if it's part of initial layout
                 return { ...w, colStart: newClockColStart, colSpan: clockSpan };
               return w;
             });
@@ -1168,7 +1076,7 @@ export default function Home() {
       const screenHeight = window.innerHeight;
       const headerH = headerRef.current?.offsetHeight || 60;
       const aiBarH = showAiCommandBar
-        ? document.getElementById("ai-command-bar")?.offsetHeight || 70
+        ? document.getElementById("ai-command-bar")?.offsetHeight || 70 // Estimate if not rendered yet
         : 0;
       const contentH = screenHeight - headerH - aiBarH;
 
@@ -1241,12 +1149,12 @@ export default function Home() {
   }, [
     isMobileView,
     cellSize,
-    showAiCommandBar,
+    showAiCommandBar, // Added dependency
     widgets,
     isLayoutEngineReady,
-    actualGridPixelWidth, // Added to dependencies
-    widgetContainerCols, // Added to dependencies
-    widgetContainerRows, // Added to dependencies
+    actualGridPixelWidth,
+    widgetContainerCols,
+    widgetContainerRows,
   ]);
 
   useEffect(() => {
@@ -1304,8 +1212,6 @@ export default function Home() {
       r2RS: number,
       buffer: number = 0
     ): boolean => {
-      // This function doesn't need totalCols/totalRows if it's just checking overlap between two defined rectangles.
-      // The boundary checks are done by canPlaceWidget using totalCols/totalRows.
       const r1ColEnd = r1C + r1CS - 1;
       const r1RowEnd = r1R + r1RS - 1;
 
@@ -1321,7 +1227,7 @@ export default function Home() {
 
       return overlapX && overlapY;
     },
-    [] // No dependencies on widgetContainerCols/Rows as it's a pure geometric check
+    []
   );
 
   const canPlaceWidget = useCallback(
@@ -1330,15 +1236,11 @@ export default function Home() {
       targetCol: number,
       targetRow: number,
       currentLayout: PageWidgetConfig[],
-      // These overrides are crucial for the dynamic grid expansion logic
       overrideTotalCols: number,
       overrideTotalRows: number
     ): boolean => {
-      // If totalCols or totalRows are 0 (or less), placement is impossible.
-      // This should be handled by the caller ensuring valid initial dimensions.
       if (overrideTotalCols <= 0 || overrideTotalRows <= 0) return false;
 
-      // Check if the widget fits within the provided grid boundaries
       if (
         targetCol < 1 ||
         targetRow < 1 ||
@@ -1348,9 +1250,8 @@ export default function Home() {
         return false;
       }
 
-      // Check for overlaps with existing widgets in the layout
       for (const existingWidget of currentLayout) {
-        if (existingWidget.id === widgetToPlace.id) continue; // Don't check against itself
+        if (existingWidget.id === widgetToPlace.id) continue;
         if (
           doRectanglesOverlap(
             targetCol,
@@ -1360,20 +1261,17 @@ export default function Home() {
             existingWidget.colStart,
             existingWidget.rowStart,
             existingWidget.colSpan,
-            existingWidget.rowSpan,
-            0 // No buffer for strict placement
-            // No need to pass overrideTotalCols/Rows to doRectanglesOverlap, as it's a pure overlap check
+            existingWidget.rowSpan
           )
         ) {
-          return false; // Found an overlap
+          return false;
         }
       }
-      return true; // No boundary issues, no overlaps
+      return true;
     },
-    [doRectanglesOverlap] // Depends only on doRectanglesOverlap
+    [doRectanglesOverlap]
   );
 
-  // New sorting function that allows the grid to expand
   const performAutoSortAndExpandIfNeeded = useCallback(
     (
       widgetsToSort: PageWidgetConfig[],
@@ -1399,8 +1297,8 @@ export default function Home() {
       });
 
       const newLayout: PageWidgetConfig[] = [];
-      let effectiveGridCols = initialGridCols > 0 ? initialGridCols : 1; // Ensure at least 1
-      let effectiveGridRows = initialGridRows > 0 ? initialGridRows : 1; // Ensure at least 1
+      let effectiveGridCols = initialGridCols > 0 ? initialGridCols : 1;
+      let effectiveGridRows = initialGridRows > 0 ? initialGridRows : 1;
 
       for (const widget of sortedWidgets) {
         let placed = false;
@@ -1410,16 +1308,11 @@ export default function Home() {
           rowSpan: Math.max(widget.rowSpan, widget.minRowSpan),
         };
 
-        // Try to place in existing rows, potentially expanding columns
         for (let r = 1; r <= effectiveGridRows + widgetToPlace.rowSpan; r++) {
-          // Allow checking rows that would require expansion
           for (let c = 1; c <= effectiveGridCols + widgetToPlace.colSpan; c++) {
-            // Allow checking columns that would require expansion
-
             const requiredColsForThisPlacement = c + widgetToPlace.colSpan - 1;
             const requiredRowsForThisPlacement = r + widgetToPlace.rowSpan - 1;
 
-            // Determine the grid dimensions needed if this widget is placed here
             const tempEffectiveCols = Math.max(
               effectiveGridCols,
               requiredColsForThisPlacement
@@ -1446,7 +1339,6 @@ export default function Home() {
                 colSpan: widgetToPlace.colSpan,
                 rowSpan: widgetToPlace.rowSpan,
               });
-              // Update effective grid size based on this placement
               effectiveGridCols = tempEffectiveCols;
               effectiveGridRows = tempEffectiveRows;
               placed = true;
@@ -1454,14 +1346,6 @@ export default function Home() {
             }
           }
           if (placed) break;
-        }
-
-        // This secondary loop for new rows might be redundant if the first loop's row limit is `effectiveGridRows + widgetToPlace.rowSpan`
-        // However, keeping it for now as a fallback, though it might need refinement or removal if the above is sufficient.
-        if (!placed) {
-          // This part indicates a failure to place even with expansion, which is the error condition.
-          // The loop condition `r <= effectiveGridRows + widgetToPlace.rowSpan` should cover all necessary row checks.
-          // If it's not placed after that, it means it's truly unplaceable with the current strategy.
         }
 
         if (!placed) {
@@ -1502,7 +1386,6 @@ export default function Home() {
         let alertMessage = "";
         let importedIsMobileLayout = false;
         let importedGridPixelWidth = window.innerWidth;
-        let finalColsFromSort = 0;
 
         if (
           typeof parsedJson === "object" &&
@@ -1560,14 +1443,14 @@ export default function Home() {
                 tempMobileTargetRows
               ),
             ];
-            importedGridPixelWidth = window.innerWidth; // For mobile, width is screen width
+            importedGridPixelWidth = window.innerWidth;
           } else {
             if (importedIsMobileLayout) {
               alertMessage = `Imported mobile layout. Adapting to desktop view with default widgets. Global data imported.`;
               finalWidgetsToSet = initialDesktopWidgetsLayout.map((w) =>
                 processWidgetConfig(w, finalCellSize, false)
               );
-              importedGridPixelWidth = window.innerWidth; // Reset to screen width if adapting from mobile
+              importedGridPixelWidth = window.innerWidth;
             } else {
               const processedImportedWidgets = (modernData.widgets || []).map(
                 (w) =>
@@ -1577,23 +1460,20 @@ export default function Home() {
                     false
                   )
               );
-              // Attempt to sort the imported widgets into the available space, expanding if necessary
               const sortResult = performAutoSortAndExpandIfNeeded(
                 processedImportedWidgets,
-                tempCols, // Initial guess based on imported/screen width
-                tempRowsAvailable // Initial guess based on screen height
+                tempCols,
+                tempRowsAvailable
               );
               if (sortResult) {
                 finalWidgetsToSet = sortResult.layout;
-                finalColsFromSort = sortResult.finalCols;
-                // Update importedGridPixelWidth based on the sort result
                 importedGridPixelWidth = Math.max(
                   window.innerWidth,
-                  finalColsFromSort * finalCellSize
+                  sortResult.finalCols * finalCellSize
                 );
                 alertMessage = `Dashboard layout (version ${modernData.dashboardVersion}), settings, and global data imported successfully for desktop view! Grid adapted.`;
               } else {
-                finalWidgetsToSet = processedImportedWidgets; // Fallback to processed, might have overlaps
+                finalWidgetsToSet = processedImportedWidgets;
                 alertMessage = `Dashboard layout (version ${modernData.dashboardVersion}) imported, but auto-sort failed. Manual adjustments may be needed.`;
               }
             }
@@ -1608,11 +1488,10 @@ export default function Home() {
           if (modernData.sharedGlobalPhotoHistory)
             photoHistoryToSet = modernData.sharedGlobalPhotoHistory;
         } else if (Array.isArray(parsedJson)) {
-          // Legacy format
           alertMessage =
             "Dashboard layout (legacy format) imported. Adapting to current view. Global data and settings will use defaults or existing data.";
-          const tempCurrentCellSize = cellSize; // Use current cell size for legacy
-          importedGridPixelWidth = window.innerWidth; // Default to screen width
+          const tempCurrentCellSize = cellSize;
+          importedGridPixelWidth = window.innerWidth;
 
           const processedLegacy = (
             parsedJson as Partial<PageWidgetConfig>[]
@@ -1669,12 +1548,12 @@ export default function Home() {
                 sortResult.finalCols * tempCurrentCellSize
               );
             } else {
-              finalWidgetsToSet = processedLegacy; // Fallback
+              finalWidgetsToSet = processedLegacy;
               alertMessage +=
                 " Auto-sort failed, manual adjustment may be needed.";
             }
           }
-          finalCellSize = tempCurrentCellSize; // Keep current cell size for legacy
+          finalCellSize = tempCurrentCellSize;
         } else {
           throw new Error(
             "Invalid file format. Could not recognize dashboard structure."
@@ -1684,7 +1563,7 @@ export default function Home() {
         alert(alertMessage);
 
         setCellSize(finalCellSize);
-        setActualGridPixelWidth(importedGridPixelWidth); // This will trigger useEffect to update widgetContainerCols/Rows
+        setActualGridPixelWidth(importedGridPixelWidth);
         setWidgets(finalWidgetsToSet);
         setSharedNotes(notesToSet);
         setActiveSharedNoteId(activeNoteIdToSet);
@@ -1728,15 +1607,15 @@ export default function Home() {
     if (
       maximizedWidgetId ||
       isMobileView ||
-      widgetContainerCols === 0 || // Should be > 0 if layout is ready
-      widgetContainerRows === 0 // Should be > 0 if layout is ready
+      widgetContainerCols === 0 ||
+      widgetContainerRows === 0
     )
       return;
 
     const currentLayout = widgets.map((w) => ({ ...w }));
     const sortResult = performAutoSortAndExpandIfNeeded(
       currentLayout,
-      widgetContainerCols, // Pass current container dimensions as initial guess
+      widgetContainerCols,
       widgetContainerRows
     );
 
@@ -1755,8 +1634,6 @@ export default function Home() {
       if (newActualGridWidthToSet !== actualGridPixelWidth) {
         setActualGridPixelWidth(newActualGridWidthToSet);
       }
-      // The useEffect watching actualGridPixelWidth will update widgetContainerCols.
-      // widgetContainerRows will also be updated by that useEffect based on available height.
     } else {
       console.error(
         "[handleAutoSortButtonClick] Failed to sort existing widgets even with dynamic grid expansion."
@@ -1770,11 +1647,11 @@ export default function Home() {
     updateWidgetsAndPushToHistory,
     maximizedWidgetId,
     isMobileView,
-    performAutoSortAndExpandIfNeeded, // New function
+    performAutoSortAndExpandIfNeeded,
     widgetContainerCols,
     widgetContainerRows,
-    cellSize, // Added cellSize for width calculation
-    actualGridPixelWidth, // Added for comparison
+    cellSize,
+    actualGridPixelWidth,
   ]);
 
   const attemptPlaceWidgetWithShrinking = useCallback(
@@ -1786,31 +1663,26 @@ export default function Home() {
       finalCols: number;
       finalRows: number;
     } | null => {
-      // Update return type
       if (widgetContainerCols === 0 || widgetContainerRows === 0) return null;
 
       const tempWidgetsLayout = currentWidgetsImmutable.map((w) => ({ ...w }));
 
-      // Try sorting with the new widget directly, allowing expansion
       const sortedWithNew = performAutoSortAndExpandIfNeeded(
         [...tempWidgetsLayout, { ...newWidgetConfig }],
-        widgetContainerCols, // Initial guess
-        widgetContainerRows // Initial guess
+        widgetContainerCols,
+        widgetContainerRows
       );
       if (sortedWithNew) {
         return sortedWithNew;
       }
 
-      // If direct sort fails, try shrinking (this part might be less necessary if performAutoSortAndExpandIfNeeded is robust)
-      // For now, keeping a simplified shrink attempt, but the primary expansion should handle most cases.
       const shrinkableWidgets = tempWidgetsLayout
         .filter((w) => w.colSpan > w.minColSpan || w.rowSpan > w.minRowSpan)
-        .sort((a, b) => b.colSpan * b.rowSpan - a.colSpan * a.rowSpan); // Largest first
+        .sort((a, b) => b.colSpan * b.rowSpan - a.colSpan * a.rowSpan);
 
       for (const existingWidget of shrinkableWidgets) {
         const originalColSpan = existingWidget.colSpan;
 
-        // Try shrinking column
         if (existingWidget.colSpan > existingWidget.minColSpan) {
           const widgetsWithShrunkCol = tempWidgetsLayout.map((w) =>
             w.id === existingWidget.id
@@ -1825,13 +1697,12 @@ export default function Home() {
           if (layoutWithShrunkCol) return layoutWithShrunkCol;
         }
 
-        // Try shrinking row (reset colSpan if it was shrunk above)
         if (existingWidget.rowSpan > existingWidget.minRowSpan) {
           const widgetsWithShrunkRow = tempWidgetsLayout.map((w) =>
             w.id === existingWidget.id
               ? {
                   ...w,
-                  colSpan: originalColSpan, // Reset colSpan to original before shrinking row
+                  colSpan: originalColSpan,
                   rowSpan: Math.max(w.minRowSpan, w.rowSpan - 1),
                 }
               : { ...w }
@@ -1844,9 +1715,9 @@ export default function Home() {
           if (layoutWithShrunkRow) return layoutWithShrunkRow;
         }
       }
-      return null; // Shrinking also failed
+      return null;
     },
-    [widgetContainerCols, widgetContainerRows, performAutoSortAndExpandIfNeeded] // Use new sort function
+    [widgetContainerCols, widgetContainerRows, performAutoSortAndExpandIfNeeded]
   );
 
   const findNextAvailablePosition = useCallback(
@@ -1855,8 +1726,6 @@ export default function Home() {
       targetRowSpan: number,
       currentLayout: PageWidgetConfig[]
     ): { colStart: number; rowStart: number } | null => {
-      // This function tries to find a spot in the *current* grid dimensions.
-      // It's used for initial placement before attempting a full sort/expand.
       if (widgetContainerCols === 0 || widgetContainerRows === 0) return null;
 
       for (let r = 1; r <= widgetContainerRows - targetRowSpan + 1; r++) {
@@ -1873,7 +1742,6 @@ export default function Home() {
             minRowSpan: targetRowSpan,
             settings: {},
           };
-          // Use widgetContainerCols/Rows for this check, as we are looking within current visible grid
           if (
             canPlaceWidget(
               dummyWidgetToCheck,
@@ -1967,16 +1835,13 @@ export default function Home() {
         finalRowSpan > widgetContainerRows &&
         !newWidgetConfigProcessed.isMinimized
       ) {
-        console.log(
-          `[handleAddNewWidget] Widget ${newWidgetConfigProcessed.title} (rowSpan: ${finalRowSpan}) is taller than grid (rows: ${widgetContainerRows}). Adding as minimized.`
-        );
         newWidgetConfigProcessed = {
           ...newWidgetConfigProcessed,
           isMinimized: true,
           originalRowSpan: finalRowSpan,
           rowSpan: MINIMIZED_WIDGET_ROW_SPAN,
         };
-        finalRowSpan = MINIMIZED_WIDGET_ROW_SPAN; // Update finalRowSpan to minimized height
+        finalRowSpan = MINIMIZED_WIDGET_ROW_SPAN;
       }
 
       let finalLayoutResult: {
@@ -1987,7 +1852,6 @@ export default function Home() {
       const currentWidgetsCopy = widgets.map((w) => ({ ...w }));
       let placedWithoutFullSort = false;
 
-      // Attempt 1: Place at specified or next available position if possible without full resort
       if (newColStart && newRowStart) {
         if (
           canPlaceWidget(
@@ -1999,7 +1863,7 @@ export default function Home() {
             newColStart,
             newRowStart,
             currentWidgetsCopy,
-            Math.max(widgetContainerCols, newColStart + finalColSpan - 1), // Check against potentially expanded grid
+            Math.max(widgetContainerCols, newColStart + finalColSpan - 1),
             Math.max(widgetContainerRows, newRowStart + finalRowSpan - 1)
           )
         ) {
@@ -2060,7 +1924,6 @@ export default function Home() {
         }
       }
 
-      // Attempt 2: If simple placement fails, try a full sort and expand
       if (!placedWithoutFullSort) {
         const attemptLayoutWithNewWidget = [
           ...currentWidgetsCopy,
@@ -2068,20 +1931,16 @@ export default function Home() {
             ...newWidgetConfigProcessed,
             colSpan: finalColSpan,
             rowSpan: finalRowSpan,
-          }, // Add new widget without position yet
+          },
         ];
         finalLayoutResult = performAutoSortAndExpandIfNeeded(
           attemptLayoutWithNewWidget,
-          widgetContainerCols, // Start with current grid size
+          widgetContainerCols,
           widgetContainerRows
         );
       }
 
-      // Attempt 3: If sort & expand fails, try shrinking existing widgets (less common path now)
       if (!finalLayoutResult) {
-        console.log(
-          "[handleAddNewWidget] Initial placement and sort/expand failed. Attempting shrinking."
-        );
         finalLayoutResult = attemptPlaceWidgetWithShrinking(
           currentWidgetsCopy,
           {
@@ -2090,13 +1949,6 @@ export default function Home() {
             rowSpan: finalRowSpan,
           }
         );
-        if (finalLayoutResult) {
-          console.log(
-            "[handleAddNewWidget] Placement successful after shrinking existing widgets."
-          );
-        } else {
-          console.log("[handleAddNewWidget] Shrinking also failed.");
-        }
       }
 
       if (finalLayoutResult) {
@@ -2120,7 +1972,6 @@ export default function Home() {
         if (actualGridPixelWidth !== newActualGridWidthToSet) {
           setActualGridPixelWidth(newActualGridWidthToSet);
         }
-        // widgetContainerRows will adjust via useEffect watching actualGridPixelWidth/cellSize/screenHeight
       } else {
         alert(
           "No available space to add this widget, even after attempting to sort, expand grid, and shrink existing widgets. Please make more room manually or try a smaller widget."
@@ -2180,9 +2031,6 @@ export default function Home() {
         newRowSpan > widgetContainerRows &&
         !targetWidget.isMinimized
       ) {
-        console.log(
-          `[handleApplyWidgetSizePreset] Preset ${presetKey} for ${targetWidget.title} (rowSpan: ${newRowSpan}) is taller than grid (rows: ${widgetContainerRows}). Applying as minimized.`
-        );
         isMinimizedDueToPreset = true;
         originalRowSpanForPreset = newRowSpan;
         newRowSpan = MINIMIZED_WIDGET_ROW_SPAN;
@@ -2192,7 +2040,7 @@ export default function Home() {
         ...targetWidget,
         colSpan: newColSpan,
         rowSpan: newRowSpan,
-        isMinimized: isMinimizedDueToPreset || targetWidget.isMinimized, // Preserve existing isMinimized if already true
+        isMinimized: isMinimizedDueToPreset || targetWidget.isMinimized,
         originalRowSpan: isMinimizedDueToPreset
           ? originalRowSpanForPreset
           : targetWidget.isMinimized
@@ -2209,7 +2057,6 @@ export default function Home() {
         .filter((w) => w.id !== widgetId)
         .map((w) => ({ ...w }));
 
-      // Try placing directly
       if (
         canPlaceWidget(
           updatedWidgetConfig,
@@ -2245,7 +2092,6 @@ export default function Home() {
         );
         finalLayoutResult = { layout, finalCols: maxCols, finalRows: maxRows };
       } else {
-        // Try finding next available position
         const newPosition = findNextAvailablePosition(
           updatedWidgetConfig.colSpan,
           updatedWidgetConfig.rowSpan,
@@ -2274,7 +2120,6 @@ export default function Home() {
             finalRows: maxRows,
           };
         } else {
-          // If that fails, try a full sort
           const widgetsToTrySort = widgets.map((w) =>
             w.id === widgetId ? updatedWidgetConfig : { ...w }
           );
@@ -2329,9 +2174,6 @@ export default function Home() {
       if (newCellSize === cellSize || maximizedWidgetId) return;
 
       const oldCellSize = cellSize;
-      console.log(
-        `[Grid Density] Changing from ${oldCellSize}px to ${newCellSize}px`
-      );
 
       let newTargetGridPixelWidth: number;
       if (isMobileView) {
@@ -2389,7 +2231,6 @@ export default function Home() {
           newOriginalRowSpan = undefined;
         } else {
           const currentPixelWidth = w.colSpan * oldCellSize;
-          // Use originalRowSpan for height calculation if minimized and it exists
           const effectiveOldRowSpan =
             w.isMinimized && w.originalRowSpan ? w.originalRowSpan : w.rowSpan;
           const currentPixelHeight = effectiveOldRowSpan * oldCellSize;
@@ -2426,20 +2267,17 @@ export default function Home() {
           );
 
           if (w.isMinimized) {
-            // If it was already minimized
             newIsMinimized = true;
-            newOriginalRowSpan = intendedNewRowSpan; // Store the full scaled height
-            newRowSpan = MINIMIZED_WIDGET_ROW_SPAN; // Keep it minimized
+            newOriginalRowSpan = intendedNewRowSpan;
+            newRowSpan = MINIMIZED_WIDGET_ROW_SPAN;
           } else if (
             tempNewGridRowsAvailable > 0 &&
             intendedNewRowSpan > tempNewGridRowsAvailable
           ) {
-            // If it becomes too tall for the new grid
             newIsMinimized = true;
             newOriginalRowSpan = intendedNewRowSpan;
             newRowSpan = MINIMIZED_WIDGET_ROW_SPAN;
           } else {
-            // Fits or was not minimized
             newIsMinimized = false;
             newRowSpan = intendedNewRowSpan;
             newOriginalRowSpan = undefined;
@@ -2457,17 +2295,14 @@ export default function Home() {
         };
       });
 
-      setCellSize(newCellSize); // Set new cell size first
-      // actualGridPixelWidth will be updated by the useEffect that depends on cellSize,
-      // or by the sort result below. It's better to let the sort dictate the final width.
+      setCellSize(newCellSize);
 
       if (!isMobileView) {
         requestAnimationFrame(() => {
-          // Ensure state updates for cellSize are processed
           const newColsAfterUpdate = Math.max(
             1,
             Math.floor(newTargetGridPixelWidth / newCellSize)
-          ); // Recalculate based on new cell size
+          );
           const currentHeaderHeight = headerRef.current?.offsetHeight || 60;
           const aiCommandBarHeight = showAiCommandBar
             ? document.getElementById("ai-command-bar")?.offsetHeight || 70
@@ -2481,7 +2316,7 @@ export default function Home() {
 
           const sortResult = performAutoSortAndExpandIfNeeded(
             scaledWidgets,
-            newColsAfterUpdate, // Pass calculated new cols/rows as initial guess
+            newColsAfterUpdate,
             newRowsAfterUpdate
           );
 
@@ -2498,11 +2333,9 @@ export default function Home() {
               finalRequiredPixelWidth
             );
             if (actualGridPixelWidth !== finalActualGridWidthToSet) {
-              // Check against current state
               setActualGridPixelWidth(finalActualGridWidthToSet);
             }
           } else {
-            // Fallback: set scaled widgets directly if sort fails (should be rare with expansion)
             setWidgets(scaledWidgets);
             updateWidgetsAndPushToHistory(
               scaledWidgets,
@@ -2514,13 +2347,12 @@ export default function Home() {
           }
         });
       } else {
-        // For mobile view, just apply scaled widgets (usually just one portfolio widget)
         setWidgets(scaledWidgets);
         updateWidgetsAndPushToHistory(
           scaledWidgets,
           `grid_density_change_mobile_${newCellSize}`
         );
-        setActualGridPixelWidth(newTargetGridPixelWidth); // For mobile, width is screen width
+        setActualGridPixelWidth(newTargetGridPixelWidth);
       }
 
       setIsDensityMenuOpen(false);
@@ -2643,9 +2475,6 @@ export default function Home() {
         updatedWidgets.forEach((w) => {
           maxColRequired = Math.max(maxColRequired, w.colStart + w.colSpan - 1);
         });
-        // If widgets array is empty, maxColRequired will be 0.
-        // newRequiredPixelWidth will be 0.
-        // newActualGridWidthToSet will be window.innerWidth. This is correct.
         const newRequiredPixelWidth = maxColRequired * cellSize;
         const newActualGridWidthToSet = Math.max(
           window.innerWidth,
@@ -2773,10 +2602,7 @@ export default function Home() {
       const updatedWidgets = currentWidgets.map((w) => {
         if (w.id === widgetId) {
           if (w.isMinimized) {
-            // Restore
-            const restoredRowSpan = w.originalRowSpan || w.rowSpan; // Use original if available
-            // Check if restoredRowSpan fits, if not, adjust or keep minimized (or sort)
-            // For simplicity, we'll allow it to restore, sort might be needed after.
+            const restoredRowSpan = w.originalRowSpan || w.rowSpan;
             return {
               ...w,
               isMinimized: false,
@@ -2784,19 +2610,16 @@ export default function Home() {
               originalRowSpan: undefined,
             };
           } else {
-            // Minimize
             return {
               ...w,
               isMinimized: true,
-              originalRowSpan: w.rowSpan, // Save current rowSpan
+              originalRowSpan: w.rowSpan,
               rowSpan: MINIMIZED_WIDGET_ROW_SPAN,
             };
           }
         }
         return w;
       });
-      // After toggling minimize, a sort might be beneficial if a large widget was restored
-      // For now, direct update. User can click sort if needed.
       updateWidgetsAndPushToHistory(
         updatedWidgets,
         `minimize_toggle_${widgetId}`
@@ -2837,14 +2660,12 @@ export default function Home() {
         JSON.stringify(history.current[newPointer])
       );
 
-      // If historic state is just widgets array (old format)
       let historicWidgets: PageWidgetConfig[];
-      let historicActualGridPixelWidth = actualGridPixelWidth; // Default to current
-      let historicCellSize = cellSize; // Default to current
+      let historicActualGridPixelWidth = actualGridPixelWidth;
+      let historicCellSize = cellSize;
 
       if (Array.isArray(historicState)) {
         historicWidgets = historicState;
-        // Recalculate width based on these widgets and current cell size
         let maxCol = 0;
         historicWidgets.forEach(
           (w) => (maxCol = Math.max(maxCol, w.colStart + w.colSpan - 1))
@@ -2858,8 +2679,7 @@ export default function Home() {
         historicState !== null &&
         "widgets" in historicState
       ) {
-        // New format with more state
-        const fullHistoricState = historicState as StoredDashboardLayout; // Assuming this structure was saved
+        const fullHistoricState = historicState as StoredDashboardLayout;
         historicWidgets = fullHistoricState.widgets;
         historicActualGridPixelWidth =
           fullHistoricState.actualGridPixelWidth || window.innerWidth;
@@ -2870,9 +2690,9 @@ export default function Home() {
         return;
       }
 
-      setCellSize(historicCellSize); // Restore cell size
-      setActualGridPixelWidth(historicActualGridPixelWidth); // Restore grid width
-      setWidgets(historicWidgets); // Restore widgets
+      setCellSize(historicCellSize);
+      setActualGridPixelWidth(historicActualGridPixelWidth);
+      setWidgets(historicWidgets);
 
       setActiveWidgetId(null);
       setMaximizedWidgetId(null);
@@ -3005,161 +2825,7 @@ export default function Home() {
     setIsAddWidgetContextMenuOpen(false);
   };
 
-  const startListening = () => {
-    if (
-      typeof window !== "undefined" &&
-      (window.SpeechRecognition || window.webkitSpeechRecognition)
-    ) {
-      const SpeechRecognitionImpl =
-        window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRecognitionImpl) {
-        setAiError("Speech recognition is not supported by your browser.");
-        return;
-      }
-      if (speechRecognitionRef.current && aiIsListening) {
-        speechRecognitionRef.current.stop();
-        return;
-      }
-
-      speechRecognitionRef.current = new SpeechRecognitionImpl();
-      speechRecognitionRef.current.continuous = false;
-      speechRecognitionRef.current.interimResults = true;
-      speechRecognitionRef.current.lang = "en-US";
-
-      speechRecognitionRef.current.onstart = () => {
-        setAiIsListening(true);
-        setAiLastFeedback("Listening...");
-        setAiError(null);
-      };
-
-      speechRecognitionRef.current.onresult = (
-        event: SpeechRecognitionEvent // Using imported type
-      ) => {
-        let interimTranscript = "";
-        let finalTranscript = "";
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
-          } else {
-            interimTranscript += event.results[i][0].transcript;
-          }
-        }
-        setAiLastFeedback(
-          finalTranscript || interimTranscript || "Listening..."
-        );
-        if (finalTranscript) {
-          setAiInputValue(finalTranscript);
-          handleSendAiCommand(finalTranscript);
-        }
-      };
-
-      speechRecognitionRef.current.onerror = (
-        event: SpeechRecognitionErrorEvent // Using imported type
-      ) => {
-        console.error("Speech recognition error:", event.error);
-        let errorMsg = `Speech recognition error: ${event.error}.`;
-        if (event.error === "no-speech")
-          errorMsg = "No speech detected. Please try again.";
-        else if (event.error === "audio-capture")
-          errorMsg = "Microphone error. Please check permissions.";
-        else if (event.error === "not-allowed")
-          errorMsg =
-            "Microphone access denied. Please enable it in browser settings.";
-        setAiError(errorMsg);
-        setAiLastFeedback(errorMsg);
-        setAiIsListening(false);
-      };
-
-      speechRecognitionRef.current.onend = () => {
-        setAiIsListening(false);
-      };
-
-      speechRecognitionRef.current.start();
-    } else {
-      const errorMsg = "Speech recognition not available in this browser.";
-      setAiError(errorMsg);
-      setAiLastFeedback(errorMsg);
-    }
-  };
-
-  const handleSendAiCommand = async (commandText: string) => {
-    if (!commandText.trim()) return;
-
-    setAiIsProcessing(true);
-    setAiLastFeedback(`Processing: "${commandText}"`);
-    setAiError(null);
-
-    const systemPrompt = getGeminiSystemPrompt(widgets);
-    const fullPrompt = systemPrompt + "\nUser Command: " + commandText;
-
-    try {
-      const chatHistory = [{ role: "user", parts: [{ text: fullPrompt }] }];
-      const payload = {
-        contents: chatHistory,
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: AI_COMMAND_SCHEMA,
-        },
-      };
-      const userProvidedApiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-      const apiKey = userProvidedApiKey || "";
-
-      if (!apiKey && !userProvidedApiKey) {
-        console.warn(
-          "Gemini API Key is missing. Please set NEXT_PUBLIC_GEMINI_API_KEY or ensure Canvas provides it."
-        );
-      }
-
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-
-      const response = await fetch(apiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Gemini API Error Response:", errorData);
-        const message =
-          errorData?.error?.message ||
-          `API request failed with status ${response.status}`;
-        throw new Error(message);
-      }
-
-      const result = await response.json();
-
-      if (
-        result.candidates &&
-        result.candidates.length > 0 &&
-        result.candidates[0].content &&
-        result.candidates[0].content.parts &&
-        result.candidates[0].content.parts.length > 0 &&
-        result.candidates[0].content.parts[0].text
-      ) {
-        const rawJsonText = result.candidates[0].content.parts[0].text;
-        const parsedCommand = JSON.parse(rawJsonText) as ParsedAiCommand;
-
-        setAiLastFeedback(parsedCommand.feedbackToUser || "Command received.");
-
-        dispatchAiCommand(parsedCommand);
-      } else {
-        console.warn("Unexpected Gemini API response structure:", result);
-        throw new Error("Received an unexpected response structure from AI.");
-      }
-    } catch (err: unknown) {
-      console.error("Error processing AI command:", err);
-      const errorMsg =
-        err instanceof Error
-          ? err.message
-          : "An unknown error occurred with AI.";
-      setAiError(`AI Error: ${errorMsg}`);
-      setAiLastFeedback(`Error: ${errorMsg}`);
-    } finally {
-      setAiIsProcessing(false);
-      setAiInputValue("");
-    }
-  };
+  // startListening and handleSendAiCommand are now in AiCommandBar.tsx
 
   const findTargetWidget = (
     command: TargetWidgetAiCommand
@@ -3217,17 +2883,17 @@ export default function Home() {
   };
 
   const dispatchAiCommand = (command: ParsedAiCommand) => {
-    console.log("Dispatching AI Command:", command);
-    setActiveWidgetId(null);
+    console.log("Dispatching AI Command from Page:", command);
+    setActiveWidgetId(null); // Deselect any active widget
 
-    let feedbackMessage = command.feedbackToUser || "";
+    // Feedback is now handled by AiCommandBar, but we can log it or use it for alerts if needed.
+    // let feedbackMessage = command.feedbackToUser || "";
 
     switch (command.action) {
       case "addWidget": {
         const addCmd = command as AddWidgetAiCommand;
         if (isMobileView && addCmd.widgetType !== "portfolio") {
-          feedbackMessage = "Adding new widgets is disabled in mobile view.";
-          setAiLastFeedback(feedbackMessage);
+          alert("Adding new widgets is disabled in mobile view."); // Or use a more integrated notification
           break;
         }
         let parsedInitialSettings: Partial<AllWidgetSettings> | undefined =
@@ -3240,9 +2906,7 @@ export default function Home() {
               "Error parsing initialSettings JSON for addWidget:",
               e
             );
-            feedbackMessage =
-              "Error applying initial settings due to invalid format.";
-            setAiLastFeedback(feedbackMessage);
+            alert("Error applying initial settings due to invalid format.");
             break;
           }
         } else if (typeof addCmd.initialSettings === "object") {
@@ -3258,40 +2922,32 @@ export default function Home() {
           addCmd.sizePreset,
           parsedInitialSettings
         );
-        if (!feedbackMessage)
-          feedbackMessage = `${addCmd.widgetType} widget added.`;
         break;
       }
       case "deleteWidget": {
         const delCmd = command as DeleteWidgetAiCommand;
         const widgetToDelete = findTargetWidget(delCmd);
         if (isMobileView && widgetToDelete?.type === "portfolio") {
-          feedbackMessage =
-            "The main portfolio widget cannot be deleted in mobile view.";
-          setAiLastFeedback(feedbackMessage);
+          alert("The main portfolio widget cannot be deleted in mobile view.");
           break;
         }
         if (widgetToDelete) {
           handleWidgetDelete(widgetToDelete.id);
-          feedbackMessage =
-            feedbackMessage || `Deleted ${widgetToDelete.title}.`;
         } else if (widgetToDelete === null) {
-          feedbackMessage =
-            delCmd.feedbackToUser ||
+          alert(
             `Multiple widgets match "${
               delCmd.targetWidgetTitle || delCmd.targetWidgetType
-            }". Please be more specific.`;
+            }". Please be more specific.`
+          );
         } else {
-          feedbackMessage =
-            delCmd.feedbackToUser || `Could not find the widget to delete.`;
+          alert(`Could not find the widget to delete.`);
         }
         break;
       }
       case "moveWidget": {
         const moveCmd = command as MoveWidgetAiCommand;
         if (isMobileView) {
-          feedbackMessage = "Moving widgets is disabled in mobile view.";
-          setAiLastFeedback(feedbackMessage);
+          alert("Moving widgets is disabled in mobile view.");
           break;
         }
         const widgetToMove = findTargetWidget(moveCmd);
@@ -3318,38 +2974,34 @@ export default function Home() {
             colStart: newCol,
             rowStart: newRow,
           });
-          feedbackMessage = feedbackMessage || `Moved ${widgetToMove.title}.`;
         } else if (widgetToMove === null) {
-          feedbackMessage =
-            moveCmd.feedbackToUser ||
-            `Multiple widgets match for moving. Please be more specific.`;
+          alert(
+            `Multiple widgets match for moving. Please be more specific.`
+          );
         } else {
-          feedbackMessage =
-            moveCmd.feedbackToUser ||
-            `Could not move widget. Target or position unclear.`;
+          alert(
+            `Could not move widget. Target or position unclear.`
+          );
         }
         break;
       }
       case "resizeWidget": {
         const resizeCmd = command as ResizeWidgetAiCommand;
         if (isMobileView) {
-          feedbackMessage = "Resizing widgets is disabled in mobile view.";
-          setAiLastFeedback(feedbackMessage);
+          alert("Resizing widgets is disabled in mobile view.");
           break;
         }
         const widgetToResize = findTargetWidget(resizeCmd);
         if (!widgetToResize) {
-          feedbackMessage =
-            resizeCmd.feedbackToUser ||
-            (widgetToResize === null
+           alert(
+            widgetToResize === null
               ? `Multiple widgets match for resizing. Please be more specific.`
-              : `Could not find widget to resize.`);
+              : `Could not find widget to resize.`
+          );
           break;
         }
         if (resizeCmd.sizePreset) {
           handleApplyWidgetSizePreset(widgetToResize.id, resizeCmd.sizePreset);
-          if (!command.feedbackToUser) return;
-          else feedbackMessage = command.feedbackToUser;
           break;
         }
 
@@ -3364,294 +3016,142 @@ export default function Home() {
           let cSpan = widgetToResize.colSpan;
           let rSpan = widgetToResize.rowSpan;
           switch (resizeCmd.resizeDirection) {
-            case "larger":
-              cSpan += 2;
-              rSpan += 2;
-              break;
-            case "smaller":
-              cSpan = Math.max(minCS, cSpan - 2);
-              rSpan = Math.max(minRS, rSpan - 2);
-              break;
-            case "wider":
-              cSpan += 2;
-              break;
-            case "narrower":
-              cSpan = Math.max(minCS, cSpan - 2);
-              break;
-            case "taller":
-              rSpan += 2;
-              break;
-            case "shorter":
-              rSpan = Math.max(minRS, rSpan - 2);
-              break;
+            case "larger": cSpan += 2; rSpan += 2; break;
+            case "smaller": cSpan = Math.max(minCS, cSpan - 2); rSpan = Math.max(minRS, rSpan - 2); break;
+            case "wider": cSpan += 2; break;
+            case "narrower": cSpan = Math.max(minCS, cSpan - 2); break;
+            case "taller": rSpan += 2; break;
+            case "shorter": rSpan = Math.max(minRS, rSpan - 2); break;
             case "resetSize":
               if (currentBlueprint) {
-                const preset =
-                  WIDGET_SIZE_PRESETS[currentBlueprint.defaultSizePreset];
-                cSpan = Math.max(
-                  minCS,
-                  Math.round(preset.targetWidthPx / cellSize)
-                );
-                rSpan = Math.max(
-                  minRS,
-                  Math.round(preset.targetHeightPx / cellSize)
-                );
+                const preset = WIDGET_SIZE_PRESETS[currentBlueprint.defaultSizePreset];
+                cSpan = Math.max(minCS, Math.round(preset.targetWidthPx / cellSize));
+                rSpan = Math.max(minRS, Math.round(preset.targetHeightPx / cellSize));
               }
               break;
           }
-          newColSpan = Math.min(
-            widgetContainerCols - widgetToResize.colStart + 1,
-            cSpan
-          );
-          newRowSpan = Math.min(
-            widgetContainerRows - widgetToResize.rowStart + 1,
-            rSpan
-          );
+          newColSpan = Math.min(widgetContainerCols - widgetToResize.colStart + 1, cSpan);
+          newRowSpan = Math.min(widgetContainerRows - widgetToResize.rowStart + 1, rSpan);
         }
 
         if (typeof newColSpan === "number" || typeof newRowSpan === "number") {
-          const finalCS =
-            typeof newColSpan === "number"
-              ? Math.max(
-                  minCS,
-                  Math.min(
-                    newColSpan,
-                    widgetContainerCols - widgetToResize.colStart + 1
-                  )
-                )
-              : widgetToResize.colSpan;
-          const finalRS =
-            typeof newRowSpan === "number"
-              ? Math.max(
-                  minRS,
-                  Math.min(
-                    newRowSpan,
-                    widgetContainerRows - widgetToResize.rowStart + 1
-                  )
-                )
-              : widgetToResize.rowSpan;
+          const finalCS = typeof newColSpan === "number" ? Math.max(minCS, Math.min(newColSpan, widgetContainerCols - widgetToResize.colStart + 1)) : widgetToResize.colSpan;
+          const finalRS = typeof newRowSpan === "number" ? Math.max(minRS, Math.min(newRowSpan, widgetContainerRows - widgetToResize.rowStart + 1)) : widgetToResize.rowSpan;
 
-          const otherWidgets = widgets.filter(
-            (w) => w.id !== widgetToResize.id
-          );
-          if (
-            canPlaceWidget(
-              { ...widgetToResize, colSpan: finalCS, rowSpan: finalRS },
-              widgetToResize.colStart,
-              widgetToResize.rowStart,
-              otherWidgets,
-              widgetContainerCols, // Check against current grid
-              widgetContainerRows
-            )
-          ) {
-            handleWidgetResizeEnd(widgetToResize.id, {
-              colStart: widgetToResize.colStart,
-              rowStart: widgetToResize.rowStart,
-              colSpan: finalCS,
-              rowSpan: finalRS,
-            });
-            feedbackMessage =
-              feedbackMessage || `Resized ${widgetToResize.title}.`;
+          const otherWidgets = widgets.filter((w) => w.id !== widgetToResize.id);
+          if (canPlaceWidget({ ...widgetToResize, colSpan: finalCS, rowSpan: finalRS }, widgetToResize.colStart, widgetToResize.rowStart, otherWidgets, widgetContainerCols, widgetContainerRows)) {
+            handleWidgetResizeEnd(widgetToResize.id, { colStart: widgetToResize.colStart, rowStart: widgetToResize.rowStart, colSpan: finalCS, rowSpan: finalRS });
           } else {
-            const tempLayout = widgets.map((w) =>
-              w.id === widgetToResize.id
-                ? { ...w, colSpan: finalCS, rowSpan: finalRS }
-                : w
-            );
-            const sortResult = performAutoSortAndExpandIfNeeded(
-              // Use new sort
-              tempLayout,
-              widgetContainerCols,
-              widgetContainerRows
-            );
+            const tempLayout = widgets.map((w) => w.id === widgetToResize.id ? { ...w, colSpan: finalCS, rowSpan: finalRS } : w);
+            const sortResult = performAutoSortAndExpandIfNeeded(tempLayout, widgetContainerCols, widgetContainerRows);
             if (sortResult) {
               setWidgets(sortResult.layout);
-              updateWidgetsAndPushToHistory(
-                sortResult.layout,
-                `ai_resize_sort_${widgetToResize.id}`
-              );
-              // Update actualGridPixelWidth if sort expanded the grid
+              updateWidgetsAndPushToHistory(sortResult.layout, `ai_resize_sort_${widgetToResize.id}`);
               const newRequiredPixelWidth = sortResult.finalCols * cellSize;
-              const newActualGridWidthToSet = Math.max(
-                window.innerWidth,
-                newRequiredPixelWidth
-              );
+              const newActualGridWidthToSet = Math.max(window.innerWidth, newRequiredPixelWidth);
               if (actualGridPixelWidth !== newActualGridWidthToSet) {
                 setActualGridPixelWidth(newActualGridWidthToSet);
               }
-              feedbackMessage =
-                feedbackMessage ||
-                `Resized ${widgetToResize.title} and rearranged grid.`;
             } else {
-              feedbackMessage =
-                feedbackMessage ||
-                `Could not resize ${widgetToResize.title} as requested due to space constraints.`;
+              alert(`Could not resize ${widgetToResize.title} as requested due to space constraints.`);
             }
           }
         } else {
-          feedbackMessage =
-            feedbackMessage ||
-            `No specific resize dimensions provided for ${widgetToResize.title}.`;
+          alert(`No specific resize dimensions provided for ${widgetToResize.title}.`);
         }
         break;
       }
       case "changeWidgetSetting": {
-        const settingCmd =
-          command as ChangeWidgetSettingAiCommand<AllWidgetSettings>;
+        const settingCmd = command as ChangeWidgetSettingAiCommand<AllWidgetSettings>;
         const widgetToChange = findTargetWidget(settingCmd);
         if (widgetToChange && settingCmd.settingName) {
-          const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(
-            (b) => b.type === widgetToChange.type
-          );
-          let valueToSet: string | number | boolean | undefined | null =
-            settingCmd.settingValue;
+          const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(b => b.type === widgetToChange.type);
+          let valueToSet: string | number | boolean | undefined | null = settingCmd.settingValue;
 
           if (blueprint?.defaultSettings) {
-            const settingDef =
-              blueprint.defaultSettings[
-                settingCmd.settingName as keyof typeof blueprint.defaultSettings
-              ];
+            const settingDef = blueprint.defaultSettings[settingCmd.settingName as keyof typeof blueprint.defaultSettings];
             if (settingDef !== undefined) {
               const expectedType = typeof settingDef;
-              if (
-                expectedType === "boolean" &&
-                typeof valueToSet === "string"
-              ) {
-                valueToSet = [
-                  "true",
-                  "on",
-                  "yes",
-                  "enable",
-                  "show",
-                  "enabled",
-                ].includes(valueToSet.toLowerCase());
-              } else if (
-                expectedType === "number" &&
-                typeof valueToSet === "string"
-              ) {
+              if (expectedType === 'boolean' && typeof valueToSet === 'string') {
+                valueToSet = ['true', 'on', 'yes', 'enable', 'show', 'enabled'].includes(valueToSet.toLowerCase());
+              } else if (expectedType === 'number' && typeof valueToSet === 'string') {
                 const numVal = parseFloat(valueToSet);
                 if (!isNaN(numVal)) valueToSet = numVal;
                 else {
-                  feedbackMessage = `Invalid number "${valueToSet}" for ${settingCmd.settingName}.`;
+                  alert(`Invalid number "${valueToSet}" for ${settingCmd.settingName}.`);
                   break;
                 }
               }
             }
           }
-          handleSaveWidgetInstanceSettings(widgetToChange.id, {
-            [settingCmd.settingName]: valueToSet,
-          });
-          feedbackMessage =
-            feedbackMessage ||
-            `Setting ${settingCmd.settingName} for ${widgetToChange.title} updated.`;
+          handleSaveWidgetInstanceSettings(widgetToChange.id, { [settingCmd.settingName]: valueToSet });
         } else if (widgetToChange === null) {
-          feedbackMessage =
-            settingCmd.feedbackToUser ||
-            `Multiple widgets match for setting change. Please be more specific.`;
+          alert(`Multiple widgets match for setting change. Please be more specific.`);
         } else {
-          feedbackMessage =
-            settingCmd.feedbackToUser ||
-            `Could not change setting. Widget or setting name unclear.`;
+          alert(`Could not change setting. Widget or setting name unclear.`);
         }
         break;
       }
       case "minimizeWidget": {
         const minCmd = command as MinimizeWidgetAiCommand;
         if (isMobileView) {
-          feedbackMessage = "Minimizing widgets is disabled in mobile view.";
-          setAiLastFeedback(feedbackMessage);
+          alert("Minimizing widgets is disabled in mobile view.");
           break;
         }
         const widgetToMinimize = findTargetWidget(minCmd);
         if (widgetToMinimize) {
           if (!widgetToMinimize.isMinimized) {
             handleWidgetMinimizeToggle(widgetToMinimize.id);
-            feedbackMessage =
-              feedbackMessage || `Minimized ${widgetToMinimize.title}.`;
-          } else {
-            feedbackMessage =
-              feedbackMessage ||
-              `${widgetToMinimize.title} is already minimized.`;
           }
         } else if (widgetToMinimize === null) {
-          feedbackMessage =
-            minCmd.feedbackToUser ||
-            `Multiple widgets match for minimizing. Please be more specific.`;
+          alert(`Multiple widgets match for minimizing. Please be more specific.`);
         } else {
-          feedbackMessage =
-            minCmd.feedbackToUser || `Could not find widget to minimize.`;
+          alert(`Could not find widget to minimize.`);
         }
         break;
       }
       case "maximizeWidget": {
         const maxCmd = command as MaximizeWidgetAiCommand;
         if (isMobileView) {
-          feedbackMessage =
-            "Maximizing widgets is not applicable in mobile view.";
-          setAiLastFeedback(feedbackMessage);
+          alert("Maximizing widgets is not applicable in mobile view.");
           break;
         }
         const widgetToMaximize = findTargetWidget(maxCmd);
         if (widgetToMaximize) {
           if (maximizedWidgetId !== widgetToMaximize.id) {
             handleWidgetMaximizeToggle(widgetToMaximize.id);
-            feedbackMessage =
-              feedbackMessage || `Maximized ${widgetToMaximize.title}.`;
-          } else {
-            feedbackMessage =
-              feedbackMessage ||
-              `${widgetToMaximize.title} is already maximized.`;
           }
         } else if (widgetToMaximize === null) {
-          feedbackMessage =
-            maxCmd.feedbackToUser ||
-            `Multiple widgets match for maximizing. Please be more specific.`;
+          alert(`Multiple widgets match for maximizing. Please be more specific.`);
         } else {
-          feedbackMessage =
-            maxCmd.feedbackToUser || `Could not find widget to maximize.`;
+          alert(`Could not find widget to maximize.`);
         }
         break;
       }
       case "restoreWidget": {
         const restoreCmd = command as RestoreWidgetAiCommand;
         if (isMobileView) {
-          feedbackMessage =
-            "Restoring widgets is not applicable in mobile view.";
-          setAiLastFeedback(feedbackMessage);
+          alert("Restoring widgets is not applicable in mobile view.");
           break;
         }
         const widgetToRestore = findTargetWidget(restoreCmd);
         if (widgetToRestore) {
           if (widgetToRestore.isMinimized) {
             handleWidgetMinimizeToggle(widgetToRestore.id);
-            feedbackMessage =
-              feedbackMessage ||
-              `Restored ${widgetToRestore.title} from minimized state.`;
           } else if (maximizedWidgetId === widgetToRestore.id) {
             handleWidgetMaximizeToggle(widgetToRestore.id);
-            feedbackMessage =
-              feedbackMessage ||
-              `Restored ${widgetToRestore.title} from maximized state.`;
-          } else {
-            feedbackMessage =
-              feedbackMessage ||
-              `${widgetToRestore.title} is not currently minimized or maximized.`;
           }
         } else if (widgetToRestore === null) {
-          feedbackMessage =
-            restoreCmd.feedbackToUser ||
-            `Multiple widgets match for restoring. Please be more specific.`;
+          alert(`Multiple widgets match for restoring. Please be more specific.`);
         } else {
-          feedbackMessage =
-            restoreCmd.feedbackToUser || `Could not find widget to restore.`;
+          alert(`Could not find widget to restore.`);
         }
         break;
       }
       case "openOrFocusWidget": {
         const openCmd = command as OpenOrFocusWidgetAiCommand;
         if (isMobileView && openCmd.widgetType !== "portfolio") {
-          feedbackMessage = `Only the portfolio widget can be focused in mobile view.`;
-          setAiLastFeedback(feedbackMessage);
+          alert(`Only the portfolio widget can be focused in mobile view.`);
           break;
         }
         let settingsToApply: Partial<AllWidgetSettings> | null = null;
@@ -3660,78 +3160,41 @@ export default function Home() {
           try {
             settingsToApply = JSON.parse(openCmd.initialSettings);
           } catch (e) {
-            console.error(
-              "Error parsing initialSettings JSON for openOrFocusWidget:",
-              e
-            );
-            feedbackMessage =
-              "Error applying initial settings due to invalid format.";
+            console.error("Error parsing initialSettings JSON for openOrFocusWidget:", e);
+            alert("Error applying initial settings due to invalid format.");
             break;
           }
         } else if (typeof openCmd.initialSettings === "object") {
           settingsToApply = openCmd.initialSettings;
         }
 
-        const matchingTypeWidgets = widgets.filter(
-          (w) => w.type === openCmd.widgetType
-        );
+        const matchingTypeWidgets = widgets.filter((w) => w.type === openCmd.widgetType);
         let targetWidget: PageWidgetConfig | null | undefined = undefined;
 
         if (matchingTypeWidgets.length === 0) {
-          const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find(
-            (b) => b.type === openCmd.widgetType
-          );
-          const newWidgetTitle =
-            openCmd.targetWidgetTitle ||
-            blueprint?.defaultTitle ||
-            `New ${openCmd.widgetType}`;
-          handleAddNewWidget(
-            openCmd.widgetType,
-            newWidgetTitle,
-            undefined,
-            undefined,
-            undefined,
-            undefined,
-            undefined,
-            settingsToApply || undefined
-          );
-          feedbackMessage =
-            feedbackMessage ||
-            `Opened new ${newWidgetTitle} widget. ${
-              settingsToApply ? "Initial settings applied." : ""
-            }`;
+          const blueprint = AVAILABLE_WIDGET_DEFINITIONS.find((b) => b.type === openCmd.widgetType);
+          const newWidgetTitle = openCmd.targetWidgetTitle || blueprint?.defaultTitle || `New ${openCmd.widgetType}`;
+          handleAddNewWidget(openCmd.widgetType, newWidgetTitle, undefined, undefined, undefined, undefined, undefined, settingsToApply || undefined);
         } else if (matchingTypeWidgets.length === 1) {
           targetWidget = matchingTypeWidgets[0];
         } else {
           if (openCmd.targetWidgetTitle) {
-            targetWidget = matchingTypeWidgets.find(
-              (w) =>
-                w.title.toLowerCase() ===
-                openCmd.targetWidgetTitle!.toLowerCase()
-            );
+            targetWidget = matchingTypeWidgets.find((w) => w.title.toLowerCase() === openCmd.targetWidgetTitle!.toLowerCase());
             if (!targetWidget) {
-              targetWidget = matchingTypeWidgets.find((w) =>
-                w.title
-                  .toLowerCase()
-                  .includes(openCmd.targetWidgetTitle!.toLowerCase())
-              );
+              targetWidget = matchingTypeWidgets.find((w) => w.title.toLowerCase().includes(openCmd.targetWidgetTitle!.toLowerCase()));
             }
           }
           if (!targetWidget) {
-            feedbackMessage = `Multiple ${openCmd.widgetType} widgets exist. Please specify which one (e.g., by title) or use "the [title] ${openCmd.widgetType}".`;
+            alert(`Multiple ${openCmd.widgetType} widgets exist. Please specify which one.`);
             break;
           }
         }
 
         if (targetWidget) {
           setActiveWidgetId(targetWidget.id);
-
           if (maximizedWidgetId && maximizedWidgetId !== targetWidget.id) {
-            const maximizedOriginal = widgets.find(
-              (w) => w.id === maximizedWidgetId
-            );
-            if (maximizedOriginal)
-              handleWidgetMaximizeToggle(maximizedOriginal.id);
+            const maximizedOriginal = widgets.find((w) => w.id === maximizedWidgetId);
+            if (maximizedOriginal) handleWidgetMaximizeToggle(maximizedOriginal.id);
           }
           if (targetWidget.isMinimized) {
             handleWidgetMinimizeToggle(targetWidget.id);
@@ -3739,11 +3202,6 @@ export default function Home() {
           if (settingsToApply) {
             handleSaveWidgetInstanceSettings(targetWidget.id, settingsToApply);
           }
-          feedbackMessage =
-            feedbackMessage ||
-            `Focused ${targetWidget.title}. ${
-              settingsToApply ? "Settings applied." : ""
-            }`;
         }
         break;
       }
@@ -3751,69 +3209,38 @@ export default function Home() {
         const cellCmd = command as ChangeCellSizeAiCommand;
         let targetCellSize = cellCmd.newCellSize;
         if (cellCmd.densityLabel) {
-          const option = CELL_SIZE_OPTIONS.find(
-            (opt) =>
-              opt.label.toLowerCase() === cellCmd.densityLabel!.toLowerCase()
-          );
+          const option = CELL_SIZE_OPTIONS.find((opt) => opt.label.toLowerCase() === cellCmd.densityLabel!.toLowerCase());
           if (option) targetCellSize = option.value;
         }
-        if (
-          typeof targetCellSize === "number" &&
-          CELL_SIZE_OPTIONS.some((opt) => opt.value === targetCellSize)
-        ) {
+        if (typeof targetCellSize === "number" && CELL_SIZE_OPTIONS.some((opt) => opt.value === targetCellSize)) {
           handleChangeCellSize(targetCellSize);
-          feedbackMessage =
-            feedbackMessage || `Cell size changed to ${targetCellSize}px.`;
         } else {
-          feedbackMessage =
-            cellCmd.feedbackToUser || `Invalid cell size or density label.`;
+          alert(`Invalid cell size or density label.`);
         }
         break;
       }
-      case "undoAction":
-        handleUndo();
-        feedbackMessage = feedbackMessage || "Undo action performed.";
-        break;
-      case "redoAction":
-        handleRedo();
-        feedbackMessage = feedbackMessage || "Redo action performed.";
-        break;
-      case "exportLayout":
-        handleExportLayout();
-        feedbackMessage = feedbackMessage || "Layout exported.";
-        break;
+      case "undoAction": handleUndo(); break;
+      case "redoAction": handleRedo(); break;
+      case "exportLayout": handleExportLayout(); break;
       case "autoSortGrid":
         if (isMobileView) {
-          feedbackMessage = "Auto-sort is disabled in mobile view.";
-          setAiLastFeedback(feedbackMessage);
+          alert("Auto-sort is disabled in mobile view.");
           break;
         }
         handleAutoSortButtonClick();
-        feedbackMessage = feedbackMessage || "Grid auto-sorted.";
         break;
       case "sendChatMessage": {
         const chatCmd = command as SendChatMessageAiCommand;
         const chatWidget = findTargetWidget(chatCmd);
         if (chatWidget && chatWidget.type === "geminiChat" && chatCmd.message) {
-          console.log(
-            `AI wants to send to ${chatWidget.id} (${chatWidget.title}): "${chatCmd.message}"`
-          );
-          feedbackMessage =
-            feedbackMessage ||
-            `Sending message to ${
-              chatWidget.title
-            }: "${chatCmd.message.substring(
-              0,
-              30
-            )}..." (Display in widget not implemented in this example).`;
+          // This part would require a more direct way to send a message to a specific widget instance.
+          // For now, we'll log it. The GeminiChatWidget itself would need a prop/method to receive messages.
+          console.log(`AI wants to send to ${chatWidget.id} (${chatWidget.title}): "${chatCmd.message}"`);
+          alert(`Sending message to ${chatWidget.title}: "${chatCmd.message.substring(0,30)}..." (Display in widget not fully implemented in this example).`);
         } else if (chatWidget === null) {
-          feedbackMessage =
-            chatCmd.feedbackToUser ||
-            `Multiple chat widgets match. Please be more specific.`;
+          alert(`Multiple chat widgets match. Please be more specific.`);
         } else {
-          feedbackMessage =
-            chatCmd.feedbackToUser ||
-            `Could not send chat message. Target chat widget or message unclear.`;
+          alert(`Could not send chat message. Target chat widget or message unclear.`);
         }
         break;
       }
@@ -3822,84 +3249,53 @@ export default function Home() {
         const widgetToQuery = findTargetWidget(infoCmd);
         if (widgetToQuery && infoCmd.requestedInfo) {
           let info = "Information not found.";
-          const settingKey = infoCmd.requestedInfo
-            .toLowerCase()
-            .replace(/\s/g, "");
-          const widgetSettings = widgetToQuery.settings as Record<
-            string,
-            string | number | boolean | undefined | null
-          >;
+          const settingKey = infoCmd.requestedInfo.toLowerCase().replace(/\s/g, "");
+          const widgetSettings = widgetToQuery.settings as Record<string, string | number | boolean | undefined | null>;
 
-          if (
-            widgetSettings &&
-            Object.prototype.hasOwnProperty.call(widgetSettings, settingKey)
-          ) {
-            info = `The ${infoCmd.requestedInfo} for ${
-              widgetToQuery.title
-            } is ${JSON.stringify(widgetSettings[settingKey])}.`;
-          } else if (settingKey === "title") {
+          if (widgetSettings && Object.prototype.hasOwnProperty.call(widgetSettings, settingKey)) {
+            info = `The ${infoCmd.requestedInfo} for ${widgetToQuery.title} is ${JSON.stringify(widgetSettings[settingKey])}.`;
+          } else if (settingKey === 'title') {
             info = `The title is ${widgetToQuery.title}.`;
-          } else if (settingKey === "type") {
+          } else if (settingKey === 'type') {
             info = `${widgetToQuery.title} is a ${widgetToQuery.type} widget.`;
-          } else if (settingKey === "size" || settingKey === "dimensions") {
+          } else if (settingKey === 'size' || settingKey === 'dimensions') {
             info = `${widgetToQuery.title} is ${widgetToQuery.colSpan} columns wide and ${widgetToQuery.rowSpan} rows tall.`;
           } else {
-            info = `I couldn't find the specific detail "${
-              infoCmd.requestedInfo
-            }" for ${
-              widgetToQuery.title
-            }. Its current settings are: ${JSON.stringify(
-              widgetToQuery.settings
-            )}.`;
+            info = `I couldn't find the specific detail "${infoCmd.requestedInfo}" for ${widgetToQuery.title}. Its current settings are: ${JSON.stringify(widgetToQuery.settings)}.`;
           }
-          feedbackMessage = info;
+          alert(info); // AI response should be handled by AiCommandBar, this is for direct feedback
         } else if (widgetToQuery === null) {
-          feedbackMessage =
-            infoCmd.feedbackToUser ||
-            `Multiple widgets match. Please be more specific.`;
+          alert(`Multiple widgets match. Please be more specific.`);
         } else {
-          feedbackMessage =
-            infoCmd.feedbackToUser ||
-            `Could not get widget info. Target or requested info unclear.`;
+          alert(`Could not get widget info. Target or requested info unclear.`);
         }
         break;
       }
       case "clarifyCommand": {
-        const clarifyCmd = command as ClarifyCommandAiCommand;
-        feedbackMessage =
-          clarifyCmd.feedbackToUser ||
-          clarifyCmd.clarificationNeeded ||
-          "I need more information to proceed.";
+        // Feedback is handled by AiCommandBar
+        // alert(clarifyCmd.feedbackToUser || clarifyCmd.clarificationNeeded || "I need more information to proceed.");
         break;
       }
       case "unknown": {
-        const unknownCmd = command as UnknownAiCommand;
-        feedbackMessage =
-          unknownCmd.feedbackToUser ||
-          `Sorry, I didn't understand the command: "${unknownCmd.originalCommand}".`;
+        // Feedback is handled by AiCommandBar
+        // const unknownCmd = command as UnknownAiCommand;
+        // alert(unknownCmd.feedbackToUser || `Sorry, I didn't understand the command: "${unknownCmd.originalCommand}".`);
         break;
       }
       default:
         const unhandledAction = (command as BaseAiCommand).action;
-        feedbackMessage = `Sorry, I can't handle the action: ${unhandledAction}. This might be an unhandled command type.`;
-    }
-
-    if (feedbackMessage) {
-      setAiLastFeedback(feedbackMessage);
+        alert(`Sorry, I can't handle the action: ${unhandledAction}. This might be an unhandled command type.`);
     }
   };
+
 
   const handleGoogleServiceSelect = (
     hubWidgetId: string,
     serviceKey: GoogleServiceActionKey
   ) => {
-    console.log(
-      `Google service selected from hub ${hubWidgetId}: ${serviceKey}`
-    );
     const hubWidget = widgets.find((w) => w.id === hubWidgetId);
 
     if (serviceKey === "calendar" || serviceKey === "maps") {
-      // Updated to include "maps"
       if (hubWidget) {
         const hubColStart = hubWidget.colStart;
         const hubRowStart = hubWidget.rowStart;
@@ -3917,8 +3313,6 @@ export default function Home() {
             `internal_delete_hub_for_${serviceKey}`
           );
 
-          // Use a microtask to ensure state update for deletion is processed
-          // before adding the new widget.
           Promise.resolve().then(() => {
             handleAddNewWidget(
               widgetTypeToOpen,
@@ -3937,17 +3331,12 @@ export default function Home() {
           serviceKey === "calendar" ? "Google Calendar" : "Google Maps";
         handleAddNewWidget(widgetTypeToOpen, widgetTitleToOpen);
       }
-      setAiLastFeedback(
-        `Opening ${
-          serviceKey === "calendar" ? "Google Calendar" : "Google Maps"
-        }...`
-      );
     } else {
       alert(
         `Selected ${serviceKey}. This would open the ${serviceKey} widget. (Functionality for other services not yet implemented)`
       );
       if (hubWidget) {
-        handleWidgetMinimizeToggle(hubWidgetId); // Or close it: handleWidgetDelete(hubWidgetId);
+        handleWidgetMinimizeToggle(hubWidgetId);
       }
     }
   };
@@ -4115,7 +3504,7 @@ export default function Home() {
             }
           />
         );
-      case "googleMaps": // Added Google Maps case
+      case "googleMaps":
         return (
           <GoogleMapsWidget
             settings={
@@ -4315,7 +3704,7 @@ export default function Home() {
             onSave={boundSaveInstanceContentSettings}
           />
         );
-      case "googleMaps": // Added Google Maps case
+      case "googleMaps":
         return (
           <GoogleMapsSettingsPanel
             widgetId={widgetConfig.id}
@@ -4407,11 +3796,10 @@ export default function Home() {
                   aria-haspopup="true"
                   aria-label="Add New Widget"
                 >
-                  {" "}
-                  <AddIcon />{" "}
+                  <AddIcon />
                   <span className="ml-1.5 text-xs hidden sm:inline">
                     Add Widget
-                  </span>{" "}
+                  </span>
                 </button>
                 {isAddWidgetMenuOpen && (
                   <div
@@ -4420,7 +3808,6 @@ export default function Home() {
                     aria-orientation="vertical"
                     aria-labelledby="add-widget-button"
                   >
-                    {" "}
                     {AVAILABLE_WIDGET_DEFINITIONS.map((widgetDef) => (
                       <button
                         key={widgetDef.type}
@@ -4429,16 +3816,15 @@ export default function Home() {
                         role="menuitem"
                         disabled={!!maximizedWidgetId}
                       >
-                        {" "}
                         {widgetDef.icon && (
                           <widgetDef.icon className="mr-2 w-4 h-4" />
-                        )}{" "}
+                        )}
                         <span className="flex-grow">
                           {widgetDef.displayName ||
                             widgetDef.defaultTitle.replace("New ", "")}
-                        </span>{" "}
+                        </span>
                       </button>
-                    ))}{" "}
+                    ))}
                   </div>
                 )}
               </div>
@@ -4448,11 +3834,10 @@ export default function Home() {
                 className="control-button flex items-center"
                 aria-label="Auto Sort Grid"
               >
-                {" "}
-                <AutoSortIcon />{" "}
+                <AutoSortIcon />
                 <span className="ml-1.5 text-xs hidden sm:inline">
                   Sort Grid
-                </span>{" "}
+                </span>
               </button>
               <button
                 onClick={handleExportLayout}
@@ -4634,8 +4019,8 @@ export default function Home() {
                 maximizedWidgetId !== widgetConfig.id &&
                 !isMobileView
               ) {
-                minCol = widgetConfig.colSpan; // When minimized, its current colSpan is its minColSpan visually
-                minRow = MINIMIZED_WIDGET_ROW_SPAN; // And its rowSpan is the minimized row span
+                minCol = widgetConfig.colSpan;
+                minRow = MINIMIZED_WIDGET_ROW_SPAN;
               }
 
               return (
@@ -4692,85 +4077,14 @@ export default function Home() {
         </div>
       </div>
 
-      {showAiCommandBar && (
-        <div
-          id="ai-command-bar"
-          className="fixed bottom-0 left-0 right-0 bg-slate-800/90 dark:bg-dark-surface/90 backdrop-blur-md p-3 md:p-4 shadow-2xl_top z-[60] border-t border-slate-700 dark:border-dark-border-interactive transition-transform duration-300 ease-out animate-slideUp"
-        >
-          <div className="max-w-3xl mx-auto">
-            <div className="flex items-center space-x-2 md:space-x-3">
-              <button
-                onClick={startListening}
-                disabled={aiIsProcessing}
-                className={`p-2.5 md:p-3 rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 ${
-                  aiIsListening
-                    ? "bg-red-500 hover:bg-red-600 text-white animate-pulse"
-                    : "bg-sky-500 hover:bg-sky-600 text-white"
-                }`}
-                aria-label={
-                  aiIsListening ? "Stop listening" : "Start voice command"
-                }
-                title={aiIsListening ? "Stop listening" : "Start voice command"}
-              >
-                {aiIsListening ? <MicOffIcon /> : <MicIcon />}
-              </button>
-              <input
-                type="text"
-                value={aiInputValue}
-                onChange={(e) => setAiInputValue(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === "Enter" && !aiIsProcessing)
-                    handleSendAiCommand(aiInputValue);
-                }}
-                placeholder={
-                  aiIsListening
-                    ? "Listening..."
-                    : "Type your command or use microphone..."
-                }
-                className="flex-grow p-3 bg-slate-700 dark:bg-slate-900 border border-slate-600 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none text-sm placeholder-slate-400 text-slate-100 transition-all duration-200 shadow-sm"
-                disabled={aiIsProcessing}
-                aria-label="AI command input"
-              />
-              <button
-                onClick={() => handleSendAiCommand(aiInputValue)}
-                disabled={aiIsProcessing || !aiInputValue.trim()}
-                className="p-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg disabled:bg-slate-600 disabled:text-slate-400 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center aspect-square focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-slate-800 shadow-md"
-                aria-label="Send command"
-              >
-                {aiIsProcessing ? <ProcessingIcon /> : <SendArrowIcon />}
-              </button>
-              <button
-                onClick={() => setShowAiCommandBar(false)}
-                className="p-2.5 md:p-3 rounded-full bg-slate-600 hover:bg-slate-500 text-slate-300 hover:text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 focus:ring-offset-slate-800"
-                aria-label="Close AI Command Bar"
-                title="Close AI Command Bar"
-              >
-                <AiCloseIcon />
-              </button>
-            </div>
-            {(aiLastFeedback || aiError) && (
-              <div
-                className={`mt-2.5 p-2.5 rounded-md text-xs ${
-                  aiError
-                    ? "bg-red-500/20 text-red-300 border border-red-500/30"
-                    : "bg-sky-500/10 text-sky-300 border border-sky-500/20"
-                }`}
-              >
-                <strong>
-                  {aiError
-                    ? "Error: "
-                    : aiIsProcessing
-                    ? "Processing: "
-                    : aiIsListening && !aiInputValue.trim()
-                    ? ""
-                    : "AI: "}
-                </strong>
-                {aiError || aiLastFeedback}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Render the AiCommandBar component */}
+      <AiCommandBar
+        isVisible={showAiCommandBar}
+        onToggleVisibility={() => setShowAiCommandBar((prev) => !prev)}
+        widgets={widgets}
+        onDispatchCommand={dispatchAiCommand}
+        geminiApiKey={process.env.NEXT_PUBLIC_GEMINI_API_KEY || ""}
+      />
 
       {isSettingsModalOpen && selectedWidgetForSettings && (
         <SettingsModal
@@ -4818,6 +4132,7 @@ export default function Home() {
   );
 }
 
+// Styles remain the same
 const styles = `
   .control-button { display:flex; align-items:center; justify-content:center; padding:0.5rem; background-color:var(--dark-accent-primary); border-radius:0.375rem; color:var(--dark-text-on-accent); transition:background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out; box-shadow:0 1px 2px 0 rgba(0,0,0,0.05); }
   .control-button:hover { background-color:var(--dark-accent-primary-hover); box-shadow:0 2px 4px 0 rgba(0,0,0,0.1); }
