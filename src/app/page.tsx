@@ -150,7 +150,7 @@ const GLOBAL_NOTES_STORAGE_KEY = "dashboardGlobalNotesCollection_v1";
 const GLOBAL_TODOS_STORAGE_KEY = "dashboardGlobalSingleTodoList_v1";
 const GLOBAL_PHOTO_HISTORY_STORAGE_KEY = "dashboardGlobalPhotoHistory_v1";
 const DATA_SAVE_DEBOUNCE_MS = 700;
-const WIDGET_DESELECT_TIMEOUT_MS = 5000;
+const WIDGET_DESELECT_TIMEOUT_MS = 3000;
 const MOBILE_BREAKPOINT_PX = 768;
 const SMOOTH_SCROLL_DURATION_MS = 1000;
 
