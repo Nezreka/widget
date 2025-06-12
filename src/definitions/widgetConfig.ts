@@ -165,7 +165,7 @@ export const GOOGLE_MAPS_DEFAULT_INSTANCE_SETTINGS: GoogleMapsWidgetSettings = {
 
 // --- Available Widget Definitions ---
 export const AVAILABLE_WIDGET_DEFINITIONS: WidgetBlueprint[] = [
-  { type: 'weather', defaultTitle: 'New Weather', displayName: 'Weather', description: "Live weather updates and forecasts.", icon: WeatherIcon, defaultSizePreset: 'medium_wide', minColSpan: 6, minRowSpan: 6, defaultSettings: { location: '97504 US', units: 'imperial', useCurrentLocation: true } },
+  { type: 'weather', defaultTitle: 'New Weather', displayName: 'Weather', description: "Live weather updates and forecasts.", icon: WeatherIcon, defaultSizePreset: 'medium_wide', minColSpan: 6, minRowSpan: 6, defaultSettings: { location: '97504 US', units: 'imperial', useCurrentLocation: true, theme: 'weather-adaptive', animationSpeed: 'normal', showExtendedForecast: true, updateInterval: 5, displayDensity: 'comfortable' } },
   { type: 'clock', defaultTitle: 'New Clock', displayName: 'Clock', description: "Analog or digital world clock.", icon: ClockIcon, defaultSizePreset: 'small_square', minColSpan: 4, minRowSpan: 4, defaultSettings: { displayType: 'digital', showSeconds: true, hourFormat: '12' } },
   { type: 'calculator', defaultTitle: 'New Calculator', displayName: 'Calculator', description: "Perform quick calculations.", icon: CalculatorIcon, defaultSizePreset: 'medium_tall', minColSpan: 4, minRowSpan: 6, defaultSettings: {} },
   { type: 'todo', defaultTitle: 'Global To-Do List', displayName: 'To-Do List', description: "Organize your tasks.", icon: TodoIcon, defaultSizePreset: 'content_driven_medium', minColSpan: 5, minRowSpan: 6, defaultSettings: { showCompleted: true, sortBy: 'createdAt_desc', defaultFilter: 'all' } },
