@@ -20,72 +20,44 @@ interface WeatherWidgetProps {
   id: string;
 }
 
-// Enhanced API interfaces
-interface TomorrowCurrentWeather {
-  time?: string;
-  temperature?: number;
-  temperatureApparent?: number;
-  weatherCode?: number;
-  humidity?: number;
-  windSpeed?: number;
-  windDirection?: number;
-  uvIndex?: number;
-  visibility?: number;
-  pressure?: number;
-  cloudCover?: number;
-}
-
-interface TomorrowHourlyForecast {
-  time: string;
-  values: {
-    temperature?: number;
-    weatherCode?: number;
-    precipitationProbability?: number;
-    windSpeed?: number;
-  };
-}
-
-interface TomorrowDailyForecast {
-  time: string;
-  values: {
-    temperatureMin?: number;
-    temperatureMax?: number;
-    weatherCode?: number;
-    precipitationProbability?: number;
-    windSpeed?: number;
-    uvIndex?: number;
-  };
-}
-
-interface ProcessedHourlyForecast {
-  time: string;
-  hour: string;
-  temperature?: number;
-  weatherCode?: number;
-  precipitationProbability?: number;
-  windSpeed?: number;
-}
-
-interface ProcessedDailyForecast {
-  time: string;
-  day: string;
-  temperatureMin?: number;
-  temperatureMax?: number;
-  weatherCode?: number;
-  precipitationProbability?: number;
-  windSpeed?: number;
-  uvIndex?: number;
-}
-
-interface EnhancedWeatherData {
-  current: TomorrowCurrentWeather;
-  hourly: ProcessedHourlyForecast[];
-  daily: ProcessedDailyForecast[];
-  location: {
-    name: string;
-    coordinates?: { lat: number; lon: number };
-  };
-  lastUpdated: number;
+// --- Standardized Weather Data Structure ---
+interface StandardizedWeatherData {
+    current: {
+        temperature?: number;
+        temperatureApparent?: number;
+        weatherCode?: number | string;
+        humidity?: number;
+        windSpeed?: number;
+        windDirection?: number;
+        uvIndex?: number;
+        visibility?: number;
+        pressure?: number;
+        cloudCover?: number;
+    };
+    hourly: {
+        time: string;
+        hour: string;
+        temperature?: number;
+        weatherCode?: number | string;
+        precipitationProbability?: number;
+        windSpeed?: number;
+    }[];
+    daily: {
+        time: string;
+        day: string;
+        temperatureMin?: number;
+        temperatureMax?: number;
+        weatherCode?: number | string;
+        precipitationProbability?: number;
+        windSpeed?: number;
+        uvIndex?: number;
+    }[];
+    location: {
+        name: string;
+        coordinates?: { lat: number; lon: number };
+    };
+    dataSource: 'weatherapi' | 'tomorrow.io';
+    lastUpdated: number;
 }
 
 // Weather condition mappings with enhanced data
@@ -399,7 +371,7 @@ const AnimatedCounter: React.FC<{ value: number; duration?: number }> = ({ value
 
 // --- Main WeatherWidget Component ---
 const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
-  const [weatherData, setWeatherData] = useState<EnhancedWeatherData | null>(null);
+  const [weatherData, setWeatherData] = useState<StandardizedWeatherData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [geoCoordinates, setGeoCoordinates] = useState<string | null>(null);
@@ -408,35 +380,19 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
   const [currentView, setCurrentView] = useState<'current' | 'hourly' | 'daily'>('current');
 
   const updateIntervalRef = useRef<NodeJS.Timeout | undefined>(undefined);
-  const API_KEY = process.env.NEXT_PUBLIC_TOMORROW_API_KEY;
 
   // Get weather condition info
-  const getWeatherCondition = (weatherCode?: number) => {
+  const getWeatherCondition = (weatherCode?: number | string) => {
+    if (typeof weatherCode === 'string') {
+        // Handle string codes from new API if necessary, or map them
+        return { emoji: '🌡️', name: 'Unknown', bg: 'from-gray-400 to-gray-600', particles: 'none' };
+    }
     return WEATHER_CONDITIONS[weatherCode as keyof typeof WEATHER_CONDITIONS] || 
            { emoji: '🌡️', name: 'Unknown', bg: 'from-gray-400 to-gray-600', particles: 'none' };
   };
 
-  // Reverse geocoding to get city name
-  const getCityName = useCallback(async (lat: number, lon: number): Promise<string> => {
-    try {
-      const response = await fetch(
-        `https://api.tomorrow.io/v4/weather/realtime?location=${lat},${lon}&apikey=${API_KEY}`
-      );
-      const data = await response.json();
-      return data.location?.name || `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
-    } catch {
-      return `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
-    }
-  }, [API_KEY]);
-
   // Enhanced data fetching
   const fetchWeatherData = useCallback(async () => {
-    if (!API_KEY) {
-      setError("API key is missing. Configure NEXT_PUBLIC_TOMORROW_API_KEY.");
-      setLoading(false);
-      return;
-    }
-
     let locationToQuery: string | undefined | null = settings?.location;
     if (settings?.useCurrentLocation) {
       if (geoCoordinates) {
@@ -459,88 +415,41 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
     setLoading(true);
     setError(null);
     
-    const trimmedLocation = locationToQuery.trim();
-    const locationQueryParam = encodeURIComponent(trimmedLocation);
     const unitsQuery = settings?.units || 'imperial';
     
-    const realtimeFields = "temperature,temperatureApparent,weatherCode,humidity,windSpeed,windDirection,uvIndex,visibility,pressure,cloudCover";
-    const hourlyFields = "temperature,weatherCode,precipitationProbability,windSpeed";
-    const dailyFields = "temperatureMin,temperatureMax,weatherCode,precipitationProbability,windSpeed,uvIndex";
-
     try {
-      const [realtimeResponse, hourlyResponse, dailyResponse] = await Promise.all([
-        fetch(`https://api.tomorrow.io/v4/weather/realtime?location=${locationQueryParam}&units=${unitsQuery}&apikey=${API_KEY}&fields=${realtimeFields}`),
-        fetch(`https://api.tomorrow.io/v4/weather/forecast?location=${locationQueryParam}&timesteps=1h&units=${unitsQuery}&apikey=${API_KEY}&fields=${hourlyFields}`),
-        fetch(`https://api.tomorrow.io/v4/weather/forecast?location=${locationQueryParam}&timesteps=1d&units=${unitsQuery}&apikey=${API_KEY}&fields=${dailyFields}`)
-      ]);
-
-      if (!realtimeResponse.ok || !hourlyResponse.ok || !dailyResponse.ok) {
-        throw new Error("Failed to fetch weather data");
-      }
-
-      const [realtimeData, hourlyData, dailyData] = await Promise.all([
-        realtimeResponse.json(),
-        hourlyResponse.json(),
-        dailyResponse.json()
-      ]);
-
-      // Process hourly data
-      const processedHourly: ProcessedHourlyForecast[] = (hourlyData.timelines?.hourly?.slice(0, 24) || []).map((item: TomorrowHourlyForecast) => ({
-        time: item.time,
-        hour: new Date(item.time).toLocaleTimeString(undefined, { hour: 'numeric', hour12: true }),
-        temperature: item.values.temperature,
-        weatherCode: item.values.weatherCode,
-        precipitationProbability: item.values.precipitationProbability,
-        windSpeed: item.values.windSpeed,
-      }));
-
-      // Process daily data
-      const processedDaily: ProcessedDailyForecast[] = (dailyData.timelines?.daily?.slice(0, 7) || []).map((item: TomorrowDailyForecast) => ({
-        time: item.time,
-        day: new Date(item.time).toLocaleDateString(undefined, { weekday: 'short' }),
-        temperatureMin: item.values.temperatureMin,
-        temperatureMax: item.values.temperatureMax,
-        weatherCode: item.values.weatherCode,
-        precipitationProbability: item.values.precipitationProbability,
-        windSpeed: item.values.windSpeed,
-        uvIndex: item.values.uvIndex,
-      }));
-
-      // Get location name
-      let displayName = realtimeData.location?.name;
-      if (!displayName && settings?.useCurrentLocation && geoCoordinates) {
-        const coords = geoCoordinates.split(',');
-        if (coords.length === 2) {
-          displayName = await getCityName(parseFloat(coords[0]), parseFloat(coords[1]));
+        const response = await fetch(`/api/weather?location=${encodeURIComponent(locationToQuery)}&units=${unitsQuery}`);
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || "Failed to fetch weather data");
         }
-      }
-      if (!displayName) {
-        displayName = settings?.useCurrentLocation ? "Current Location" : trimmedLocation;
-      }
+        const data: StandardizedWeatherData = await response.json();
 
-      setWeatherData({
-        current: realtimeData.data.values,
-        hourly: processedHourly,
-        daily: processedDaily,
-        location: {
-          name: displayName,
-          coordinates: geoCoordinates ? {
-            lat: parseFloat(geoCoordinates.split(',')[0]),
-            lon: parseFloat(geoCoordinates.split(',')[1])
-          } : undefined
-        },
-        lastUpdated: Date.now()
-      });
+        // Post-process time/date formats for display
+        const processedData = {
+            ...data,
+            hourly: data.hourly.map(h => ({
+                ...h,
+                hour: new Date(h.time).toLocaleTimeString(undefined, { hour: 'numeric', hour12: true }),
+            })),
+            daily: data.daily.map(d => ({
+                ...d,
+                day: new Date(d.time).toLocaleDateString(undefined, { weekday: 'short' }),
+            })),
+            lastUpdated: Date.now()
+        };
 
-      setLastUpdateTime(Date.now());
+        setWeatherData(processedData);
+        setLastUpdateTime(Date.now());
+
     } catch (err: unknown) {
-      console.error("Weather fetch error:", err);
-      setError(err instanceof Error ? err.message : "Failed to fetch weather data");
-      setWeatherData(null);
+        console.error("Weather fetch error:", err);
+        setError(err instanceof Error ? err.message : "Failed to fetch weather data");
+        setWeatherData(null);
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  }, [settings, API_KEY, geoCoordinates, isRequestingGeo, getCityName]);
+  }, [settings, geoCoordinates, isRequestingGeo]);
 
   // Geolocation effect
   useEffect(() => {
@@ -829,7 +738,7 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
                         : 'text-white/70 hover:text-white'
                     }`}
                   >
-                    {view === 'current' ? 'Now' : view === 'hourly' ? '24h' : '7d'}
+                    {view === 'current' ? 'Now' : view === 'hourly' ? '24h' : '5d'}
                   </button>
                 ))}
               </div>
