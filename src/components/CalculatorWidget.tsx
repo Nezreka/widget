@@ -2,22 +2,39 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 
-// --- Icons (These might be used by a parent Widget component or for future features) ---
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const SettingsIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-  </svg>
-);
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const HistoryIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
+// --- Animation Variants ---
+const containerVariants: Variants = {
+  hidden: { opacity: 0, scale: 0.95 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: {
+      duration: 0.6,
+      ease: "easeOut",
+      staggerChildren: 0.05
+    }
+  }
+};
 
+const buttonVariants: Variants = {
+  hidden: { opacity: 0, scale: 0.8 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: { type: "spring", stiffness: 400, damping: 20 }
+  }
+};
+
+const displayVariants: Variants = {
+  hidden: { opacity: 0, y: -20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.5, ease: "easeOut" }
+  }
+};
 
 // --- Settings Interface & Defaults ---
 export interface CalculatorWidgetSettings {
@@ -400,13 +417,19 @@ const CalculatorWidget: React.FC<CalculatorWidgetProps> = ({ settings: initialSe
     if (isError) return;
     let finalExpression = expression;
 
+    // Append current input if it's a valid number and not just "0"
     if (currentInput !== "" && !isNaN(parseFloat(currentInput))) {
-        const lastToken = expression.trim().split(" ").pop();
-        if (!OPERATORS[lastToken as string] && lastToken !== '(') {
-            finalExpression += currentInput;
-        }
+        finalExpression += currentInput;
     }
-    
+
+    // Trim and remove any trailing operators
+    finalExpression = finalExpression.trim();
+    const lastPart = finalExpression.split(' ').pop();
+    if (lastPart && OPERATORS[lastPart]) {
+        finalExpression = finalExpression.slice(0, finalExpression.lastIndexOf(lastPart)).trim();
+    }
+
+    // Auto-close parentheses
     const openParenCount = (finalExpression.match(/\(/g) || []).length;
     const closeParenCount = (finalExpression.match(/\)/g) || []).length;
     if (openParenCount > closeParenCount) {
@@ -626,111 +649,140 @@ const CalculatorWidget: React.FC<CalculatorWidgetProps> = ({ settings: initialSe
 
 
   const simpleButtons: ButtonConfig[] = [
-    { label: 'AC', action: clearAll, className: 'col-span-2 bg-red-500/80 hover:bg-red-600/80 dark:bg-red-700/80 dark:hover:bg-red-600/80' },
-    { label: 'C', action: clearEntry, className: 'bg-amber-500/80 hover:bg-amber-600/80 dark:bg-amber-600/80 dark:hover:bg-amber-500/80' },
-    { label: '÷', action: () => handleOperatorClick('/'), className: 'op-button' },
+    { label: 'AC', action: clearAll, className: 'clear-button col-span-2' },
+    { label: 'C', action: clearEntry, className: 'clear-button' },
+    { label: '÷', action: () => handleOperatorClick('/'), className: 'operator-button' },
     { label: '7', action: () => handleNumberClick('7') }, { label: '8', action: () => handleNumberClick('8') },
-    { label: '9', action: () => handleNumberClick('9') }, { label: '×', action: () => handleOperatorClick('*'), className: 'op-button' },
+    { label: '9', action: () => handleNumberClick('9') }, { label: '×', action: () => handleOperatorClick('*'), className: 'operator-button' },
     { label: '4', action: () => handleNumberClick('4') }, { label: '5', action: () => handleNumberClick('5') },
-    { label: '6', action: () => handleNumberClick('6') }, { label: '−', action: () => handleOperatorClick('-'), className: 'op-button' },
+    { label: '6', action: () => handleNumberClick('6') }, { label: '−', action: () => handleOperatorClick('-'), className: 'operator-button' },
     { label: '1', action: () => handleNumberClick('1') }, { label: '2', action: () => handleNumberClick('2') },
-    { label: '3', action: () => handleNumberClick('3') }, { label: '+', action: () => handleOperatorClick('+'), className: 'op-button' },
+    { label: '3', action: () => handleNumberClick('3') }, { label: '+', action: () => handleOperatorClick('+'), className: 'operator-button' },
     { label: '0', action: () => handleNumberClick('0'), className: 'col-span-2' },
     { label: '.', action: () => handleNumberClick('.') },
-    { label: '=', action: handleEqualsClick, className: 'bg-green-500/80 hover:bg-green-600/80 dark:bg-green-600/80 dark:hover:bg-green-500/80' },
+    { label: '=', action: handleEqualsClick, className: 'equals-button' },
   ];
 
   const scientificButtons: ButtonConfig[] = [
-    { label: s.angleUnit === 'deg' ? 'Deg' : 'Rad', action: () => {/* Informational only or open settings */}, className: `text-xs ${s.angleUnit === 'deg' ? 'bg-sky-600 ring-2 ring-sky-300' : 'bg-sky-800'} hover:bg-sky-700`, title: `Current unit: ${s.angleUnit}. Change in settings.` },
-    { label: 'x!', action: () => handleFunctionClick('fact'), className: 'sci-button' },
-    { label: 'sin', action: () => handleFunctionClick('sin'), className: 'sci-button' },
-    { label: 'cos', action: () => handleFunctionClick('cos'), className: 'sci-button' },
-    { label: 'tan', action: () => handleFunctionClick('tan'), className: 'sci-button' },
-    { label: '%', action: handlePercentage, className: 'sci-button' },
-    { label: 'AC', action: clearAll, className: 'bg-red-500/80 hover:bg-red-600/80' },
+    { label: s.angleUnit === 'deg' ? 'Deg' : 'Rad', action: () => {/* Informational only or open settings */}, className: `scientific-button text-xs ${s.angleUnit === 'deg' ? 'bg-blue-700 ring-2 ring-blue-400' : 'bg-blue-900'} hover:bg-blue-800`, title: `Current unit: ${s.angleUnit}. Change in settings.` },
+    { label: 'x!', action: () => handleFunctionClick('fact'), className: 'scientific-button' },
+    { label: 'sin', action: () => handleFunctionClick('sin'), className: 'scientific-button' },
+    { label: 'cos', action: () => handleFunctionClick('cos'), className: 'scientific-button' },
+    { label: 'tan', action: () => handleFunctionClick('tan'), className: 'scientific-button' },
+    { label: '%', action: handlePercentage, className: 'scientific-button' },
+    { label: 'AC', action: clearAll, className: 'clear-button' },
 
-    { label: '(', action: () => handleParenthesis('('), className: 'sci-button' },
-    { label: 'ln', action: () => handleFunctionClick('ln'), className: 'sci-button' },
+    { label: '(', action: () => handleParenthesis('('), className: 'scientific-button' },
+    { label: 'ln', action: () => handleFunctionClick('ln'), className: 'scientific-button' },
     { label: '7', action: () => handleNumberClick('7') }, { label: '8', action: () => handleNumberClick('8') },
-    { label: '9', action: () => handleNumberClick('9') }, { label: '÷', action: () => handleOperatorClick('/'), className: 'op-button' },
-    { label: 'C', action: clearEntry, className: 'bg-amber-500/80 hover:bg-amber-600/80' },
+    { label: '9', action: () => handleNumberClick('9') }, { label: '÷', action: () => handleOperatorClick('/'), className: 'operator-button' },
+    { label: 'C', action: clearEntry, className: 'clear-button' },
     
-    { label: ')', action: () => handleParenthesis(')'), className: 'sci-button' },
-    { label: 'log', action: () => handleFunctionClick('log'), className: 'sci-button' },
+    { label: ')', action: () => handleParenthesis(')'), className: 'scientific-button' },
+    { label: 'log', action: () => handleFunctionClick('log'), className: 'scientific-button' },
     { label: '4', action: () => handleNumberClick('4') }, { label: '5', action: () => handleNumberClick('5') },
-    { label: '6', action: () => handleNumberClick('6') }, { label: '×', action: () => handleOperatorClick('*'), className: 'op-button' },
-    { label: '±', action: toggleSign, className: 'op-button' },
+    { label: '6', action: () => handleNumberClick('6') }, { label: '×', action: () => handleOperatorClick('*'), className: 'operator-button' },
+    { label: '±', action: toggleSign, className: 'operator-button' },
     
-    { label: '√', action: () => handleFunctionClick('sqrt'), className: 'sci-button' },
-    { label: 'x^y', action: () => handleOperatorClick('^'), className: 'sci-button' },
+    { label: '√', action: () => handleFunctionClick('sqrt'), className: 'scientific-button' },
+    { label: 'x^y', action: () => handleOperatorClick('^'), className: 'scientific-button' },
     { label: '1', action: () => handleNumberClick('1') }, { label: '2', action: () => handleNumberClick('2') },
-    { label: '3', action: () => handleNumberClick('3') }, { label: '−', action: () => handleOperatorClick('-'), className: 'op-button' },
-    { label: 'M+', action: memoryAdd, className: 'mem-button' },
+    { label: '3', action: () => handleNumberClick('3') }, { label: '−', action: () => handleOperatorClick('-'), className: 'operator-button' },
+    { label: 'M+', action: memoryAdd, className: 'memory-button' },
     
-    { label: 'π', action: () => { const piStr = String(Math.PI); handleNumberClick(piStr); setExpression(prev => prev + piStr + " ") }, className: 'sci-button' },
-    { label: 'e', action: () => { const eStr = String(Math.E); handleNumberClick(eStr); setExpression(prev => prev + eStr + " ") }, className: 'sci-button' },
+    { label: 'π', action: () => { const piStr = String(Math.PI); handleNumberClick(piStr); setExpression(prev => prev + piStr + " ") }, className: 'scientific-button' },
+    { label: 'e', action: () => { const eStr = String(Math.E); handleNumberClick(eStr); setExpression(prev => prev + eStr + " ") }, className: 'scientific-button' },
     { label: '0', action: () => handleNumberClick('0'), className: 'col-span-2' },
-    { label: '.', action: () => handleNumberClick('.') }, { label: '+', action: () => handleOperatorClick('+'), className: 'op-button' },
-    { label: 'M-', action: memorySubtract, className: 'mem-button' },
+    { label: '.', action: () => handleNumberClick('.') }, { label: '+', action: () => handleOperatorClick('+'), className: 'operator-button' },
+    { label: 'M-', action: memorySubtract, className: 'memory-button' },
 
-    { label: 'MR', action: memoryRecall, className: 'mem-button' },
-    { label: 'MC', action: memoryClear, className: 'mem-button' },
-    { label: 'MS', action: memoryStore, className: 'mem-button' },
-    { label: '⌫', action: handleBackspace, className: 'op-button col-span-2' }, 
-    { label: '=', action: handleEqualsClick, className: 'bg-green-500/80 hover:bg-green-600/80 col-span-2' }, 
+    { label: 'MR', action: memoryRecall, className: 'memory-button' },
+    { label: 'MC', action: memoryClear, className: 'memory-button' },
+    { label: 'MS', action: memoryStore, className: 'memory-button' },
+    { label: '⌫', action: handleBackspace, className: 'operator-button col-span-2' }, 
+    { label: '=', action: handleEqualsClick, className: 'equals-button col-span-2' }, 
   ];
   
   const buttonsToRender: ButtonConfig[] = s.mode === 'scientific' ? scientificButtons : simpleButtons;
   const gridColsClass = s.mode === 'scientific' ? 'grid-cols-7' : 'grid-cols-4';
 
-  const baseButtonClass = `text-sm md:text-base font-medium rounded-md p-2 md:p-2.5 active:opacity-70 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-dark-surface dark:focus:ring-offset-slate-900 focus:ring-accent-primary dark:focus:ring-sky-400 transition-all duration-100 ease-in-out text-slate-50`;
-  const numberButtonClass = "bg-slate-600/70 hover:bg-slate-500/70 dark:bg-slate-700/70 dark:hover:bg-slate-600/70";
-  const opButtonClass = "bg-orange-500/80 hover:bg-orange-600/80 dark:bg-orange-600/80 dark:hover:bg-orange-500/80";
-  const sciButtonClass = "bg-sky-700/80 hover:bg-sky-600/80 dark:bg-sky-800/80 dark:hover:bg-sky-700/80";
-  const memButtonClass = "bg-purple-600/80 hover:bg-purple-700/80 dark:bg-purple-700/80 dark:hover:bg-purple-600/80";
+  const baseButtonClass = `text-xl font-semibold rounded-xl p-3 active:opacity-70 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-black/20 transition-all duration-100 ease-in-out text-white shadow-lg`;
+  const numberButtonClass = "bg-gray-700/70 hover:bg-gray-600/70 focus:ring-gray-500";
+  const operatorButtonClass = "bg-blue-600/70 hover:bg-blue-500/70 focus:ring-blue-400";
+  const scientificButtonClass = "bg-purple-600/70 hover:bg-purple-500/70 focus:ring-purple-400 text-sm";
+  const memoryButtonClass = "bg-green-600/70 hover:bg-green-500/70 focus:ring-green-400 text-sm";
+  const clearButtonClass = "bg-red-600/70 hover:bg-red-500/70 focus:ring-red-400";
+  const equalsButtonClass = "bg-emerald-500/90 hover:bg-emerald-400/90 focus:ring-emerald-300";
 
   const getButtonClass = (btn: ButtonConfig) => {
-    if (btn.className?.includes('bg-')) return btn.className.split(' ').filter(c => c.startsWith('bg-') || c.startsWith('hover:bg-') || c.startsWith('dark:bg-') || c.startsWith('dark:hover:bg-') || c.startsWith('ring-')).join(' ');
-    if (btn.className === 'op-button') return opButtonClass;
-    if (btn.className === 'sci-button') return sciButtonClass;
-    if (btn.className === 'mem-button') return memButtonClass;
+    if (btn.className?.includes('col-span-') || btn.className?.includes('row-span-')) {
+        const customClasses = btn.className.split(' ').filter(c => c.includes('span-')).join(' ');
+        if (btn.className.includes('clear-button')) return `${clearButtonClass} ${customClasses}`;
+        if (btn.className.includes('equals-button')) return `${equalsButtonClass} ${customClasses}`;
+        return `${numberButtonClass} ${customClasses}`;
+    }
+    if (btn.className === 'operator-button') return operatorButtonClass;
+    if (btn.className === 'scientific-button') return scientificButtonClass;
+    if (btn.className === 'memory-button') return memoryButtonClass;
+    if (btn.className === 'clear-button') return clearButtonClass;
+    if (btn.className === 'equals-button') return equalsButtonClass;
     return numberButtonClass;
   };
   
   const animationClass = s.enableAnimations ? "transform active:scale-95" : "";
 
   return (
-    <div className="w-full h-full flex flex-col p-2 bg-slate-800/80 dark:bg-slate-900/90 text-primary overflow-hidden rounded-lg shadow-xl">
-      <div className={`bg-slate-900/70 dark:bg-black/70 text-right p-3 rounded-t-lg mb-2 shadow-inner`}>
-        <div 
-            className="h-6 text-xs md:text-sm text-slate-400 dark:text-slate-500 font-mono break-all truncate"
-            title={expression}
-        >
-            {expression.length > MAX_EXPRESSION_LENGTH ? "..." + expression.slice(-MAX_EXPRESSION_LENGTH + 3) : expression}
-        </div>
+    <motion.div
+      className="w-full h-full flex flex-col p-4 bg-white/10 backdrop-blur-md rounded-xl shadow-2xl text-white font-sans overflow-hidden"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
+      {/* Display Area */}
+      <motion.div
+        className="bg-black/20 rounded-lg p-4 mb-4 text-right font-mono overflow-hidden shadow-inner"
+        variants={displayVariants}
+      >
         <div
-          className={`block text-2xl md:text-4xl font-mono break-all ${isError ? 'text-red-400 dark:text-red-500' : 'text-slate-50 dark:text-slate-100'} transition-colors duration-200`}
-          style={{ minHeight: '2em', lineHeight: '1.25em' }} 
-          title={displayValue}
+          className="text-sm text-gray-300 h-6 truncate"
+          title={expression}
         >
-          {displayValue.length > MAX_DISPLAY_LENGTH ? displayValue.slice(0, MAX_DISPLAY_LENGTH -3) + "..." : displayValue}
+          {expression.length > MAX_EXPRESSION_LENGTH ? "..." + expression.slice(-MAX_EXPRESSION_LENGTH + 3) : expression}
         </div>
-      </div>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={displayValue} // Key change to trigger animation on value change
+            initial={{ y: 10, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -10, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className={`text-4xl font-bold ${isError ? 'text-red-300' : 'text-white'} break-all`}
+            style={{ minHeight: '1.5em', lineHeight: '1.2em' }}
+            title={displayValue}
+          >
+            {displayValue.length > MAX_DISPLAY_LENGTH ? displayValue.slice(0, MAX_DISPLAY_LENGTH - 3) + "..." : displayValue}
+          </motion.div>
+        </AnimatePresence>
+      </motion.div>
 
-      <div className={`grid ${gridColsClass} gap-1.5 flex-grow`}>
+      {/* Button Grid */}
+      <div className={`grid ${gridColsClass} gap-2 flex-grow`}>
         {buttonsToRender.map((btn) => (
-          <button
+          <motion.button
             key={btn.label}
             onClick={btn.action}
             className={`${baseButtonClass} ${getButtonClass(btn)} ${animationClass} ${btn.className && (btn.className.includes('col-span-') || btn.className.includes('row-span-')) ? btn.className.split(' ').filter(c => c.includes('span-')).join(' ') : ''}`}
             aria-label={btn.label}
-            title={btn.title || btn.label} 
+            title={btn.title || btn.label}
+            variants={buttonVariants}
+            whileHover={{ scale: s.enableAnimations ? 1.05 : 1 }}
+            whileTap={{ scale: s.enableAnimations ? 0.95 : 1 }}
           >
             {btn.label}
-          </button>
+          </motion.button>
         ))}
       </div>
-    </div>
+    </motion.div>
   );
 };
 
