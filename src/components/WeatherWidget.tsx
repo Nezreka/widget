@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 
 // --- Interfaces & Types ---
 export interface WeatherWidgetSettings {
@@ -85,7 +85,7 @@ const WEATHER_CONDITIONS = {
 };
 
 // Animation variants
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0, scale: 0.95 },
   visible: {
     opacity: 1,
@@ -98,7 +98,7 @@ const containerVariants = {
   }
 };
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: {
     opacity: 1,
@@ -107,7 +107,7 @@ const itemVariants = {
   }
 };
 
-const temperatureVariants = {
+const temperatureVariants: Variants = {
   hidden: { opacity: 0, scale: 0.8 },
   visible: {
     opacity: 1,
@@ -493,7 +493,7 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
       return;
     }
     fetchWeatherData();
-  }, [settings?.location, settings?.units, settings?.useCurrentLocation, geoCoordinates, fetchWeatherData]);
+  }, [settings?.location, settings?.units, settings?.useCurrentLocation, geoCoordinates, fetchWeatherData, error, isRequestingGeo]);
 
   // Auto-refresh effect
   useEffect(() => {
