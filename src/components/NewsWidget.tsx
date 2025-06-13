@@ -1,7 +1,10 @@
-// src/components/NewsWidget.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useNewsFeed } from '../hooks/useNewsFeed';
+import ArticleCard from './news/ArticleCard';
+import ArticleSkeleton from './news/ArticleSkeleton';
 
 // --- Types ---
 
@@ -33,72 +36,140 @@ interface NewsWidgetProps {
 
 // --- Constants ---
 
-const NEWS_CATEGORIES = ['business', 'entertainment', 'general', 'health', 'science', 'sports', 'technology'];
+const NEWS_CATEGORIES = ['general', 'business', 'entertainment', 'health', 'science', 'sports', 'technology'];
 const NEWS_COUNTRIES = ['us', 'gb', 'ca', 'au', 'de', 'fr', 'in', 'jp'];
-const DEFAULT_UPDATE_INTERVAL = 15; // 15 minutes
 
 // --- Main Component ---
 
 const NewsWidget: React.FC<NewsWidgetProps> = ({ settings }) => {
-  const [articles, setArticles] = useState<NewsArticle[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState(settings?.category || 'general');
 
-  const fetchNews = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (settings?.country) params.append('country', settings.country);
-      if (settings?.category) params.append('category', settings.category);
-      if (settings?.keywords) params.append('q', settings.keywords);
-      if (settings?.articlesToShow) params.append('pageSize', String(settings.articlesToShow));
+  const memoizedSettings = useMemo(() => ({
+    ...settings,
+    category: selectedCategory
+  }), [settings, selectedCategory]);
 
-      const response = await fetch(`/api/news?${params.toString()}`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch news');
-      }
-      const data = await response.json();
-      setArticles(data.articles || []);
-    } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('An unknown error occurred');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [settings]);
+  const { articles, loading, error } = useNewsFeed(memoizedSettings);
 
   useEffect(() => {
-    fetchNews();
-    const interval = setInterval(fetchNews, (settings?.updateInterval || DEFAULT_UPDATE_INTERVAL) * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [fetchNews, settings?.updateInterval]);
+    if (settings?.category && settings.category !== selectedCategory) {
+      setSelectedCategory(settings.category);
+    }
+  }, [settings?.category, selectedCategory]);
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.08,
+      },
+    },
+  };
+
+  const featuredArticle = articles.length > 0 ? articles[0] : null;
+  const otherArticles = articles.slice(1);
 
   return (
-    <div className="h-full w-full overflow-hidden flex flex-col text-white">
-      {loading && <div className="flex items-center justify-center h-full">Loading news...</div>}
-      {error && <div className="flex items-center justify-center h-full text-red-400">{error}</div>}
-      {!loading && !error && (
-        <div className="h-full overflow-y-auto custom-scrollbar">
-          {articles.map((article, index) => (
-            <a key={index} href={article.url} target="_blank" rel="noopener noreferrer" className="block p-2.5 border-b border-slate-700/50 hover:bg-slate-800/50 transition-colors duration-200">
-              {settings?.showImages && article.urlToImage && (
-                <img src={article.urlToImage} alt={article.title} className="w-full h-32 object-cover rounded-md mb-2" />
+    <div className="@container/news w-full h-full flex flex-col bg-dark-surface/50 text-primary overflow-hidden p-4 space-y-4">
+      {/* Category Selector Bar */}
+      <div className="flex-shrink-0 overflow-x-auto pb-2 -mx-4 px-4 custom-scrollbar-horizontal">
+        <div className="flex items-center gap-2">
+          {NEWS_CATEGORIES.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`relative flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 ease-in-out whitespace-nowrap
+                ${selectedCategory === cat
+                  ? 'text-slate-50'
+                  : 'text-slate-400 hover:text-slate-200'
+                }`}
+            >
+              {cat.charAt(0).toUpperCase() + cat.slice(1)}
+              {selectedCategory === cat && (
+                <motion.div
+                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent-primary"
+                  layoutId="underline"
+                  initial={false}
+                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                />
               )}
-              <h3 className="font-semibold text-sm mb-1">{article.title}</h3>
-              {settings?.showDescription && <p className="text-xs text-slate-400 mb-1">{article.description}</p>}
-              <div className="text-xs text-slate-500 flex justify-between">
-                <span>{article.source.name}</span>
-                <span>{new Date(article.publishedAt).toLocaleDateString()}</span>
-              </div>
-            </a>
+            </button>
           ))}
         </div>
-      )}
+      </div>
+
+      {/* Content Area */}
+      <div className="flex-grow overflow-y-auto pr-1 custom-scrollbar">
+        {loading && (
+          <div className="space-y-6">
+            <ArticleSkeleton isFeatured />
+            <div className="grid grid-cols-1 @md/news:grid-cols-2 @2xl/news:grid-cols-3 gap-4">
+              {[...Array(5)].map((_, i) => <ArticleSkeleton key={i} />)}
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="flex flex-col items-center justify-center h-full text-red-400 text-center p-4">
+            <p className="font-semibold">Error fetching news</p>
+            <p className="mt-1 text-sm text-slate-500">{error}</p>
+          </div>
+        )}
+
+        {!loading && !error && (
+          <AnimatePresence mode="wait">
+            {articles.length > 0 ? (
+              <motion.div
+                key={selectedCategory} // This key is crucial for re-triggering animation on category change
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+                className="space-y-6"
+              >
+                {/* Featured Article */}
+                {featuredArticle && (
+                  <motion.div layout variants={containerVariants}>
+                    <ArticleCard
+                      article={featuredArticle}
+                      isFeatured
+                      showImages={settings?.showImages !== false}
+                      showDescription={settings?.showDescription !== false}
+                    />
+                  </motion.div>
+                )}
+
+                {/* Other Articles Grid */}
+                {otherArticles.length > 0 && (
+                  <motion.div
+                    className="grid grid-cols-1 @md/news:grid-cols-2 @2xl/news:grid-cols-3 gap-4"
+                    variants={containerVariants}
+                  >
+                    {otherArticles.map((article, index) => (
+                      <ArticleCard
+                        key={article.url + index}
+                        article={article}
+                        showImages={settings?.showImages !== false}
+                        showDescription={settings?.showDescription !== false}
+                      />
+                    ))}
+                  </motion.div>
+                )}
+              </motion.div>
+            ) : (
+              <motion.div
+                key="no-articles"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="flex items-center justify-center h-full text-slate-400 text-center p-4"
+              >
+                {`No articles found for '${selectedCategory}'.`}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
+      </div>
     </div>
   );
 };
@@ -110,7 +181,7 @@ export const NewsSettingsPanel: React.FC<{
   currentSettings: NewsWidgetSettings | undefined;
   onSave: (newSettings: NewsWidgetSettings) => void;
 }> = ({ widgetId, currentSettings, onSave }) => {
-  const [settings, setSettings] = useState<NewsWidgetSettings>(currentSettings || {});
+  const [settings, setSettings] = React.useState<NewsWidgetSettings>(currentSettings || {});
 
   const handleSave = () => {
     onSave(settings);
@@ -176,7 +247,7 @@ export const NewsSettingsPanel: React.FC<{
             <input
               id={`${widgetId}-updateInterval`}
               type="number"
-              value={settings.updateInterval || DEFAULT_UPDATE_INTERVAL}
+              value={settings.updateInterval || 10} // Default interval is 10 minutes
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSettings({ ...settings, updateInterval: parseInt(e.target.value, 10) })}
               min="1"
               className={inputClass}
