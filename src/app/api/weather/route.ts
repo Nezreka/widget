@@ -151,6 +151,7 @@ interface StandardizedWeatherData {
         visibility?: number;
         pressure?: number;
         cloudCover?: number;
+        isDay?: boolean;
     };
     hourly: {
         time: string;
@@ -190,6 +191,7 @@ function transformWeatherApiData(data: WeatherApiResponse, units: 'metric' | 'im
             visibility: units === 'imperial' ? data.current.vis_miles : data.current.vis_km,
             pressure: units === 'imperial' ? data.current.pressure_in : data.current.pressure_mb,
             cloudCover: data.current.cloud,
+            isDay: data.current.is_day === 1,
         },
         hourly: data.forecast.forecastday[0].hour.map(h => ({
             time: h.time,

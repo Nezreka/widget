@@ -33,6 +33,7 @@ interface StandardizedWeatherData {
         visibility?: number;
         pressure?: number;
         cloudCover?: number;
+        isDay?: boolean;
     };
     hourly: {
         time: string;
@@ -62,29 +63,25 @@ interface StandardizedWeatherData {
 
 // Weather condition mappings with enhanced data
 const WEATHER_CONDITIONS = {
-  1000: { emoji: '☀️', name: 'Clear', bg: 'from-yellow-400 to-orange-500', particles: 'sun-rays' },
-  1100: { emoji: '🌤️', name: 'Mostly Clear', bg: 'from-yellow-300 to-blue-400', particles: 'light-clouds' },
-  1101: { emoji: '⛅', name: 'Partly Cloudy', bg: 'from-blue-400 to-gray-400', particles: 'clouds' },
-  1102: { emoji: '☁️', name: 'Mostly Cloudy', bg: 'from-gray-400 to-gray-600', particles: 'heavy-clouds' },
-  1001: { emoji: '☁️', name: 'Cloudy', bg: 'from-gray-500 to-gray-700', particles: 'overcast' },
-  2000: { emoji: '🌫️', name: 'Fog', bg: 'from-gray-300 to-gray-500', particles: 'fog' },
-  2100: { emoji: '🌫️', name: 'Light Fog', bg: 'from-gray-200 to-gray-400', particles: 'light-fog' },
-  4000: { emoji: '🌦️', name: 'Drizzle', bg: 'from-blue-500 to-gray-600', particles: 'drizzle' },
-  4001: { emoji: '🌧️', name: 'Rain', bg: 'from-blue-600 to-gray-700', particles: 'rain' },
-  4200: { emoji: '🌧️', name: 'Light Rain', bg: 'from-blue-400 to-gray-500', particles: 'light-rain' },
-  4201: { emoji: '⛈️', name: 'Heavy Rain', bg: 'from-blue-800 to-gray-900', particles: 'heavy-rain' },
-  5000: { emoji: '🌨️', name: 'Snow', bg: 'from-blue-200 to-gray-400', particles: 'snow' },
-  5001: { emoji: '❄️', name: 'Flurries', bg: 'from-blue-100 to-gray-300', particles: 'light-snow' },
-  5100: { emoji: '🌨️', name: 'Light Snow', bg: 'from-blue-200 to-gray-300', particles: 'light-snow' },
-  5101: { emoji: '❄️', name: 'Heavy Snow', bg: 'from-blue-300 to-gray-500', particles: 'heavy-snow' },
-  6000: { emoji: '🧊', name: 'Freezing Drizzle', bg: 'from-cyan-300 to-blue-600', particles: 'ice' },
-  6001: { emoji: '🧊', name: 'Freezing Rain', bg: 'from-cyan-400 to-blue-700', particles: 'freezing-rain' },
-  6200: { emoji: '🧊', name: 'Light Freezing Rain', bg: 'from-cyan-200 to-blue-500', particles: 'light-ice' },
-  6201: { emoji: '🧊', name: 'Heavy Freezing Rain', bg: 'from-cyan-500 to-blue-800', particles: 'heavy-ice' },
-  7000: { emoji: '🧊', name: 'Ice Pellets', bg: 'from-cyan-300 to-gray-600', particles: 'ice-pellets' },
-  7101: { emoji: '🧊', name: 'Heavy Ice Pellets', bg: 'from-cyan-400 to-gray-700', particles: 'heavy-ice-pellets' },
-  7102: { emoji: '🧊', name: 'Light Ice Pellets', bg: 'from-cyan-200 to-gray-500', particles: 'light-ice-pellets' },
-  8000: { emoji: '⛈️', name: 'Thunderstorm', bg: 'from-purple-600 to-gray-900', particles: 'thunderstorm' },
+  // Day
+  1000: { day: { emoji: '☀️', name: 'Clear', bg: 'from-blue-400 to-cyan-300', particles: 'sun-rays' }, night: { emoji: '🌙', name: 'Clear', bg: 'from-gray-800 to-black', particles: 'stars' } },
+  1100: { day: { emoji: '🌤️', name: 'Mostly Clear', bg: 'from-blue-300 to-cyan-200', particles: 'light-clouds' }, night: { emoji: '🌙', name: 'Mostly Clear', bg: 'from-gray-700 to-gray-900', particles: 'stars' } },
+  1101: { day: { emoji: '⛅', name: 'Partly Cloudy', bg: 'from-sky-400 to-gray-400', particles: 'clouds' }, night: { emoji: '☁️', name: 'Partly Cloudy', bg: 'from-gray-600 to-gray-800', particles: 'light-clouds' } },
+  1102: { day: { emoji: '☁️', name: 'Mostly Cloudy', bg: 'from-gray-400 to-gray-600', particles: 'heavy-clouds' }, night: { emoji: '☁️', name: 'Mostly Cloudy', bg: 'from-gray-500 to-gray-700', particles: 'heavy-clouds' } },
+  1001: { day: { emoji: '☁️', name: 'Cloudy', bg: 'from-gray-500 to-gray-700', particles: 'overcast' }, night: { emoji: '☁️', name: 'Cloudy', bg: 'from-gray-600 to-gray-800', particles: 'overcast' } },
+  // Rain
+  4001: { day: { emoji: '🌧️', name: 'Rain', bg: 'from-blue-600 to-gray-700', particles: 'rain' }, night: { emoji: '🌧️', name: 'Rain', bg: 'from-blue-800 to-gray-900', particles: 'rain' } },
+  4200: { day: { emoji: '🌧️', name: 'Light Rain', bg: 'from-blue-400 to-gray-500', particles: 'light-rain' }, night: { emoji: '🌧️', name: 'Light Rain', bg: 'from-blue-700 to-gray-800', particles: 'light-rain' } },
+  4201: { day: { emoji: '⛈️', name: 'Heavy Rain', bg: 'from-blue-800 to-gray-900', particles: 'heavy-rain' }, night: { emoji: '⛈️', name: 'Heavy Rain', bg: 'from-blue-900 to-black', particles: 'heavy-rain' } },
+  // Snow
+  5000: { day: { emoji: '🌨️', name: 'Snow', bg: 'from-blue-200 to-gray-400', particles: 'snow' }, night: { emoji: '🌨️', name: 'Snow', bg: 'from-blue-300 to-gray-500', particles: 'snow' } },
+  5100: { day: { emoji: '🌨️', name: 'Light Snow', bg: 'from-blue-200 to-gray-300', particles: 'light-snow' }, night: { emoji: '🌨️', name: 'Light Snow', bg: 'from-blue-300 to-gray-400', particles: 'light-snow' } },
+  // Fog
+  2000: { day: { emoji: '🌫️', name: 'Fog', bg: 'from-gray-300 to-gray-500', particles: 'fog' }, night: { emoji: '🌫️', name: 'Fog', bg: 'from-gray-500 to-gray-700', particles: 'fog' } },
+  // Thunderstorm
+  8000: { day: { emoji: '⛈️', name: 'Thunderstorm', bg: 'from-purple-600 to-gray-900', particles: 'thunderstorm' }, night: { emoji: '⛈️', name: 'Thunderstorm', bg: 'from-purple-800 to-black', particles: 'thunderstorm' } },
+  // Default
+  default: { day: { emoji: '🌡️', name: 'Unknown', bg: 'from-gray-400 to-gray-600', particles: 'none' }, night: { emoji: '🌡️', name: 'Unknown', bg: 'from-gray-700 to-gray-900', particles: 'none' } }
 };
 
 // Animation variants
@@ -326,6 +323,9 @@ const WeatherParticles: React.FC<{ type: string; intensity?: number }> = ({ type
           style={getParticleStyle()}
         />
       ))}
+      {type === 'thunderstorm' && (
+        <div className="absolute top-0 left-0 w-full h-full animate-lightning" />
+      )}
     </div>
   );
 };
@@ -382,13 +382,10 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
   const updateIntervalRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   // Get weather condition info
-  const getWeatherCondition = (weatherCode?: number | string) => {
-    if (typeof weatherCode === 'string') {
-        // Handle string codes from new API if necessary, or map them
-        return { emoji: '🌡️', name: 'Unknown', bg: 'from-gray-400 to-gray-600', particles: 'none' };
-    }
-    return WEATHER_CONDITIONS[weatherCode as keyof typeof WEATHER_CONDITIONS] || 
-           { emoji: '🌡️', name: 'Unknown', bg: 'from-gray-400 to-gray-600', particles: 'none' };
+  const getWeatherCondition = (weatherCode?: number | string, isDay: boolean = true) => {
+    const code = (typeof weatherCode === 'number' && weatherCode in WEATHER_CONDITIONS) ? weatherCode : 'default';
+    const condition = WEATHER_CONDITIONS[code as keyof typeof WEATHER_CONDITIONS];
+    return isDay ? condition.day : condition.night;
   };
 
   // Enhanced data fetching
@@ -520,7 +517,7 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
 
   const unitSymbol = settings?.units === 'metric' ? '°C' : '°F';
   const speedUnit = settings?.units === 'metric' ? 'km/h' : 'mph';
-  const currentCondition = weatherData ? getWeatherCondition(weatherData.current.weatherCode) : null;
+  const currentCondition = weatherData ? getWeatherCondition(weatherData.current.weatherCode, weatherData.current.isDay) : null;
 
   // Loading state
   if (isRequestingGeo && settings?.useCurrentLocation && !error) {
@@ -686,37 +683,37 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
           {/* Weather Details Grid */}
           <motion.div 
             variants={itemVariants}
-            className="grid grid-cols-2 @standard:grid-cols-4 @detailed:grid-cols-1 @full:grid-cols-4 gap-4 mb-6 @compact:hidden"
+            className="grid grid-cols-4 gap-2 mb-6 @compact:hidden"
           >
             {weatherData.current.humidity !== undefined && (
-              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center">
-                <div className="text-2xl mb-1">💧</div>
-                <div className="text-sm opacity-75">Humidity</div>
-                <div className="font-semibold">{Math.round(weatherData.current.humidity)}%</div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-2 text-center">
+                <div className="text-xl mb-1">💧</div>
+                <div className="text-xs opacity-75">Humidity</div>
+                <div className="font-semibold text-sm">{Math.round(weatherData.current.humidity)}%</div>
               </div>
             )}
             
             {weatherData.current.windSpeed !== undefined && (
-              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center">
-                <div className="text-2xl mb-1">💨</div>
-                <div className="text-sm opacity-75">Wind</div>
-                <div className="font-semibold">{Math.round(weatherData.current.windSpeed)} {speedUnit}</div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-2 text-center">
+                <div className="text-xl mb-1">💨</div>
+                <div className="text-xs opacity-75">Wind</div>
+                <div className="font-semibold text-sm">{Math.round(weatherData.current.windSpeed)} {speedUnit}</div>
               </div>
             )}
             
             {weatherData.current.uvIndex !== undefined && (
-              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center">
-                <div className="text-2xl mb-1">☀️</div>
-                <div className="text-sm opacity-75">UV Index</div>
-                <div className="font-semibold">{Math.round(weatherData.current.uvIndex)}</div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-2 text-center">
+                <div className="text-xl mb-1">☀️</div>
+                <div className="text-xs opacity-75">UV Index</div>
+                <div className="font-semibold text-sm">{Math.round(weatherData.current.uvIndex)}</div>
               </div>
             )}
             
             {weatherData.current.visibility !== undefined && (
-              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center">
-                <div className="text-2xl mb-1">👁️</div>
-                <div className="text-sm opacity-75">Visibility</div>
-                <div className="font-semibold">{Math.round(weatherData.current.visibility)} km</div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-2 text-center">
+                <div className="text-xl mb-1">👁️</div>
+                <div className="text-xs opacity-75">Visibility</div>
+                <div className="font-semibold text-sm">{Math.round(weatherData.current.visibility)} km</div>
               </div>
             )}
           </motion.div>
@@ -784,41 +781,34 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="space-y-2 @detailed:hidden"
+                  className="overflow-x-auto"
                 >
-                  {weatherData.daily.slice(0, 5).map((day, index) => (
-                    <div
-                      key={day.time}
-                      className="bg-white/10 backdrop-blur-sm rounded-lg p-3 flex items-center justify-between"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className="text-2xl">
+                  <div className="flex space-x-4 pb-2">
+                    {weatherData.daily.slice(0, 7).map((day, index) => (
+                      <div
+                        key={day.time}
+                        className="flex-shrink-0 bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center min-w-[80px]"
+                      >
+                        <div className="text-xs opacity-75 mb-1">
+                          {index === 0 ? 'Today' : day.day}
+                        </div>
+                        <div className="text-2xl mb-1">
                           {getWeatherCondition(day.weatherCode).emoji}
                         </div>
-                        <div>
-                          <div className="font-medium">
-                            {index === 0 ? 'Today' : day.day}
-                          </div>
-                          <div className="text-xs opacity-75">
-                            {getWeatherCondition(day.weatherCode).name}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold">
+                        <div className="text-sm font-semibold">
                           {day.temperatureMax ? Math.round(day.temperatureMax) : '--'}°
-                          <span className="text-sm opacity-60 ml-1">
+                          <span className="opacity-60 ml-1">
                             {day.temperatureMin ? Math.round(day.temperatureMin) : '--'}°
                           </span>
                         </div>
                         {day.precipitationProbability !== undefined && (
-                          <div className="text-xs opacity-60">
-                            {Math.round(day.precipitationProbability)}% rain
+                          <div className="text-xs opacity-60 mt-1">
+                            {Math.round(day.precipitationProbability)}%
                           </div>
                         )}
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -918,9 +908,17 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
           0%, 100% { transform: translateY(0) scale(1); opacity: 0.7; }
           50% { transform: translateY(-20px) scale(1.1); opacity: 1; }
         }
+        @keyframes lightning {
+          0%, 100% { opacity: 0; }
+          50% { opacity: 0.3; }
+        }
         .animate-rain { animation: rain linear infinite; }
         .animate-snow { animation: snow linear infinite; }
         .animate-float { animation: float ease-in-out infinite; }
+        .animate-lightning {
+          background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 60%);
+          animation: lightning 2s infinite;
+        }
       `}</style>
     </motion.div>
   );
