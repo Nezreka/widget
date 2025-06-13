@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNewsFeed } from '../hooks/useNewsFeed';
 import ArticleCard from './news/ArticleCard';
 import ArticleSkeleton from './news/ArticleSkeleton';
+import CategoryTabs from './news/CategoryTabs';
 
 // --- Types ---
 
@@ -55,7 +56,7 @@ const NewsWidget: React.FC<NewsWidgetProps> = ({ settings }) => {
     if (settings?.category && settings.category !== selectedCategory) {
       setSelectedCategory(settings.category);
     }
-  }, [settings?.category, selectedCategory]);
+  }, [settings?.category]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -72,32 +73,11 @@ const NewsWidget: React.FC<NewsWidgetProps> = ({ settings }) => {
 
   return (
     <div className="@container/news w-full h-full flex flex-col bg-dark-surface/50 text-primary overflow-hidden p-4 space-y-4">
-      {/* Category Selector Bar */}
-      <div className="flex-shrink-0 overflow-x-auto pb-2 -mx-4 px-4 custom-scrollbar-horizontal">
-        <div className="flex items-center gap-2">
-          {NEWS_CATEGORIES.map(cat => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`relative flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 ease-in-out whitespace-nowrap
-                ${selectedCategory === cat
-                  ? 'text-slate-50'
-                  : 'text-slate-400 hover:text-slate-200'
-                }`}
-            >
-              {cat.charAt(0).toUpperCase() + cat.slice(1)}
-              {selectedCategory === cat && (
-                <motion.div
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent-primary"
-                  layoutId="underline"
-                  initial={false}
-                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                />
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
+      <CategoryTabs
+        categories={NEWS_CATEGORIES}
+        selectedCategory={selectedCategory}
+        onSelectCategory={setSelectedCategory}
+      />
 
       {/* Content Area */}
       <div className="flex-grow overflow-y-auto pr-1 custom-scrollbar">
