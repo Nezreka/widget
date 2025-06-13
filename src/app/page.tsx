@@ -75,6 +75,10 @@ import GoogleCalendarWidget, {
 import GoogleMapsWidget, {
   GoogleMapsSettingsPanel,
 } from "@/components/GoogleMapsWidget";
+import NewsWidget, {
+  NewsSettingsPanel,
+  type NewsWidgetSettings,
+} from "@/components/NewsWidget";
 
 import AddWidgetContextMenu, {
   mapBlueprintToContextMenuItem,
@@ -102,6 +106,7 @@ import {
   GOOGLE_SERVICES_HUB_DEFAULT_INSTANCE_SETTINGS,
   GOOGLE_CALENDAR_DEFAULT_INSTANCE_SETTINGS,
   GOOGLE_MAPS_DEFAULT_INSTANCE_SETTINGS,
+  NEWS_WIDGET_DEFAULT_INSTANCE_SETTINGS,
   type WidgetSizePresetKey,
   type AllWidgetSettings,
   type WidgetType,
@@ -321,6 +326,17 @@ const ensureGoogleMapsInstanceSettings = (
   };
 };
 
+const ensureNewsWidgetInstanceSettings = (
+  settings: AllWidgetSettings | undefined
+): NewsWidgetSettings => {
+  const newsInstanceDefaults = NEWS_WIDGET_DEFAULT_INSTANCE_SETTINGS;
+  const currentNewsSettings = settings as NewsWidgetSettings | undefined;
+  return {
+    ...newsInstanceDefaults,
+    ...currentNewsSettings,
+  };
+};
+
 const processWidgetConfig = (
   widgetData: Partial<PageWidgetConfig>,
   currentCellSize: number,
@@ -429,6 +445,10 @@ const processWidgetConfig = (
   } else if (widgetData.type === "googleMaps") {
     finalContentSettings = ensureGoogleMapsInstanceSettings(
       finalContentSettings as GoogleMapsWidgetSettings
+    );
+  } else if (widgetData.type === "news") {
+    finalContentSettings = ensureNewsWidgetInstanceSettings(
+      finalContentSettings as NewsWidgetSettings
     );
   }
 
@@ -3513,6 +3533,13 @@ export default function Home() {
             instanceId={widgetConfig.id}
           />
         );
+      case "news":
+        return (
+          <NewsWidget
+            id={widgetConfig.id}
+            settings={currentWidgetSettings as NewsWidgetSettings | undefined}
+          />
+        );
       default:
         return (
           <p className="text-xs text-secondary italic">
@@ -3710,6 +3737,16 @@ export default function Home() {
             widgetId={widgetConfig.id}
             currentSettings={
               currentContentSettings as GoogleMapsWidgetSettings | undefined
+            }
+            onSave={boundSaveInstanceContentSettings}
+          />
+        );
+      case "news":
+        return (
+          <NewsSettingsPanel
+            widgetId={widgetConfig.id}
+            currentSettings={
+              currentContentSettings as NewsWidgetSettings | undefined
             }
             onSave={boundSaveInstanceContentSettings}
           />

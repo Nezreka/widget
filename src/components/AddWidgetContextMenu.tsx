@@ -12,6 +12,7 @@ import {
     GoogleServicesHubIcon,
     PlaceholderCalendarIcon,
     PlaceholderMapsIcon, // Added for Google Maps
+    NewsIcon,
 } from '@/components/Icons';
 
 
@@ -329,6 +330,7 @@ export const mapBlueprintToContextMenuItem = (blueprint: WidgetBlueprintFromConf
       case 'googleServicesHub': iconComponent = GoogleServicesHubIcon; break;
       case 'googleCalendar': iconComponent = PlaceholderCalendarIcon; break;
       case 'googleMaps': iconComponent = PlaceholderMapsIcon; break; // Added Google Maps
+      case 'news': iconComponent = NewsIcon; break;
       default: iconComponent = undefined; // Or a generic icon
     }
   }

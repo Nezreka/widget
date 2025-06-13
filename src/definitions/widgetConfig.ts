@@ -17,6 +17,7 @@ import {
   GoogleServicesHubIcon,
   PlaceholderCalendarIcon, // Added for Google Calendar
   PlaceholderMapsIcon, // Added for Google Maps
+  NewsIcon,
 } from '@/components/Icons'; // Assuming Icons.tsx is in @/components/
 
 // Import specific widget settings types from their respective component files
@@ -35,6 +36,7 @@ import { type PortfolioWidgetSettings } from "@/components/PortfolioWidget";
 import { type GeminiChatWidgetSettings } from "@/components/GeminiChatWidget";
 import { type GoogleServicesHubWidgetSettings } from "@/components/GoogleServicesHubWidget";
 import { type GoogleCalendarWidgetSettings } from "@/components/GoogleCalendarWidget"; // Added for Google Calendar
+import { type NewsWidgetSettings } from "@/components/NewsWidget";
 // Define GoogleMapsWidgetSettings - can be expanded later
 export interface GoogleMapsWidgetSettings {
   defaultLocation?: string;
@@ -96,13 +98,13 @@ export type AllWidgetSettings =
     WeatherWidgetSettings | TodoWidgetSettings | ClockWidgetSettings | CalculatorWidgetSettings |
     PageInstanceNotesSettings | YoutubeWidgetSettings | MinesweeperWidgetSettings | UnitConverterWidgetSettings |
     CountdownStopwatchWidgetSettings | PhotoWidgetSettings | PortfolioWidgetSettings | GeminiChatWidgetSettings |
-    GoogleServicesHubWidgetSettings | GoogleCalendarWidgetSettings | GoogleMapsWidgetSettings | // Added GoogleMapsWidgetSettings
+    GoogleServicesHubWidgetSettings | GoogleCalendarWidgetSettings | GoogleMapsWidgetSettings | NewsWidgetSettings | // Added GoogleMapsWidgetSettings
     Record<string, unknown>; // Fallback for generic or unknown settings
 
 export type WidgetType =
     'weather' | 'todo' | 'clock' | 'calculator' | 'notes' | 'youtube' |
     'minesweeper' | 'unitConverter' | 'countdownStopwatch' | 'photo' | 'portfolio' |
-    'geminiChat' |
+    'geminiChat' | 'news' |
     'googleServicesHub' | 'googleCalendar' | 'googleMaps' | // Added 'googleMaps'
     'generic';
 
@@ -162,6 +164,16 @@ export const GOOGLE_MAPS_DEFAULT_INSTANCE_SETTINGS: GoogleMapsWidgetSettings = {
     showTraffic: false,
 };
 
+export const NEWS_WIDGET_DEFAULT_INSTANCE_SETTINGS: NewsWidgetSettings = {
+    category: 'general',
+    country: 'us',
+    keywords: '',
+    articlesToShow: 20,
+    updateInterval: 15,
+    showImages: true,
+    showDescription: true,
+};
+
 
 // --- Available Widget Definitions ---
 export const AVAILABLE_WIDGET_DEFINITIONS: WidgetBlueprint[] = [
@@ -211,5 +223,16 @@ export const AVAILABLE_WIDGET_DEFINITIONS: WidgetBlueprint[] = [
     minColSpan: 12, 
     minRowSpan: 10,
     defaultSettings: GOOGLE_MAPS_DEFAULT_INSTANCE_SETTINGS,
+  },
+  {
+    type: 'news',
+    defaultTitle: 'News Headlines',
+    displayName: 'News',
+    description: 'Live news headlines from around the world.',
+    icon: NewsIcon,
+    defaultSizePreset: 'content_driven_medium',
+    minColSpan: 8,
+    minRowSpan: 10,
+    defaultSettings: NEWS_WIDGET_DEFAULT_INSTANCE_SETTINGS,
   },
 ];
