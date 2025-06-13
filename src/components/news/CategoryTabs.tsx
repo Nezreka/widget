@@ -11,7 +11,7 @@ interface CategoryTabsProps {
 
 const CategoryTabs: React.FC<CategoryTabsProps> = ({ categories, selectedCategory, onSelectCategory }) => {
   return (
-    <div className="flex-shrink-0 overflow-x-auto pb-2 -mx-4 px-4 custom-scrollbar-horizontal">
+    <div className="flex-shrink-0 overflow-x-auto pb-2 custom-scrollbar-horizontal">
       <div className="flex items-center gap-2">
         {categories.map(cat => (
           <div

@@ -82,6 +82,7 @@ const ArticleCard: React.FC<ArticleCardProps> = ({
               alt={article.title}
               layout="fill"
               objectFit="cover"
+              objectPosition="center top"
               className="transform"
               onError={handleImageError}
             />

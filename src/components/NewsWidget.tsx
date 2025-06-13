@@ -38,19 +38,49 @@ interface NewsWidgetProps {
 
 // --- Constants ---
 
-const NEWS_CATEGORIES = ['general', 'business', 'entertainment', 'health', 'science', 'sports', 'technology'];
+const VALID_NEWS_CATEGORIES = ['general', 'business', 'entertainment', 'health', 'science', 'sports', 'technology'];
+const UI_NEWS_CATEGORIES = [...VALID_NEWS_CATEGORIES, 'gaming', 'music'];
 const NEWS_COUNTRIES = ['us', 'gb', 'ca', 'au', 'de', 'fr', 'in', 'jp'];
+
 
 // --- Main Component ---
 
 const NewsWidget: React.FC<NewsWidgetProps> = ({ settings }) => {
   const [selectedCategory, setSelectedCategory] = useState(settings?.category || 'general');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [selectedArticle, setSelectedArticle] = useState<NewsArticle | null>(null);
+  const [activeKeyword, setActiveKeyword] = useState<string | undefined>(undefined);
 
-  const memoizedSettings = useMemo(() => ({
-    ...settings,
-    category: selectedCategory
-  }), [settings, selectedCategory]);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500); // 500ms debounce delay
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchQuery]);
+
+  const handleSelectCategory = (category: string) => {
+    setSelectedCategory(category);
+    if (!VALID_NEWS_CATEGORIES.includes(category)) {
+      setActiveKeyword(category);
+    } else {
+      setActiveKeyword(undefined);
+    }
+    setSearchQuery(''); // Clear search input when a category is clicked
+  };
+  
+  const memoizedSettings = useMemo(() => {
+    const isSpecialCategory = !VALID_NEWS_CATEGORIES.includes(selectedCategory);
+    return {
+      ...settings,
+      category: isSpecialCategory ? 'general' : selectedCategory,
+      keywords: debouncedSearchQuery || activeKeyword || settings?.keywords,
+    };
+  }, [settings, selectedCategory, debouncedSearchQuery, activeKeyword]);
 
   const { articles, loading, error } = useNewsFeed(memoizedSettings);
 
@@ -86,11 +116,24 @@ const NewsWidget: React.FC<NewsWidgetProps> = ({ settings }) => {
       {selectedArticle && (
         <ArticleViewer article={selectedArticle} onClose={handleCloseViewer} />
       )}
-      <CategoryTabs
-        categories={NEWS_CATEGORIES}
-        selectedCategory={selectedCategory}
-        onSelectCategory={setSelectedCategory}
-      />
+      <div className="flex flex-col @xs/news:flex-row items-center justify-between gap-4">
+        <div className="flex-auto overflow-hidden">
+          <CategoryTabs
+            categories={UI_NEWS_CATEGORIES}
+            selectedCategory={selectedCategory}
+            onSelectCategory={handleSelectCategory}
+          />
+        </div>
+        <div className="relative w-full @xs/news:w-auto flex-shrink-0">
+          <input
+            type="text"
+            placeholder="Search articles..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full @xs/news:w-40 px-3 py-2 text-sm rounded-full bg-dark-surface border border-border-interactive focus:ring-2 focus:ring-accent-primary focus:outline-none transition-all focus:w-full @xs/news:focus:w-48"
+          />
+        </div>
+      </div>
 
       {/* Content Area */}
       <div className="flex-grow overflow-y-auto pr-1 custom-scrollbar">
@@ -209,7 +252,7 @@ export const NewsSettingsPanel: React.FC<{
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSettings({ ...settings, category: e.target.value })}
               className={inputClass}
             >
-              {NEWS_CATEGORIES.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
+              {VALID_NEWS_CATEGORIES.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
             </select>
         </div>
         <div>

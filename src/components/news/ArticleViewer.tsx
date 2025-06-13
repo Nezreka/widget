@@ -58,6 +58,7 @@ const ArticleViewer: React.FC<ArticleViewerProps> = ({ article, onClose }) => {
                 alt={article.title}
                 layout="fill"
                 objectFit="cover"
+                objectPosition="center top"
                 className="transform"
                 onError={handleImageError}
               />
