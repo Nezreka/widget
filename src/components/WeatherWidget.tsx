@@ -707,7 +707,7 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
       initial="hidden"
       animate="visible"
       variants={containerVariants}
-      className={`h-full relative overflow-hidden rounded-xl bg-gradient-to-br ${currentCondition?.bg || 'from-blue-500 to-purple-600'} text-white`}
+      className={`@container h-full relative overflow-hidden rounded-xl bg-gradient-to-br ${currentCondition?.bg || 'from-blue-500 to-purple-600'} text-white`}
     >
       {/* Weather Particles */}
       <WeatherParticles type={currentCondition?.particles || 'none'} />
@@ -716,11 +716,11 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
       <div className="absolute inset-0 bg-black/10 backdrop-blur-sm" />
       
       {/* Main Content */}
-      <div className="relative z-10 h-full flex flex-col p-4 sm:p-6">
+      <div className="relative z-10 h-full flex flex-col p-4 @sm:p-6">
         {/* Header with Location and Last Updated */}
-        <motion.div variants={itemVariants} className="flex justify-between items-start mb-4">
+        <motion.div variants={itemVariants} className="flex justify-between items-start mb-4 @compact:hidden">
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold truncate">
+            <h2 className="text-xl @sm:text-2xl font-bold truncate">
               {weatherData.location.name}
             </h2>
             <p className="text-sm opacity-75">
@@ -752,22 +752,22 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
                 repeat: Infinity, 
                 ease: "easeInOut" 
               }}
-              className="text-8xl sm:text-9xl mb-4"
+              className="text-8xl @sm:text-9xl mb-4 @micro:text-6xl"
             >
               {currentCondition?.emoji}
             </motion.div>
 
             {/* Temperature */}
             <motion.div variants={temperatureVariants} className="mb-4">
-              <div className="text-6xl sm:text-7xl font-light">
+              <div className="text-6xl @sm:text-7xl font-light @micro:text-4xl">
                 <AnimatedCounter 
                   value={Math.round(weatherData.current.temperature || 0)} 
                   duration={1500}
                 />
-                <span className="text-4xl">{unitSymbol}</span>
+                <span className="text-4xl @micro:text-2xl">{unitSymbol}</span>
               </div>
               {weatherData.current.temperatureApparent !== undefined && (
-                <p className="text-lg opacity-80">
+                <p className="text-lg opacity-80 @compact:hidden">
                   Feels like {Math.round(weatherData.current.temperatureApparent)}{unitSymbol}
                 </p>
               )}
@@ -777,7 +777,7 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
           {/* Weather Details Grid */}
           <motion.div 
             variants={itemVariants}
-            className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6"
+            className="grid grid-cols-2 @standard:grid-cols-4 @detailed:grid-cols-1 @full:grid-cols-4 gap-4 mb-6 @compact:hidden"
           >
             {weatherData.current.humidity !== undefined && (
               <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center">
@@ -815,9 +815,9 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
 
         {/* Extended Forecast */}
         {settings?.showExtendedForecast && (
-          <motion.div variants={itemVariants} className="mt-auto">
+          <motion.div variants={itemVariants} className="mt-auto @standard:hidden">
             {/* View Toggle */}
-            <div className="flex justify-center mb-4">
+            <div className="flex justify-center mb-4 @detailed:hidden">
               <div className="bg-white/10 backdrop-blur-sm rounded-lg p-1 flex">
                 {(['current', 'hourly', 'daily'] as const).map((view) => (
                   <button
@@ -875,7 +875,7 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="space-y-2"
+                  className="space-y-2 @detailed:hidden"
                 >
                   {weatherData.daily.slice(0, 5).map((day, index) => (
                     <div
@@ -915,6 +915,84 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ settings }) => {
             </AnimatePresence>
           </motion.div>
         )}
+        <div className="hidden @detailed:block">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key="hourly"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="overflow-x-auto"
+            >
+              <div className="flex space-x-4 pb-2">
+                {weatherData.hourly.slice(0, 12).map((hour) => (
+                  <div
+                    key={hour.time}
+                    className="flex-shrink-0 bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center min-w-[80px]"
+                  >
+                    <div className="text-xs opacity-75 mb-1">{hour.hour}</div>
+                    <div className="text-2xl mb-1">
+                      {getWeatherCondition(hour.weatherCode).emoji}
+                    </div>
+                    <div className="text-sm font-semibold">
+                      {hour.temperature ? Math.round(hour.temperature) : '--'}{unitSymbol}
+                    </div>
+                    {hour.precipitationProbability !== undefined && (
+                      <div className="text-xs opacity-60 mt-1">
+                        {Math.round(hour.precipitationProbability)}%
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+        <div className="hidden @full:block">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key="daily"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-2"
+            >
+              {weatherData.daily.slice(0, 5).map((day, index) => (
+                <div
+                  key={day.time}
+                  className="bg-white/10 backdrop-blur-sm rounded-lg p-3 flex items-center justify-between"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="text-2xl">
+                      {getWeatherCondition(day.weatherCode).emoji}
+                    </div>
+                    <div>
+                      <div className="font-medium">
+                        {index === 0 ? 'Today' : day.day}
+                      </div>
+                      <div className="text-xs opacity-75">
+                        {getWeatherCondition(day.weatherCode).name}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-semibold">
+                      {day.temperatureMax ? Math.round(day.temperatureMax) : '--'}°
+                      <span className="text-sm opacity-60 ml-1">
+                        {day.temperatureMin ? Math.round(day.temperatureMin) : '--'}°
+                      </span>
+                    </div>
+                    {day.precipitationProbability !== undefined && (
+                      <div className="text-xs opacity-60">
+                        {Math.round(day.precipitationProbability)}% rain
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </motion.div>
+          </AnimatePresence>
+        </div>
       </div>
 
       {/* Custom CSS for animations */}
