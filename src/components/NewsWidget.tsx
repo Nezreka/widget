@@ -6,6 +6,7 @@ import { useNewsFeed } from '../hooks/useNewsFeed';
 import ArticleCard from './news/ArticleCard';
 import ArticleSkeleton from './news/ArticleSkeleton';
 import CategoryTabs from './news/CategoryTabs';
+import ArticleViewer from './news/ArticleViewer';
 
 // --- Types ---
 
@@ -44,6 +45,7 @@ const NEWS_COUNTRIES = ['us', 'gb', 'ca', 'au', 'de', 'fr', 'in', 'jp'];
 
 const NewsWidget: React.FC<NewsWidgetProps> = ({ settings }) => {
   const [selectedCategory, setSelectedCategory] = useState(settings?.category || 'general');
+  const [selectedArticle, setSelectedArticle] = useState<NewsArticle | null>(null);
 
   const memoizedSettings = useMemo(() => ({
     ...settings,
@@ -71,8 +73,19 @@ const NewsWidget: React.FC<NewsWidgetProps> = ({ settings }) => {
   const featuredArticle = articles.length > 0 ? articles[0] : null;
   const otherArticles = articles.slice(1);
 
+  const handleArticleSelect = (article: NewsArticle) => {
+    setSelectedArticle(article);
+  };
+
+  const handleCloseViewer = () => {
+    setSelectedArticle(null);
+  };
+
   return (
     <div className="@container/news w-full h-full flex flex-col bg-dark-surface/50 text-primary overflow-hidden p-4 space-y-4">
+      {selectedArticle && (
+        <ArticleViewer article={selectedArticle} onClose={handleCloseViewer} />
+      )}
       <CategoryTabs
         categories={NEWS_CATEGORIES}
         selectedCategory={selectedCategory}
@@ -115,6 +128,7 @@ const NewsWidget: React.FC<NewsWidgetProps> = ({ settings }) => {
                       isFeatured
                       showImages={settings?.showImages !== false}
                       showDescription={settings?.showDescription !== false}
+                      onArticleSelect={() => handleArticleSelect(featuredArticle)}
                     />
                   </motion.div>
                 )}
@@ -131,6 +145,7 @@ const NewsWidget: React.FC<NewsWidgetProps> = ({ settings }) => {
                         article={article}
                         showImages={settings?.showImages !== false}
                         showDescription={settings?.showDescription !== false}
+                        onArticleSelect={() => handleArticleSelect(article)}
                       />
                     ))}
                   </motion.div>
